@@ -11,7 +11,7 @@
 
 ## Import Survey Data
 firm_dt <- as.data.table(
-  read_dta(paste0("../../../3output_data/main_empsurvey_cleaned_", date, ".dta")))
+  read_dta(paste0(data_root, "3output_data/main_empsurvey_cleaned_", date, ".dta")))
 
   #### Drop Incomplete
   firm_dt <- firm_dt[D_mainsample == 1]
@@ -44,26 +44,26 @@ firm_dt <- as.data.table(
   
 ## Import Student Data
 student_dt <- as.data.table(
-  read_csv(paste0("../../../3output_data/main_empsurvey_student.csv")))
+  read_csv(paste0(data_root, "3output_data/main_empsurvey_student.csv")))
 
   
 ##### ##### ##### Import Distribution Data ##### ##### ##### 
   
 ## Import Qualtrics Distribution Data
 qualtrics_distribution_dt <- as.data.table(
-  read_csv("../../../3output_data/main_empsurvey_distribution_final.csv"))
+  read_csv(paste0(data_root, "3output_data/main_empsurvey_distribution_final.csv")))
 
 ## Import Apollo Data
 
   #### HR's Firm Data
-  path <- "../../../15firm_recruitment/B_Contact_Sources"  
+  path <- paste0(data_root, "15firm_recruitment/B_Contact_Sources")
   hr_files <- list.files(path, pattern = "(?i)HR.*\\.csv$", full.names = TRUE)
   apollo_hr_dt <- rbindlist(lapply(hr_files, fread), fill = TRUE)
   setDT(apollo_hr_dt)
   rm(path, hr_files)
   
   #### Eng's Firm Data
-  path <- "../../../15firm_recruitment/B_Contact_Sources"  
+  path <- paste0(data_root, "15firm_recruitment/B_Contact_Sources")
   eng_files <- list.files(path, pattern = "(?i)ENG.*\\.csv$", full.names = TRUE)
   apollo_eng_dt <- rbindlist(lapply(eng_files, fread), fill = TRUE)
   setDT(apollo_eng_dt)
@@ -75,7 +75,7 @@ qualtrics_distribution_dt <- as.data.table(
   
 ## Import Student Data
 crunchbase_dt <- as.data.table(
-  read_csv(paste0("../../../3output_data/main_empsurvey_clean_firm_names.csv")))
+  read_csv(paste0(data_root, "3output_data/main_empsurvey_clean_firm_names.csv")))
   
 
 # ##### ##### ##### Import Dynamic Weights Data ##### ##### ##### 

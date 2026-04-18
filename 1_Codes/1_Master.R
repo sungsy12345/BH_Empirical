@@ -16,6 +16,10 @@ rm(list=ls())
 # Identify Data Version We Want To Use
 date <- "18mar2026"
 
+# Root of the canonical (read-only) Dropbox data folder. All scripts read
+# raw and intermediate data from here. Nothing is ever written back.
+data_root <- "C:/Users/sungs/Dropbox/2_Research/A_By_Topics/A_Blind_hiring/"
+
 
 ## -------------------- PREAMBLE --------------------
 
@@ -42,26 +46,30 @@ knitr::opts_chunk$set(echo = FALSE) # When knitting, print the code
 ## -------------------- RUN CODES --------------------
 
 ## Import Firm Side Survey Data
-source(here("2_Import.R"))
+source(here("1_Codes", "2_Import.R"))
+
+## ----- Steps below are temporarily disabled. -----
+## Re-enable them one at a time as each script is migrated and its data
+## paths are updated for the new BH_Empirical/1_Codes layout.
 
 ## Firm Name Cleaning
-source(here("3_Firm_Cleaning.R"))
+# source(here("1_Codes", "3_Firm_Cleaning.R"))
 
 ## Distribution Cleaning
-source(here("4_Distribution_Cleaning.R"))
+# source(here("1_Codes", "4_Distribution_Cleaning.R"))
 
 ## Data Cleaning
-source(here("5_Cleaning.R"))
+# source(here("1_Codes", "5_Cleaning.R"))
 
 ## Create Matching Output
-source(here("6_Hiring_Simulation.R"))
+# source(here("1_Codes", "6_Hiring_Simulation.R"))
 
 ## Analysis
-rmarkdown::render("7_Descriptive.Rmd")
-rmarkdown::render("8A_Preferences.Rmd")
-rmarkdown::render("8B_Stage_BH.Rmd")
-# rmarkdown::render("8C_Dynamic_BH.Rmd")
-# rmarkdown::render("8C_Dynamic_BH_Jobs.Rmd")
+# rmarkdown::render(here("1_Codes", "7_Descriptive.Rmd"))
+# rmarkdown::render(here("1_Codes", "8A_Preferences.Rmd"))
+# rmarkdown::render(here("1_Codes", "8B_Stage_BH.Rmd"))
+# rmarkdown::render(here("1_Codes", "8C_Dynamic_BH.Rmd"))
+# rmarkdown::render(here("1_Codes", "8C_Dynamic_BH_Jobs.Rmd"))
 
 ## Results
-rmarkdown::render("9_Final_Results.Rmd")
+# rmarkdown::render(here("1_Codes", "9_Final_Results.Rmd"))
