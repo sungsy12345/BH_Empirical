@@ -105,9 +105,6 @@
     levels = c("Complete_BH", "Realistic_BH", "Control")
   )]
   
-  #### Output
-  fwrite(matching_crosswalk, paste0("../../../3output_data/matching_crosswalk", date, ".csv"))
-  
   rm(hr_blind, hr_nonblind,
      eng_blind, eng_nonblind,
      nonblind_pairs,

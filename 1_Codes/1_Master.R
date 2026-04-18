@@ -48,21 +48,21 @@ knitr::opts_chunk$set(echo = FALSE) # When knitting, print the code
 ## Import Firm Side Survey Data
 source(here("1_Codes", "2_Import.R"))
 
-## ----- Steps below are temporarily disabled. -----
-## Re-enable them one at a time as each script is migrated and its data
-## paths are updated for the new BH_Empirical/1_Codes layout.
-
 ## Firm Name Cleaning
-# source(here("1_Codes", "3_Firm_Cleaning.R"))
+source(here("1_Codes", "3_Firm_Cleaning.R"))
 
 ## Distribution Cleaning
-# source(here("1_Codes", "4_Distribution_Cleaning.R"))
+source(here("1_Codes", "4_Distribution_Cleaning.R"))
 
 ## Data Cleaning
-# source(here("1_Codes", "5_Cleaning.R"))
+source(here("1_Codes", "5_Cleaning.R"))
 
 ## Create Matching Output
-# source(here("1_Codes", "6_Hiring_Simulation.R"))
+source(here("1_Codes", "6_Hiring_Simulation.R"))
+
+## ----- Steps below are temporarily disabled. -----
+## Re-enable them one at a time as each Rmd is migrated and its data
+## paths are updated for the new BH_Empirical/1_Codes layout.
 
 ## Analysis
 # rmarkdown::render(here("1_Codes", "7_Descriptive.Rmd"))

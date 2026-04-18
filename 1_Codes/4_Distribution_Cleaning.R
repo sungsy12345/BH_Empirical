@@ -36,6 +36,6 @@ apollo_eng_dt[, finished := fifelse(!is.na(Email) & tolower(Email) %chin% finish
 rm(emailed_vec, bounced_vec, attempted_vec, finished_vec)
 
 ## Combine HR and Engineer Distribution Database
-apollo_combined_dt <- rbind(apollo_hr_dt[, role := "HR"], apollo_eng_dt[, role := "Eng"])
+apollo_combined_dt <- rbind(apollo_hr_dt[, role := "HR"], apollo_eng_dt[, role := "Eng"], fill = TRUE)
 apollo_combined_dt[, role := factor(role, levels = c("HR", "Eng"))]
 rm(apollo_hr_dt, apollo_eng_dt)
