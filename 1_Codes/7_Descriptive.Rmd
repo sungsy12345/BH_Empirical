@@ -288,7 +288,7 @@ temp_dt <- temp_dt %>%
   )
 
 
-ggplot(temp_dt, aes(x = reorder(eng_versed, proportion), y = proportion, fill = eng_versed)) +
+ggplot(temp_dt, aes(x = fct_rev(eng_versed), y = proportion, fill = eng_versed)) +
   geom_col(show.legend = FALSE) +
   geom_text(aes(label = scales::percent(proportion)), hjust = -0.1, size = 4) +
   coord_flip() +
@@ -303,7 +303,7 @@ rm(temp_dt)
 \newpage
 ## Position Hiring For
 
-```{r positions_hiring, echo = FALSE}
+```{r positions_hiring, echo = FALSE, fig.width = 10, fig.height = 6}
 
 # Job Labels
 job_labels <- c(
@@ -896,7 +896,7 @@ rm(covars_dei, covars_firm_demo, covars_resp_demo, covars_resp_demo2,
 
 ## Proportion of Candidates Passed to Next Stage
 
-```{r advance_selfreport, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+```{r advance_selfreport, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE, fig.align = 'center'}
 
 temp <- firm_dt[!is.na(s4_application_num) & !is.na(s4_interview_num) & s4_application_num != 0, s4_advance_rate := s4_interview_num / s4_application_num * 100]
 
@@ -924,7 +924,7 @@ rm(temp, mean_stats)
 \clearpage
 ## (HR) Number Candidates Passed to Next Stage
 
-```{r advance_experiment, echo = FALSE, results = 'asis'}
+```{r advance_experiment, echo = FALSE, results = 'asis', fig.align = 'center'}
 
 temp <- unique(firm_long_dt[role == "HR", counts_advanced := sum(sc_advance), by = .(responseid)][role == "HR", .(role, responseid, counts_advanced)])
 
@@ -951,7 +951,7 @@ rm(temp, mean_stats)
 \clearpage
 ## (HR) Correlation between Self Reported Advance Rate and Experimental Advance Rate
 
-```{r corr_advance, echo = FALSE, results = 'asis'}
+```{r corr_advance, echo = FALSE, results = 'asis', fig.align = 'center'}
 
 temp1 <- firm_dt[!is.na(s4_application_num) & !is.na(s4_interview_num) & s4_application_num != 0, s4_advance_rate := s4_interview_num / s4_application_num * 100][!is.na(s4_advance_rate), .(responseid, s4_advance_rate)]
 
@@ -978,7 +978,7 @@ rm(temp1, temp2, temp3, cor_val)
 \clearpage  
 ## Correlation between IRR (want to receive resumes) and median time spent on resumes
 
-```{r IRR_time, echo = FALSE, results = 'asis'}
+```{r IRR_time, echo = FALSE, results = 'asis', fig.align = 'center'}
 
 temp <- unique(firm_long_dt[, timeonpage_median := median(timeonpage), by = .(responseid)][, .(responseid, role, IRR_ever, timeonpage_median)])
 
@@ -1009,7 +1009,7 @@ rm(temp)
 \newpage
 ## Relationship between Time Spent on Evaluation by Treatment
 
-```{r blinding_time, echo = FALSE, results = 'asis'}
+```{r blinding_time, echo = FALSE, results = 'asis', fig.align = 'center'}
 
 temp <- unique(firm_long_dt[, timeonpage_median := median(timeonpage), by = .(responseid)][, .(responseid, role, treat, timeonpage_median)])
 
@@ -1040,31 +1040,60 @@ rm(temp)
 
 
 \newpage
-## (Causal) Relationship between Time Spent on and Off the Evaluation by Treatment
+## (Causal) Relationship between Time Spent On and Off the Evaluation by Treatment
 
 ```{r blinding_time_causal, echo = FALSE, results = 'asis'}
 
+# --- Time On Page ---
 model_timeon_hr  <- feols(timeonpage ~ treat + resp_age | r_do + resume_index + resp_gender + resp_race, firm_long_dt[role == "HR"], vcov = ~ responseid)
 model_timeon_eng <- feols(timeonpage ~ treat + resp_age | r_do + resume_index + resp_gender + resp_race + resp_python + resp_java, firm_long_dt[role == "Eng"], vcov = ~ responseid)
 
-modelsummary(list("HR" = model_timeon_hr, "Engineers" = model_timeon_eng),
-             stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
-             title = "Effect of Treatment on Time Spent on Page (Fixed Effects)",
-             output = "latex",
-             coef_map = c("treatblind" = "Blind Treatment"))
+tbl_on <- modelsummary(list("HR" = model_timeon_hr, "Engineers" = model_timeon_eng),
+                       stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+                       output = "latex",
+                       float = FALSE,
+                       coef_map = c("treatblind" = "Blind Treatment"),
+                       gof_omit = "R2 Within|AIC|BIC|RMSE")
 
+# --- Time Off Page ---
 model_timeoff_hr  <- feols(timeoffpage ~ treat + resp_age | r_do + resume_index + resp_gender + resp_race, firm_long_dt[role == "HR"], vcov = ~ responseid)
 model_timeoff_eng <- feols(timeoffpage ~ treat + resp_age | r_do + resume_index + resp_gender + resp_race + resp_python + resp_java, firm_long_dt[role == "Eng"], vcov = ~ responseid)
 
-modelsummary(list("HR" = model_timeoff_hr, "Engineers" = model_timeoff_eng),
-             stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
-             title = "Effect of Treatment on Time Spent off Page (Fixed Effects)",
-             output = "latex",
-             float = FALSE,
-             coef_map = c("treatblind" = "Blind Treatment"))
+tbl_off <- modelsummary(list("HR" = model_timeoff_hr, "Engineers" = model_timeoff_eng),
+                        stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+                        output = "latex",
+                        float = FALSE,
+                        coef_map = c("treatblind" = "Blind Treatment"),
+                        gof_omit = "R2 Within|AIC|BIC|RMSE")
+
+# --- Render side-by-side via LaTeX minipages ---
+# modelsummary wraps its tabular in \begin{table}...\end{table} even with
+# float = FALSE. That outer floating environment is what fails inside a
+# minipage with "Not in outer par mode". Strip it so we have a bare tabular,
+# then add titles manually as bold text above each minipage.
+strip_table_env <- function(x) {
+  s <- paste(as.character(x), collapse = "\n")
+  s <- gsub("\\\\begin\\{table\\}[^\n]*\n?", "", s)
+  s <- gsub("\\\\end\\{table\\}\\s*", "", s)
+  s
+}
+
+cat("\\noindent\\begin{tabular}{@{}c@{\\hspace{1em}}c@{}}\n")
+cat("\\begin{minipage}[t]{0.48\\linewidth}\\centering\n")
+cat("\\textbf{Effect of Treatment on Time Spent On Page (Fixed Effects)}\\par\\smallskip\n")
+cat(strip_table_env(tbl_on))
+cat("\n\\end{minipage} &\n")
+cat("\\begin{minipage}[t]{0.48\\linewidth}\\centering\n")
+cat("\\textbf{Effect of Treatment on Time Spent Off Page (Fixed Effects)}\\par\\smallskip\n")
+cat(strip_table_env(tbl_off))
+cat("\n\\end{minipage}\n")
+cat("\\end{tabular}\n")
+
+rm(strip_table_env)
 
 rm(model_timeon_hr, model_timeon_eng,
-   model_timeoff_hr, model_timeoff_eng)
+   model_timeoff_hr, model_timeoff_eng,
+   tbl_on, tbl_off)
 
 ```
 
@@ -1129,9 +1158,10 @@ model_open_code2 <- feols(open_code2 ~ treat + resp_age | r_do + resume_index + 
 modelsummary(list("P(Open Res)" = model_open_res, "P(Open Code 1)" = model_open_code1, "P(Open Code 2)" = model_open_code2),
              stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
              title = "Effect of Treatment on Rate of Opening Res / Codes",
-             output = "latex",
-             float = FALSE,
-             coef_map = c("treatblind" = "Blind Treatment"))
+             output = "kableExtra",
+             coef_map = c("treatblind" = "Blind Treatment"),
+             gof_omit = "R2 Within|AIC|BIC|RMSE") %>%
+  kable_styling(latex_options = "HOLD_position")
 
 rm(model_open_res, model_open_code1, model_open_code2)
 
