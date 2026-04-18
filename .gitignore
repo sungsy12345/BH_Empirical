@@ -47,3 +47,50 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# =============================================================================
+# Data files — NEVER commit
+# Per CLAUDE.md rule #3: BH_Empirical is a git repo and may be pushed to a
+# remote. Raw and processed datasets must remain in the Dropbox source folder
+# and never enter this repository.
+# =============================================================================
+
+# Tabular / delimited
+*.csv
+*.tsv
+*.psv
+*.txt.gz
+
+# R-native serialization (note: .RData already covered above)
+*.rds
+*.rda
+
+# Columnar / binary
+*.parquet
+*.feather
+*.arrow
+*.h5
+*.hdf5
+
+# Other statistical software
+*.dta
+*.sav
+*.por
+*.sas7bdat
+*.xpt
+
+# Spreadsheets
+*.xlsx
+*.xls
+*.xlsm
+
+# Databases
+*.sqlite
+*.sqlite3
+*.db
+*.duckdb
+
+# Whole-folder safeguards (uncomment & adjust if you create these)
+# data/
+# raw_data/
+# processed_data/
