@@ -1,0 +1,1457 @@
+---
+title: "7_Descriptive"
+output:
+  pdf_document:
+    number_sections: true
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{threeparttable}  
+  - \usepackage{float}  
+  - \usepackage{placeins}
+geometry: margin=0.5in, landscape
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r fix_unicode_error, include=FALSE}
+
+## Fix Unicode Errors
+
+  #### Clean characters: Remove ALL non-ASCII characters (including U+0080, U+0099, etc.)
+  firm_dt_cleaned <- lapply(firm_dt, function(x) {
+    if (is.character(x)) {
+      # iconv with sub="" removes any character that doesn't fit in standard ASCII
+      return(iconv(x, "UTF-8", "ASCII", sub = ""))
+    }
+    return(x)
+  })
+
+  #### Restore data.table status so := works in your next chunk
+  setDT(firm_dt_cleaned)
+
+  #### Replace the original object
+  firm_dt <- firm_dt_cleaned
+  
+rm(firm_dt_cleaned)
+
+```
+
+
+
+<!-- +++++ ++++++ ++++++ Part 1: Counts +++++ ++++++ ++++++ -->
+
+
+# Counts
+
+```{r counts, echo=FALSE}
+
+##### ##### Counts by Role and Treatment ##### #####
+
+table_counts <- addmargins(xtabs(~ role + treat, data = firm_dt), 2)
+
+kable(table_counts, format = "latex", booktabs = TRUE,
+      caption = "Counts by Role and Treatment") %>%
+  kable_styling(latex_options = "HOLD_position")
+
+rm(table_counts)
+
+
+##### ##### Counts by Versions ##### #####
+
+table_counts_ver <- xtabs(~ role + resume_ver, data = firm_dt)
+
+kable(
+  table_counts_ver,
+  format = "latex",
+  booktabs = TRUE,
+  caption = "Counts by Versions") %>%
+  kable_styling(latex_options = "HOLD_position")
+
+rm(table_counts_ver)
+
+
+##### ##### BH: Matched Pairs ##### #####
+
+table_counts_arms <- addmargins(xtabs(~ arm + resume_ver_eng, data = matching_crosswalk),2)
+
+kable(
+  table_counts_arms[, c(9)],
+  format = "latex",
+  booktabs = TRUE,
+  col.names = "Number of Pairs",
+  caption = "Counts by Matched Pairs") %>%
+  kable_styling(latex_options = "HOLD_position")
+
+rm(table_counts_arms)
+
+```
+
+\newpage
+## Distribution and Response Rate (Completed / Emailed)
+
+```{r distribution, echo = FALSE}
+
+# Total Email Count (Excluding Bounced)
+paste("Number of Emails Addresses Survey was Distributed to (not counting bounced emails):", uniqueN(qualtrics_distribution_dt[!`Status` %in% c("Email Hard Bounce", "Email Soft Bounce", "Email Failed"), `Email Address`]))
+
+# Response Rate (Finished)
+status_priority <- c("Survey Finished" = 1, "Survey Partially Finished" = 2, "Survey Started" = 3,
+                      "Survey Reopened" = 4, "Session Expired" = 5, "Email Blocked" = 6,
+                      "Email Opened" = 7, "Email Sent" = 8)
+
+paste("Response Rate (%): ", round(uniqueN(qualtrics_distribution_dt[!`Status` %in% c("Email Hard Bounce", "Email Soft Bounce", "Email Failed")][, priority := status_priority[`Status`]][order(priority)][!duplicated(`Email Address`)] [, priority := NULL][`Status` == "Survey Finished", `Email Address`]) / uniqueN(qualtrics_distribution_dt[!`Status` %in% c("Email Hard Bounce", "Email Soft Bounce", "Email Failed"), `Email Address`]) * 100, 2))
+
+rm(status_priority)
+
+```
+
+
+
+\newpage
+<!-- +++++ ++++++ ++++++ Part 2: Demographics +++++ ++++++ ++++++ -->
+
+# Participant Demographics
+
+## Summary Table
+
+```{r demo_table, echo = FALSE, results = 'asis'}
+
+## Set global option to prevent tinytable/siunitx issues
+options("modelsummary_format_numeric_latex" = "plain")
+options(modelsummary_factory_latex = "kableExtra")
+
+## Variables that needs to be converted from proportion to percentage
+pct_cols <- c("resp_female", "resp_male", "resp_nonbinaryother",
+              "resp_white", "resp_asian", "resp_hispanic", "resp_black", "resp_raceother",
+              "resp_educ_uniabove",
+              "resp_income_100ormore",
+              "ucb_yes",
+              "firm_size_small", "firm_size_mid", "firm_size_large",
+              "ats_yes", "bh_race", "bh_gender",
+              "currentlyhiring_yes",
+              "IRR_ever")
+
+## Generate Descriptive Table
+modelsummary::datasummary(
+  (`Age` = resp_age) +
+    (`Gender: Female (%)` = resp_female) +
+    (`Gender: Male (%)` = resp_male) +
+    (`Gender: Non-binary / Other (%)` = resp_nonbinaryother) +
+    (`Race: White (%)` = resp_white) +
+    (`Race: Asian (%)` = resp_asian) +
+    (`Race: Hispanic (%)` = resp_hispanic) +
+    (`Race: Black (%)` = resp_black) +
+    (`Race: Other (%)` = resp_raceother) +
+    (`Edu: Have college degree (%)` = resp_educ_uniabove) +
+    (`Exp: No. Years at Current Firm` = s2_firm_howlong_in_years) +
+    (`Exp: No. Years Recruiting`= s4_recruiting_in_years) +
+    (`Exp: Interacted with UCB CS Student (%)` = ucb_yes) +
+    (`Firm Size: Less than 100 (%)` = firm_size_small) +
+    (`Firm Size: 100 ~ 999 (%)` = firm_size_mid) +
+    (`Firm Size: More than 1000 (%)` = firm_size_large) +
+    (`Firm Hiring Policy: Uses ATS (%)` = ats_yes) +
+    (`Firm Hiring Policy: Blinds Race (%)` = bh_race)  +
+    (`Firm Hiring Policy: Blinds Gender (%)` = bh_gender) +
+    (`IRR: Firm Currently Hiring (%)` = currentlyhiring_yes) +
+    (`IRR: Wants to be Matched to UCB CS Candidate (%)` = IRR_ever) ~
+     mean * role,
+  data = copy(firm_dt)[, (pct_cols) := lapply(.SD, function(x) x * 100), .SDcols = pct_cols],
+  title = "Participant Demographics",
+  fmt = 1,
+  output = "kableExtra") %>%
+  kable_styling(latex_options = c("scale_down", "HOLD_position")) %>%
+  # Use pack_rows to create your Panels A and B
+  pack_rows("Panel A: Individual Characteristics", 1, 13) %>%
+  pack_rows("Panel B: Firm Characteristics", 14, 21)
+
+rm(pct_cols)
+```
+
+\newpage
+## Primary Industry
+
+```{r demo_firm_industry, echo = FALSE, results = 'asis'}
+
+##### ##### Prep: Industry ##### #####
+
+industry_dict <- c(
+  "1" = "Accounting",
+  "2" = "Advertising",
+  "3" = "Agriculture/Fishing",
+  "4" = "Architecture",
+  "5" = "Automotive",
+  "6" = "Aviation",
+  "7" = "Banking/Financial",
+  "8" = "Bio-Tech",
+  "9" = "Brokerage",
+  "10" = "Carpentry/Electrical installations",
+  "11" = "Chemicals/Plastics/Rubber",
+  "12" = "Communications/Information",
+  "13" = "Computer Hardware",
+  "14" = "Computer Reseller (software/hardware)",
+  "15" = "Computer Software",
+  "16" = "Construction",
+  "17" = "Consulting",
+  "18" = "Consumer Electronics",
+  "19" = "Consumer Packaged Goods",
+  "20" = "Education",
+  "21" = "Energy/Utilities/Oil and Gas",
+  "22" = "Engineering",
+  "23" = "Environmental Services",
+  "24" = "Fashion/Apparel",
+  "25" = "Food/Beverage",
+  "26" = "Government/Public Sector",
+  "27" = "Healthcare",
+  "28" = "Hospitality/Tourism",
+  "29" = "Human Resources",
+  "30" = "Information Technology/IT",
+  "31" = "Insurance",
+  "32" = "Internet",
+  "33" = "Legal/Law",
+  "34" = "Manufacturing",
+  "35" = "Marketing",
+  "36" = "Market Research",
+  "37" = "Media/Entertainment",
+  "38" = "Military",
+  "39" = "Non Profit/Social services",
+  "40" = "Personal Services",
+  "41" = "Pharmaceuticals",
+  "42" = "Printing/Publishing",
+  "43" = "Public Relations",
+  "44" = "Real Estate/Property",
+  "45" = "Retail/Wholesale trade",
+  "46" = "Sales",
+  "47" = "Security",
+  "48" = "Shipping/Distribution",
+  "49" = "Telecommunications",
+  "50" = "Transportation",
+  "96" = "Other (write-in)"
+)
+
+## Industries (HR Only)
+table_hr <- firm_dt[role == "HR", .N, by = .(s2_firm_industry)][order(-N)]
+table_hr[, Industry := industry_dict[as.character(s2_firm_industry)]]
+table_hr <- table_hr[order(Industry == "Other (write-in)", -N), .(Industry, N)]
+
+## Industries (Engineer Only)
+table_eng <- firm_dt[role == "Eng", .N, by = .(s2_firm_industry)][order(-N)]
+table_eng[, Industry := industry_dict[as.character(s2_firm_industry)]]
+table_eng <- table_eng[order(Industry == "Other (write-in)", -N), .(Industry, N)]
+
+# 1. Create a row index to facilitate a side-by-side merge
+table_hr[, row_id := .I]
+table_eng[, row_id := .I]
+
+# 2. Outer join the two tables on the row index to align them perfectly
+combined_industry <- merge(table_hr, table_eng, by = "row_id", all = TRUE, suffixes = c("_hr", "_eng"))
+
+# 3. Clean up: Remove the ID and replace NA values with empty strings/blank space
+combined_industry[, row_id := NULL]
+combined_industry[is.na(Industry_hr), Industry_hr := ""]
+combined_industry[is.na(Industry_eng), Industry_eng := ""]
+
+# 4. Produce a single table with four columns
+combined_industry %>%
+  kbl(format = "latex", 
+      booktabs = TRUE, 
+      align = "lrlr", 
+      col.names = c("HR Professionals", "N", "Software Engineers", "N"),
+      caption = "Industry Distribution (Self-Reported)") %>%
+  kable_styling(latex_options = c("hold_position", "scale_down"))
+
+rm(industry_dict, table_hr, table_eng, combined_industry)
+
+```
+
+\newpage
+## Coding Lanugages (Python and Java)
+Note: Of 18 candidates presented, 16 tested in Python, an 2 tested in Java
+
+```{r demo_coding_language, echo = FALSE, results = 'asis'}
+
+temp_dt <- firm_dt[role == "Eng", .(resp_java, resp_python)]
+invisible(temp_dt[, eng_versed := fifelse(resp_python == 1 & resp_java == 1, "Both",
+                                          fifelse(resp_python == 1 & resp_java == 0, "Python Only",
+                                                  fifelse(resp_python == 0 & resp_java == 1, "Java Only",
+                                                          fifelse(resp_python == 0 & resp_java == 0, "Neither", NA_character_))))])
+
+temp_dt[, eng_versed := factor(eng_versed, levels = c("Both", "Python Only", "Java Only", "Neither"))]
+
+temp_dt <- temp_dt %>%
+  count(eng_versed) %>%
+  arrange(eng_versed) %>%
+  mutate(
+    proportion = n / sum(n),
+    percent_label = paste0(eng_versed, "\n", scales::percent(proportion))
+  )
+
+
+ggplot(temp_dt, aes(x = reorder(eng_versed, proportion), y = proportion, fill = eng_versed)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = scales::percent(proportion)), hjust = -0.1, size = 4) +
+  coord_flip() +
+  scale_y_continuous(labels = scales::percent, expand = expansion(mult = c(0, 0.15))) +
+  theme_minimal() +
+  labs(x = NULL, y = NULL, title = "Proportion of Engineers Qualified to Evaluate in Python & Java")
+
+rm(temp_dt)
+
+```
+
+\newpage
+## Position Hiring For
+
+```{r positions_hiring, echo = FALSE}
+
+# Job Labels
+job_labels <- c(
+  "1" = "AI Engineer", 
+  "2" = "Back-End Developer", 
+  "3" = "Blockchain Developer",
+  "4" = "Computer Hardware Engineer", 
+  "5" = "Cloud Engineer", 
+  "6" = "Front-End Developer",
+  "7" = "Full-Stack Developer", 
+  "8" = "Information Security Analyst",
+  "9" = "Machine Learning Engineer", 
+  "10" = "Mobile App Developer",
+  "11" = "Network Engineer",
+  "12" = "Project Manager", 
+  "13" = "Software Developer/Engineer",
+  "14" = "System Architect",
+  "15" = "Web Designer",
+  "16" = "UX Designer",
+  "17" = "Video Game Developer"
+)
+
+# Function to create job summary and plot
+plot_jobs_by_role <- function(dt, role_name) {
+  job_cols <- paste0("job_", 1:17)
+  job_summary <- data.table(
+    job_name = job_labels[as.character(1:17)],
+    count = dt[role == role_name, sapply(.SD, sum, na.rm = TRUE), .SDcols = job_cols]
+  )
+  job_summary[, job_name := factor(job_name, levels = rev(job_labels))]
+  
+  ggplot(job_summary, aes(x = job_name, y = count)) +
+    geom_col(fill = "steelblue") +
+    geom_text(aes(label = count), hjust = -0.1, size = 3.5) +
+    coord_flip() +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+    theme_minimal() +
+    labs(x = NULL, y = "Count", title = paste0("(",role_name, ") Hiring"))
+}
+
+p_hr <- plot_jobs_by_role(firm_dt, "HR")
+p_eng <- plot_jobs_by_role(firm_dt, "Eng")
+
+combined_plot <- p_hr + p_eng
+print(combined_plot)
+
+rm(job_labels, plot_jobs_by_role, p_hr, p_eng, combined_plot)  
+```
+
+
+
+\newpage
+## Residence Location
+
+```{r location, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', out.width='100%'}
+
+## HR and Engineer Residence Locations
+
+  #### Extract 5 Digit Zip Code
+  df_zip <- firm_dt %>%
+    mutate(zip5 = str_extract(as.character(s6_address_5), "\\d{5}")) %>%
+    filter(!is.na(zip5)) %>%
+    distinct(zip5)
+  
+  #### Lookup to States
+  zip_crosswalk <- zipcodeR::reverse_zipcode(df_zip$zip5) %>%
+    select(zip5 = zipcode, state_name = state) %>%
+    # Get FIPS codes by joining with a standard state lookup
+    left_join(
+      tigris::states(cb = TRUE) %>% st_drop_geometry() %>% select(state_fips = STATEFP, state_name = STUSPS),
+      by = "state_name"
+    )
+  
+  #### Merge in State FIPs code to firm_dt
+  firm_dt <- firm_dt %>%
+    mutate(zip5 = str_extract(as.character(s6_address_5), "\\d{5}")) %>%
+    left_join(zip_crosswalk %>% select(zip5, state_fips), by = "zip5") %>%
+    as.data.table()
+
+  #### Aggregate counts by state and role
+  hr_state_counts <- firm_dt[role == "HR" & !is.na(state_fips), count := .N, by = state_fips][role == "HR" & !is.na(state_fips), .(state_fips, count)]
+  eng_state_counts <- firm_dt[role == "Eng" & !is.na(state_fips), count := .N, by = state_fips][role == "Eng" & !is.na(state_fips), .(state_fips, count)]
+  missing_hr  <- firm_dt[role == "HR" & is.na(state_fips), .N]
+  missing_eng <- firm_dt[role == "Eng" & is.na(state_fips), .N]
+  
+  #### Get state geometries (contiguous US)
+  hr_states_sf <- tigris::states(cb = TRUE, year = 2023, class = "sf") %>%
+    filter(!(STATEFP %in% c("02","15","72","60","66","69","78"))) %>%
+    left_join(hr_state_counts, by = c("STATEFP" = "state_fips")) %>%
+    mutate(count = replace_na(count, 0))
+
+  eng_states_sf <- tigris::states(cb = TRUE, year = 2023, class = "sf") %>%
+    filter(!(STATEFP %in% c("02","15","72","60","66","69","78"))) %>%
+    left_join(eng_state_counts, by = c("STATEFP" = "state_fips")) %>%
+    mutate(count = replace_na(count, 0))
+  
+  #### Output Choropleth Map
+  hr_state_choropleth <- ggplot(hr_states_sf) +
+    geom_sf(aes(fill = count), color = "white", size = 0.2) +
+    scale_fill_viridis_c(
+      option = "plasma", 
+      name = "N",
+      na.value = "grey95",
+      guide = guide_colorbar(barwidth = 0.5, barheight = 3, title.position = "top")
+    ) +
+    coord_sf(expand = FALSE) +
+    labs(
+      title = "HR",
+      caption = paste0("Total N = ", sum(unique(hr_states_sf)$count), " (Missing Zip = ", missing_hr, ")")
+    ) +
+    theme_minimal() +
+    theme(
+      legend.position = "right",
+      plot.title = element_text(hjust = 0.5, face = "bold"),
+      plot.subtitle = element_text(hjust = 0.5),
+      axis.text = element_blank(),
+      axis.ticks = element_blank(),
+      panel.grid = element_blank()
+    )
+  
+  eng_state_choropleth <- ggplot(eng_states_sf) +
+    geom_sf(aes(fill = count), color = "white", size = 0.2) +
+    scale_fill_viridis_c(
+      option = "plasma", 
+      name = "N",
+      na.value = "grey95",
+      guide = guide_colorbar(barwidth = 0.5, barheight = 3, title.position = "top")
+    ) +
+    coord_sf(expand = FALSE) +
+    labs(
+      title = "Engineers",
+      caption = paste0("Total N = ", sum(unique(eng_states_sf)$count), " (Missing Zip = ", missing_eng, ")")
+    ) +
+    theme_minimal() +
+    theme(
+      legend.position = "right",
+      plot.title = element_text(hjust = 0.5, face = "bold"),
+      plot.subtitle = element_text(hjust = 0.5),
+      axis.text = element_blank(),
+      axis.ticks = element_blank(),
+      panel.grid = element_blank()
+    )
+
+(hr_state_choropleth | eng_state_choropleth) + plot_annotation(title = "Respondent Residence Locations", 
+                             theme = theme(plot.title = element_text(hjust = 0.5, size = 16, face = "bold")))
+
+rm(df_zip,zip_crosswalk, hr_state_counts, eng_state_counts, hr_states_sf, eng_states_sf, missing_hr, missing_eng, 
+   hr_state_choropleth, eng_state_choropleth)
+
+```
+
+
+
+<!-- +++++ ++++++ ++++++ Part 3: Balance Check +++++ ++++++ ++++++ -->
+\newpage
+
+# Balance Check
+
+## Balance across Treatment (Nonblind vs Blind)
+
+```{r Treatment Balance Check Table Function, echo = FALSE}
+
+# ---------- Balance-table function using kable ----------
+make_balance_table <- function(dt, covars, dict, title = NULL) {
+
+  beta      <- numeric(length(covars))
+  se_beta   <- numeric(length(covars))
+  p_beta    <- numeric(length(covars))
+  ctrl_mean <- numeric(length(covars))
+  Ns        <- integer(length(covars))
+
+  names(beta) <- names(se_beta) <- names(p_beta) <-
+    names(ctrl_mean) <- names(Ns) <- covars
+
+  for (v in covars) {
+    # regression: covariate on treat_blind
+    m <- suppressMessages(
+      suppressWarnings(
+         feols(as.formula(paste0(v, " ~ treat_blind")), data = dt, se = "hetero")
+       )
+     )
+
+    beta[v]    <- coef(m)[["treat_blind"]]
+    se_beta[v] <- se(m)[["treat_blind"]]
+    p_beta[v]  <- pvalue(m)[["treat_blind"]]
+
+    idx <- !is.na(dt[[v]]) & !is.na(dt$treat_blind)
+    ctrl_mean[v] <- mean(dt[idx & dt$treat_blind == 0, get(v)], na.rm = TRUE)
+    Ns[v]        <- sum(idx)
+  }
+
+  # significance stars
+  stars <- ifelse(p_beta < 0.01, "***",
+           ifelse(p_beta < 0.05, "**",
+           ifelse(p_beta < 0.10, "*", "")))
+
+  beta_fmt <- sprintf("%.3f%s", beta, stars)
+  se_fmt   <- paste0("(", sprintf("%.3f", se_beta), ")")
+  cm_fmt   <- sprintf("%.3f", ctrl_mean)
+  N_fmt    <- as.character(Ns)
+
+  # column labels from dict, in the order of covars
+  col_names <- unname(dict[covars])
+  # fallback: if some labels missing in dict, use variable names
+  col_names[is.na(col_names)] <- covars[is.na(col_names)]
+
+  # build 4-row table
+  tab <- rbind(
+    "Difference (Blind - Nonblind)" = beta_fmt,
+    "SE"                                      = se_fmt,
+    "Non-Blind Group Mean"                        = cm_fmt,
+    "N"                                       = N_fmt
+  )
+
+  colnames(tab) <- col_names   # visible column headers
+
+  # base kable object
+  tbl <- kable(
+    tab,
+    format   = "latex",
+    booktabs = TRUE,
+    caption  = title,
+    escape   = TRUE
+  )
+
+  # add HOLD_position so the table doesn't float
+  tbl <- kable_styling(
+    tbl,
+    latex_options = "HOLD_position"
+  )
+
+  tbl
+}
+
+# ---------- Formatting Function ----------
+
+fix_tabular <- function(x, new_spec) {
+  # x: kable / knitr_kable object
+  # new_spec: the full column spec you want, e.g. "@{}l c|cc|ccc@{}"
+
+  x <- paste(as.character(x), collapse = "\n")
+
+  # Replace whatever is inside { } after \begin{tabular}[t]
+  x <- sub(
+    "\\\\begin\\{tabular\\}\\[t\\]\\{[^}]*\\}",
+    paste0("\\\\begin{tabular}[t]{", new_spec, "}"),
+    x
+  )
+
+  x
+}
+
+```
+
+
+```{r Balance Table Print, echo = FALSE, results = 'asis'}
+
+# ---------- Choose and Label Covariates ----------
+
+## Respondent Demographics
+covars_resp_demo <- c("resp_age", 
+                      "resp_female",
+                      "resp_male",
+                      "resp_white",
+                      "resp_hispanic",
+                      "resp_asian"
+                      )
+
+dict_resp_demo = c(
+  "treat_blind"               = "Difference (Blind - Control)",
+  "resp_age"                  = "Age",
+  "resp_female"               = "Female",
+  "resp_male"                 = "Male",
+  "resp_white"                = "White",
+  "resp_hispanic"             = "Hispanic",
+  "resp_asian"                = "Asian"
+  )
+
+covars_resp_demo2 <- c("resp_income_50", 
+                      "resp_income_100",
+                      "resp_income_150",
+                      "resp_income_200",
+                      "resp_income_500ormore",
+                      "resp_educ_uniabove"
+                      )
+
+dict_resp_demo2 = c(
+  "treat_blind"               = "Difference (Blind - Control)",
+  "resp_income_50"            = "< 50K",
+  "resp_income_100"           = "50-100K",
+  "resp_income_150"           = "100-150K",
+  "resp_income_200"           = "150-200K",
+  "resp_income_500ormore"     = "200K+",
+  "resp_educ_uniabove"        = "University degree or more"
+  )
+
+## Firm Demographics
+covars_firm_demo <- c(
+  "firm_size_small", 
+  "firm_size_mid", 
+  "firm_size_large",
+  "s2_firm_gendercomp_1",
+  "s2_firm_gendercomp_2",
+  "s2_firm_racecomp_1", 
+  "s2_firm_racecomp_3", 
+  "s2_firm_racecomp_4"
+)
+
+dict_firm_demo = c(
+  "treat_blind"               = "Difference (Blind - Control)",
+  "firm_size_small"           = "Size_Small",
+  "firm_size_mid"             = "Size_Mid",
+  "firm_size_large"           = "Size_Large",
+  "s2_firm_gendercomp_1"      = "Male %",
+  "s2_firm_gendercomp_2"      = "Female %",
+  "s2_firm_racecomp_1"        = "White %",
+  "s2_firm_racecomp_3"        = "Hispanic %",
+  "s2_firm_racecomp_4"        = "Asian %"
+)
+
+## Firm's DEI Policies
+covars_dei <- c(
+  "bh_yes",
+  "dei_policy_1", 
+  "dei_policy_2", 
+  "dei_policy_3", 
+  "dei_policy_4", 
+  "dei_policy_5", 
+  "dei_policy_6"
+)
+  
+dict_dei = c(
+  "treat_blind"               = "Difference (Blind - Control)",
+  "bh_yes"                 = "Conducts BH",
+  "dei_policy_1"              = "Non Discrimination Policy",
+  "dei_policy_2"              = "Diveristy Policy",
+  "dei_policy_3"              = "DEI Training",
+  "dei_policy_4"              = "DEI Position",
+  "dei_policy_5"              = "Tranparent Policy",
+  "dei_policy_6"              = "Affinity Groups"
+)
+
+# covars_dei2 <- c(
+#   "dei_group_1", 
+#   "dei_group_2", 
+#   "dei_group_3", 
+#   "dei_group_4", 
+#   "dei_group_5", 
+#   "dei_group_6"
+# )
+#   
+# dict_dei2 = c(
+#   "treat_blind"              = "Difference (Blind - Control)",
+#   "dei_group_1"              = "White",
+#   "dei_group_2"              = "Black",
+#   "dei_group_3"              = "Hispanic",
+#   "dei_group_4"              = "Asian",
+#   "dei_group_5"              = "Male",
+#   "dei_group_6"              = "Female"
+# )
+
+# ---------- Print 1: HR (ALL)----------
+
+cat("\\textbf{Within HR (Treatment Balance) - All}")
+
+# Table 1
+res_hr_demo <- make_balance_table(firm_dt[role == "HR"],  covars_resp_demo, dict_resp_demo, "HR: Respondent Demographics")
+res_hr_demo <- fix_tabular(res_hr_demo, "l|c|cc|ccc@{}")
+cat(res_hr_demo)
+rm(res_hr_demo)
+
+# Table 2
+res_hr_demo2 <- make_balance_table(firm_dt[role == "HR"],  covars_resp_demo2, dict_resp_demo2, "HR: Respondent Demographics 2")
+res_hr_demo2 <- fix_tabular(res_hr_demo2, "l|ccccc|cc@{}")
+cat(res_hr_demo2)
+rm(res_hr_demo2)
+
+# Table 3
+res_hr_firm <- make_balance_table(firm_dt[role == "HR"],  covars_firm_demo, dict_firm_demo, "HR: Firm Characteristics")
+res_hr_firm <- fix_tabular(res_hr_firm, "l|ccc|cc|ccc@{}")
+cat(res_hr_firm)
+rm(res_hr_firm)
+
+# Table 4
+res_hr_dei <- make_balance_table(firm_dt[role == "HR"],  covars_dei,       dict_dei,       "HR: Firm's DEI Policies")
+res_hr_dei <- fix_tabular(res_hr_dei, "l|c|cccccc@{}")
+cat(res_hr_dei)
+rm(res_hr_dei)
+
+# ---------- Print 2: Eng (All)----------
+
+cat("\\newpage\n")
+cat("\\vspace{1em}\n\\textbf{Within Engineer (Treatment Balance) - All}")
+
+# Table 1
+res_eng_demo <- make_balance_table(firm_dt[role == "Eng"], covars_resp_demo, dict_resp_demo, "Engineers: Respondent Demographics")
+res_eng_demo <- fix_tabular(res_eng_demo, "l|c|cc|ccc@{}")
+cat(res_eng_demo)
+
+# Table 2
+res_eng_demo2 <- make_balance_table(firm_dt[role == "Eng"], covars_resp_demo2, dict_resp_demo2, "Engineers: Respondent Demographics 2")
+res_eng_demo2 <- fix_tabular(res_eng_demo2, "l|ccccc|cc@{}")
+cat(res_eng_demo2)
+
+# Table 3
+res_eng_firm <- make_balance_table(firm_dt[role == "Eng"], covars_firm_demo, dict_firm_demo, "Engineers: Firm Characteristics")
+res_eng_firm <- fix_tabular(res_eng_firm, "l|ccc|cc|ccc@{}")
+cat(res_eng_firm)
+
+# Table 4
+res_eng_dei <- make_balance_table(firm_dt[role == "Eng"], covars_dei,       dict_dei,       "Engineers: Firm's DEI Policies")
+res_eng_dei <- fix_tabular(res_eng_dei, "l|c|cccccc@{}")
+cat(res_eng_dei)
+
+```
+
+\newpage
+## Balance across Versions
+
+```{r Versions Balance Check Table Function, echo = FALSE}
+
+# ---------- Version-balance table: means by resume_ver + joint p-value ----------
+
+make_version_balance_table <- function(dt, covars, dict,
+                                       title = NULL,
+                                       hline_after = NULL) {
+  # dt    : data.table subset (e.g., treat == "blind")
+  # covars: vector of variable names to check
+  # dict  : named vector mapping var name -> pretty label for row names
+  # title : LaTeX caption
+  # hline_after: character vector of row labels AFTER which to draw \midrule
+  
+  # ensure resume_ver is present and not missing
+  dt <- dt[!is.na(resume_ver)]
+  
+  # ---- sample sizes by resume_ver ----
+  Ns_dt <- dt[, .N, by = resume_ver]
+  data.table::setorder(Ns_dt, resume_ver)
+  
+  # ---- means by version ----
+  means_dt <- dt[, lapply(.SD, mean, na.rm = TRUE),
+                 by = resume_ver, .SDcols = covars]
+  data.table::setorder(means_dt, resume_ver)
+  
+  # align Ns with means_dt
+  Ns <- Ns_dt$N[match(means_dt$resume_ver, Ns_dt$resume_ver)]
+  
+  means_mat <- t(as.matrix(means_dt[, ..covars]))   # rows: covars, cols: versions
+  colnames(means_mat) <- paste0(means_dt$resume_ver, " (N = ", Ns, ")")
+  
+  # ---- joint F-test p-values ----
+  p_joint <- numeric(length(covars))
+  names(p_joint) <- covars
+  
+  for (v in covars) {
+    f <- as.formula(paste0(v, " ~ factor(resume_ver)"))
+    m <- lm(f, data = dt)
+    a <- anova(m)
+    p_joint[v] <- a["factor(resume_ver)", "Pr(>F)"]
+  }
+  
+  # ---- pretty labels ----
+  row_labels <- unname(dict[covars])
+  row_labels[is.na(row_labels)] <- covars[is.na(row_labels)]
+  rownames(means_mat) <- row_labels
+  
+  means_chr <- apply(means_mat, c(1, 2), function(x) sprintf("%.3f", x))
+  
+  # significance stars for p-values
+  stars <- ifelse(p_joint < 0.01, "***",
+           ifelse(p_joint < 0.05, "**",
+           ifelse(p_joint < 0.10, "*", "")))
+  p_chr <- sprintf("%.3f%s", p_joint, stars)
+  
+  tab <- cbind(means_chr, "p-value (joint test)" = p_chr)
+  
+  # ---- build kable ----
+  tbl <- knitr::kable(
+    tab,
+    format   = "latex",
+    booktabs = TRUE,
+    caption  = title,
+    escape   = TRUE
+  )
+  
+  # add horizontal lines after specific row labels, if requested
+  if (!is.null(hline_after)) {
+    rn  <- rownames(tab)
+    idx <- match(hline_after, rn)
+    idx <- idx[!is.na(idx)]
+    if (length(idx) > 0) {
+      for (i in idx) {
+        tbl <- kableExtra::row_spec(tbl, i, extra_latex_after = "\\midrule")
+      }
+    }
+  }
+  
+  tbl <- kableExtra::kable_styling(
+    tbl,
+    latex_options = "HOLD_position"
+  )
+  
+  tbl
+}
+
+```
+
+```{r Print Version Balance, echo = FALSE, results = 'asis'}
+
+# ---------- Print 5: HR Non-Blind (All)----------
+
+cat("\\textbf{Version Balance within Nonblinded HR (All)}")
+
+# Blind: Respondent Demographics
+make_version_balance_table(
+  firm_dt[role == "HR" & treat == "nonblind"],
+  c(covars_resp_demo,covars_resp_demo2),
+  c(dict_resp_demo,dict_resp_demo2),
+  title = "HR Nonblind: Respondent Demographics",
+  hline_after  = c("Age", "Male", "Asian", "200K+")
+)
+
+# Blind: Firm Characteristics
+make_version_balance_table(
+  firm_dt[role == "HR" & treat == "nonblind"],
+  covars_firm_demo ,
+  dict_firm_demo,
+  title = "HR Nonblind: Firm Characteristics",
+  hline_after = c("Size_Large", "Female %")
+)
+
+# Blind: Firm' Demographics's DEI Policies
+make_version_balance_table(
+  firm_dt[role == "HR" & treat == "nonblind"],
+  covars_dei,
+  dict_dei,
+  title = "HR Nonblind: Firm' Demographics's DEI Policies",
+  hline_after = c("Conducts BH")
+)
+
+
+# ---------- Print 6: Engineer Non-Blind (All)----------
+
+cat("\\newpage\n")
+cat("\\textbf{Version Balance within Nonblinded Engineers (All)}")
+
+# Blind: Respondent Demographics
+make_version_balance_table(
+  firm_dt[role == "Eng" & treat == "nonblind"],
+  c(covars_resp_demo,covars_resp_demo2),
+  c(dict_resp_demo,dict_resp_demo2),
+  title = "Eng Nonblind: Respondent Demographics",
+  hline_after  = c("Age", "Male", "Asian", "200K+")
+)
+
+# Blind: Firm Characteristics
+make_version_balance_table(
+  firm_dt[role == "Eng" & treat == "nonblind"],
+  covars_firm_demo ,
+  dict_firm_demo,
+  title = "Eng Nonblind: Firm Characteristics",
+  hline_after = c("Size_Large", "Female %")
+)
+
+# Blind: Firm' Demographics's DEI Policies
+make_version_balance_table(
+  firm_dt[role == "Eng" & treat == "nonblind"],
+  covars_dei,
+  dict_dei,
+  title = "Eng Nonblind: Firm' Demographics's DEI Policies",
+  hline_after = c("Conducts BH")
+)
+
+
+```
+
+```{r,echo = FALSE}
+## Clean Up
+rm(covars_dei, covars_firm_demo, covars_resp_demo, covars_resp_demo2,
+   dict_dei, dict_firm_demo, dict_resp_demo, dict_resp_demo2,
+   res_eng_dei, res_eng_demo, res_eng_demo2,res_eng_firm,
+   make_version_balance_table, make_balance_table)
+```
+
+
+\newpage
+<!-- +++++ ++++++ ++++++ Part 4: Behavioral Exploration +++++ ++++++ ++++++ -->
+
+# [Explorations] 
+
+## Proportion of Candidates Passed to Next Stage
+
+```{r advance_selfreport, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+
+temp <- firm_dt[!is.na(s4_application_num) & !is.na(s4_interview_num) & s4_application_num != 0, s4_advance_rate := s4_interview_num / s4_application_num * 100]
+
+mean_stats <- temp[, .(mean_val = mean(s4_advance_rate, na.rm = TRUE)), by = role]
+
+ggplot(temp[!is.na(s4_advance_rate)], aes(x = s4_advance_rate)) +
+  geom_histogram(
+    binwidth=5
+  ) +
+  facet_wrap(~ role) + 
+  geom_vline(data = mean_stats, aes(xintercept = mean_val),
+            color="blue", linetype="dashed", size=1) + 
+  geom_text(data = mean_stats, 
+            aes(x = mean_val + 2,  y = 20, 
+                label = paste0("Mean: ", round(mean_val, 1))), 
+            color = "blue", 
+            hjust = 0) + 
+  labs(y = "Counts", x = "Self-Reported Advance Rate (%)")
+
+rm(temp, mean_stats)
+
+```
+
+
+\clearpage
+## (HR) Number Candidates Passed to Next Stage
+
+```{r advance_experiment, echo = FALSE, results = 'asis'}
+
+temp <- unique(firm_long_dt[role == "HR", counts_advanced := sum(sc_advance), by = .(responseid)][role == "HR", .(role, responseid, counts_advanced)])
+
+mean_stats <- temp[, .(mean_val = mean(counts_advanced, na.rm = TRUE))]
+
+ggplot(temp, 
+       aes(x = counts_advanced)) + 
+  geom_histogram(
+    binwidth = 1
+  ) + 
+  geom_vline(data = mean_stats, aes(xintercept = mean_val), 
+             color = "blue", linetype = "dashed", size = 1) + 
+  geom_text(data = mean_stats,
+            aes(x = mean_val + 2, y = 20,
+                label = paste0("Mean: ", round(mean_val, 1))),
+            color = "blue", 
+            hjust = 0) + 
+  labs(y = "Counts of HR", x = "Number of Candidates Advanced among 18")
+
+rm(temp, mean_stats)
+
+```
+
+\clearpage
+## (HR) Correlation between Self Reported Advance Rate and Experimental Advance Rate
+
+```{r corr_advance, echo = FALSE, results = 'asis'}
+
+temp1 <- firm_dt[!is.na(s4_application_num) & !is.na(s4_interview_num) & s4_application_num != 0, s4_advance_rate := s4_interview_num / s4_application_num * 100][!is.na(s4_advance_rate), .(responseid, s4_advance_rate)]
+
+temp2 <- unique(firm_long_dt[role == "HR", counts_advanced := sum(sc_advance), by = .(responseid)][role == "HR", .(responseid, counts_advanced)])
+
+temp3 <- merge(temp1, temp2, by = "responseid")
+
+cor_val <- cor(temp3$s4_advance_rate, temp3$counts_advanced)
+
+ggplot(temp3, aes(x = counts_advanced, y = s4_advance_rate)) +
+  geom_jitter(alpha = 0.5, width = 0.5, height = 0.2) + 
+  geom_smooth(method = "lm", color = "blue", fill = "lightblue") +
+  labs(
+    title = paste0("Self-Reported vs. Actual Advance Rates (Corr: ", round(cor_val, 2), ")"),
+    x = "Actual Resumes Passed (Count 0-18)",
+    y = "Self-Reported Advance Rate (%)"
+  ) +
+  theme_minimal()  
+
+rm(temp1, temp2, temp3, cor_val)
+
+```
+
+\clearpage  
+## Correlation between IRR (want to receive resumes) and median time spent on resumes
+
+```{r IRR_time, echo = FALSE, results = 'asis'}
+
+temp <- unique(firm_long_dt[, timeonpage_median := median(timeonpage), by = .(responseid)][, .(responseid, role, IRR_ever, timeonpage_median)])
+
+ggplot(temp, aes(x = factor(IRR_ever), y = timeonpage_median, fill = factor(IRR_ever))) +
+  
+  # Add boxplots to show the median and distribution
+  geom_boxplot(alpha = 0.6, outlier.shape = NA) +
+  
+  # Optional: Add jittered points to show the raw data behind the boxes
+  geom_jitter(width = 0.2, alpha = 0.3) +
+  
+  # Split: HR on Left, Engineer on Right
+  facet_wrap(~ role) + 
+  
+  # Labels and Formatting
+  labs(
+    title = "Correlation: IRR Status vs. Respondent's Median Time on Page",
+    x = "IRR Ever (0 = No, 1 = Yes)",
+    y = "Median Time on Page (Seconds)",
+    fill = "IRR Status"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+rm(temp)
+```
+
+\newpage
+## Relationship between Time Spent on Evaluation by Treatment
+
+```{r blinding_time, echo = FALSE, results = 'asis'}
+
+temp <- unique(firm_long_dt[, timeonpage_median := median(timeonpage), by = .(responseid)][, .(responseid, role, treat, timeonpage_median)])
+
+ggplot(temp, aes(x = factor(treat), y = timeonpage_median, fill = factor(treat))) +
+  
+  # Add boxplots to show the median and distribution
+  geom_boxplot(alpha = 0.6, outlier.shape = NA) +
+  
+  # Optional: Add jittered points to show the raw data behind the boxes
+  geom_jitter(width = 0.2, alpha = 0.3) +
+  
+  # Split: HR on Left, Engineer on Right
+  facet_wrap(~ role) + 
+  
+  # Labels and Formatting
+  labs(
+    title = "Correlation: Treatment vs. Respondent's Median Time on Page",
+    x = "Treatment",
+    y = "Median Time on Page (Seconds)",
+    fill = "Blind Treatment"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+rm(temp)
+
+```
+
+
+\newpage
+## (Causal) Relationship between Time Spent on and Off the Evaluation by Treatment
+
+```{r blinding_time_causal, echo = FALSE, results = 'asis'}
+
+model_timeon_hr  <- feols(timeonpage ~ treat + resp_age | r_do + resume_index + resp_gender + resp_race, firm_long_dt[role == "HR"], vcov = ~ responseid)
+model_timeon_eng <- feols(timeonpage ~ treat + resp_age | r_do + resume_index + resp_gender + resp_race + resp_python + resp_java, firm_long_dt[role == "Eng"], vcov = ~ responseid)
+
+modelsummary(list("HR" = model_timeon_hr, "Engineers" = model_timeon_eng),
+             stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+             title = "Effect of Treatment on Time Spent on Page (Fixed Effects)",
+             output = "latex",
+             coef_map = c("treatblind" = "Blind Treatment"))
+
+model_timeoff_hr  <- feols(timeoffpage ~ treat + resp_age | r_do + resume_index + resp_gender + resp_race, firm_long_dt[role == "HR"], vcov = ~ responseid)
+model_timeoff_eng <- feols(timeoffpage ~ treat + resp_age | r_do + resume_index + resp_gender + resp_race + resp_python + resp_java, firm_long_dt[role == "Eng"], vcov = ~ responseid)
+
+modelsummary(list("HR" = model_timeoff_hr, "Engineers" = model_timeoff_eng),
+             stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+             title = "Effect of Treatment on Time Spent off Page (Fixed Effects)",
+             output = "latex",
+             float = FALSE,
+             coef_map = c("treatblind" = "Blind Treatment"))
+
+rm(model_timeon_hr, model_timeon_eng,
+   model_timeoff_hr, model_timeoff_eng)
+
+```
+
+
+\newpage
+## (Eng Only) Relationship between Open Resume / Codes by Treatment
+
+```{r blinding_open_resume, echo = FALSE, results = 'asis', fig.align='center', out.width='45%', fig.pos="H"}
+
+temp <- unique(firm_long_dt[role == "Eng"][, .(responseid, treat, prop_open_resume, prop_open_code)])
+  
+ggplot(temp, aes(x = factor(treat), y = prop_open_resume, fill = factor(treat))) +
+  
+  # Add boxplots to show the median and distribution
+  geom_boxplot(alpha = 0.6, outlier.shape = NA) +
+  
+  # Optional: Add jittered points to show the raw data behind the boxes
+  geom_jitter(width = 0.2, alpha = 0.3) +
+  
+  # Labels and Formatting
+  labs(
+    title = "Correlation: Treatment vs. Resume Open Rates",
+    x = "Treatment",
+    y = "Proportion of Resume Opened",
+    fill = "Blind Treatment"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+ggplot(temp, aes(x = factor(treat), y = prop_open_code, fill = factor(treat))) +
+
+  # Add boxplots to show the median and distribution
+  geom_boxplot(alpha = 0.6, outlier.shape = NA) +
+
+  # Optional: Add jittered points to show the raw data behind the boxes
+  geom_jitter(width = 0.2, alpha = 0.3) +
+
+  # Labels and Formatting
+  labs(
+    title = "Correlation: Treatment vs. Code Open Rates",
+    x = "Treatment",
+    y = "Proportion of Resume Opened",
+    fill = "Blind Treatment"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+rm(temp)
+
+```
+
+
+\newpage
+## (Causal) Relationship between Open Resume / Codes by Treatment
+
+```{r blinding_open_resume_causal, echo = FALSE, results = 'asis', fig.align='center', out.width='45%'}
+
+model_open_res  <- feols(open_resume ~ treat + resp_age | r_do + resume_index + resp_gender + resp_race + resp_python + resp_java, firm_long_dt[role == "Eng"], vcov = ~ responseid)
+model_open_code1 <- feols(open_code1 ~ treat + resp_age | r_do + resume_index + resp_gender + resp_race + resp_python + resp_java, firm_long_dt[role == "Eng"], vcov = ~ responseid)
+model_open_code2 <- feols(open_code2 ~ treat + resp_age | r_do + resume_index + resp_gender + resp_race + resp_python + resp_java, firm_long_dt[role == "Eng"], vcov = ~ responseid)
+
+modelsummary(list("P(Open Res)" = model_open_res, "P(Open Code 1)" = model_open_code1, "P(Open Code 2)" = model_open_code2),
+             stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+             title = "Effect of Treatment on Rate of Opening Res / Codes",
+             output = "latex",
+             float = FALSE,
+             coef_map = c("treatblind" = "Blind Treatment"))
+
+rm(model_open_res, model_open_code1, model_open_code2)
+
+```
+
+
+
+\newpage
+## Relationship between Blinding & IRR (want to receive resumes)
+
+```{r blinding_irr, echo = FALSE, results = 'asis'}
+firm_dt[, .(Proportion = round(mean(IRR_ever, na.rm = TRUE), 2), N = .N), by = .(role, treat)][order(role, treat)] |>
+  knitr::kable(format = "latex", booktabs = TRUE)
+```
+
+
+## Relationship between Blinding & Looking at Outside Resources
+
+```{r blinding_outsidesearch, echo = FALSE, results = 'asis'}
+firm_dt[, .(Proportion = round(mean(s3_outside_res, na.rm = TRUE),2), N = .N), by = .(role, treat)][order(role, treat)] |>
+  knitr::kable(format = "latex", booktabs = TRUE)
+```
+
+
+
+\newpage
+<!-- +++++ ++++++ ++++++ Part 5: Thoughts on Blind Hiring +++++ ++++++ ++++++ -->
+# Section 5: Thoughts on Blind Hirings (Collected for Last 2 weeks)
+
+## s5_insights_bh_chg (Blinded Group Only)
+
+(Optional but encouraged) While evaluating candidates without names (or other information that could signal demographic background, such as home address or languages), how—if at all—did this affect the way you evaluated the candidates? What went through your mind?
+
+(Please describe your thought process in your own words. There is no right or wrong answer.)
+
+```{r s5_insights_bh_chg, echo = FALSE, results='asis'}
+responses <- firm_dt[!is.na(s5_insights_bh_chg) & nchar(s5_insights_bh_chg) > 0 & 
+                       role == "HR", s5_insights_bh_chg]
+cat("\n\n\\vspace{12pt}\n")
+cat("\\noindent \\textbf{HR Responses} \n\n")
+cat(paste0(seq_along(responses), ". ", responses, collapse = "\n\n"))
+rm(responses)
+
+responses <- firm_dt[!is.na(s5_insights_bh_chg) & nchar(s5_insights_bh_chg) > 0 & 
+                       role == "Eng", s5_insights_bh_chg]
+cat("\n\n\\vspace{12pt}\n")
+cat("\\noindent \\textbf{Engineer Responses} \n\n")
+cat(paste0(seq_along(responses), ". ", responses, collapse = "\n\n"))
+rm(responses)
+```
+
+\newpage
+## s5_guess_gender and s5_guess_race
+
+Thinking back on the candidates you evaluated, what do you believe was the approximate gender composition of the 18 candidates? Of race composition?
+
+```{r s5_guess_gender, echo = FALSE, results='asis'}
+
+# 1. Define variables and labels
+guess_vars <- c("s5_guess_gender_1", "s5_guess_gender_2", "s5_guess_gender_3",
+                "s5_guess_race_1", "s5_guess_race_2", "s5_guess_race_3", "s5_guess_race_4", "s5_guess_race_5")
+labels <- c("Male", "Female", "Gender (Other)",
+            "White", "Asian", "Hispanic", "Black", "Race (Other)")
+
+# 2. Function to calculate stats with N in labels
+get_role_stats <- function(target_role) {
+  subset_dt <- firm_dt[role == target_role & resume_ver != "v7"]
+  
+  # Calculate N for each treatment arm
+  n_blind    <- nrow(subset_dt[treat == "blind" & !is.na(s5_guess_gender_1)])
+  n_nonblind <- nrow(subset_dt[treat == "nonblind" & !is.na(s5_guess_gender_1)])
+  
+  suppressWarnings({
+    role_results <- lapply(guess_vars, function(var) {
+      m_blind    <- mean(subset_dt[treat == "blind"][[var]], na.rm = TRUE)
+      m_nonblind <- mean(subset_dt[treat == "nonblind"][[var]], na.rm = TRUE)
+      
+      test <- t.test(as.formula(paste0(var, " ~ treat")), data = subset_dt)
+      diff <- m_blind - m_nonblind
+      pval <- test$p.value
+      stars <- ifelse(pval < 0.01, "***", ifelse(pval < 0.05, "**", ifelse(pval < 0.1, "*", "")))
+      
+      return(c(
+        blind = sprintf("%.3f", m_blind),
+        nonblind = sprintf("%.3f", m_nonblind),
+        diff = sprintf("%.3f", diff),
+        pval = sprintf("%.3f%s", pval, stars)
+      ))
+    })
+  })
+  
+  res <- t(do.call(rbind, role_results))
+  
+  # Update row names to include N
+  rownames(res) <- c(
+    paste0("Blind (N = ", n_blind, ")"),
+    paste0("Non-blind (N = ", n_nonblind, ")"),
+    "Difference (B - NB)",
+    "P-value"
+  )
+  return(res)
+}
+
+# 3. Execute calculations
+hr_stats  <- get_role_stats("HR")
+eng_stats <- get_role_stats("Eng")
+
+# 4. Assemble the final matrix
+tab_matrix <- rbind(
+  "Panel A: HR Professionals" = rep("", 8),
+  hr_stats,
+  " "                         = rep("", 8), # Spacer row
+  "Panel B: Software Engineers" = rep("", 8),
+  eng_stats
+)
+
+colnames(tab_matrix) <- labels
+
+# 5. Generate Table
+tbl <- kable(
+  tab_matrix,
+  format   = "latex",
+  booktabs = TRUE,
+  caption  = "Candidate Identity Guesses: Treatment Comparison with Sample Sizes",
+  escape   = TRUE,
+  align    = "lcccccccc"
+) %>%
+  kable_styling(latex_options = "HOLD_position") %>%
+  row_spec(c(1, 7), bold = TRUE) %>% 
+  row_spec(c(5, 11), italic = TRUE, color = "gray")
+
+# 6. Apply custom vertical lines
+tbl_fixed <- fix_tabular(tbl, "l|ccc|ccccc")
+
+cat(tbl_fixed)
+
+rm(guess_vars, labels, get_role_stats,
+   hr_stats, eng_stats, tab_matrix, tbl, tbl_fixed)
+
+```
+
+
+\newpage
+<!-- +++++ ++++++ ++++++ Part 6: Qualitative Responses +++++ ++++++ ++++++ -->
+# Qualtitative Responses
+
+## s6_insight_hr
+
+(Optional) Can you share any ways in which you felt engineers, who usually conduct technical interviews, pursued or not pursued DEI objectives in the hiring process and what impact it had on the firm, overall?
+
+```{r s6_insight_hr, eval= TRUE, echo = FALSE, results='asis'}
+
+responses <- firm_dt[!is.na(s6_insight_hr) & nchar(s6_insight_hr) > 5, s6_insight_hr]
+cat(paste0(seq_along(responses), ". ", responses, collapse = "\n\n"))
+rm(responses)
+```
+
+
+\newpage
+## s5_insight_engineer
+
+(Optional) Can you share any ways in which you felt HR influenced or encouraged DEI objectives in the hiring process and what impact it had on the firm, overall?
+
+```{r s5_insight_engineer, eval= TRUE, echo = FALSE, results='asis'}
+responses <- firm_dt[!is.na(s5_insight_engineer) & nchar(s5_insight_engineer) > 5, s5_insight_engineer]
+cat(paste0(seq_along(responses), ". ", responses, collapse = "\n\n"))
+rm(responses)
+```
+
+\newpage
+## s5_insights_industry
+
+(Optional) Do you have any additional thoughts on hiring trends or DEI initiatives? Feel free to share whatever you believe would be helpful for researchers.
+
+```{r s5_insights_industry, eval= TRUE, echo = FALSE, results='asis'}
+responses <- firm_dt[!is.na(s5_insights_industry) & nchar(s5_insights_industry) > 5, s5_insights_industry]
+cat(paste0(seq_along(responses), ". ", responses, collapse = "\n\n"))
+rm(responses)
+```
+
+\newpage
+## s6_feedback
+
+(Optional) Do you have any suggestions for improving this survey?
+
+```{r s6_feedback, eval= TRUE, echo = FALSE, results='asis'}
+responses <- firm_dt[!is.na(s6_feedback) & nchar(s6_feedback) > 5, s6_feedback]
+cat(paste0(seq_along(responses), ". ", responses, collapse = "\n\n"))
+rm(responses)
+```
+
+
+<!-- \newpage -->
+<!-- <!-- +++++ ++++++ ++++++ Part 7: Additional Quality Check +++++ ++++++ ++++++ --> -->
+<!-- # Additional Quality Check -->
+
+<!-- ## Engineers: Correlation between Test Cases and Overall Score / Coding Score -->
+<!-- ```{r eng_correlation_with_test_cases, eval= FALSE, echo = FALSE, fig.align='center', out.width='100%'} -->
+
+<!-- # Compute within-respondent correlations -->
+<!-- resp_cors <- firm_long_dt[role == "Eng", .( -->
+<!--   cor_overall = cor(test_case, sc_overall_z, use = "complete.obs"), -->
+<!--   cor_coding = cor(test_case, sc_coding_z, use = "complete.obs") -->
+<!-- ), by = .(role, responseid, treat)] -->
+
+<!-- # Negative Correlations? -->
+<!-- # resp_cors[cor_overall < 0] -->
+<!-- # resp_cors[cor_coding < 0] -->
+
+<!-- # Graph Distributions of Correlations -->
+<!-- p1_blind <- ggplot(resp_cors[treat == "blind"], aes(x = cor_overall)) + -->
+<!--   geom_histogram(bins = 30, fill = "steelblue", color = "white") + -->
+<!--   geom_vline(xintercept = 0, linetype = "dashed", color = "red") + -->
+<!--   theme_minimal() + -->
+<!--   labs(x = "Correlation", y = "Count", title = "(Blind) Test Case vs Overall") -->
+
+<!-- p2_blind <- ggplot(resp_cors[treat == "blind"], aes(x = cor_coding)) + -->
+<!--   geom_histogram(bins = 30, fill = "steelblue", color = "white") + -->
+<!--   geom_vline(xintercept = 0, linetype = "dashed", color = "red") + -->
+<!--   theme_minimal() + -->
+<!--   labs(x = "Correlation", y = "Count", title = "(Blind) Test Case vs Coding") -->
+
+<!-- grid.arrange(p1_blind, p2_blind, ncol = 2) -->
+
+<!-- p1_nonblind <- ggplot(resp_cors[treat == "nonblind"], aes(x = cor_overall)) + -->
+<!--   geom_histogram(bins = 30, fill = "steelblue", color = "white") + -->
+<!--   geom_vline(xintercept = 0, linetype = "dashed", color = "red") + -->
+<!--   theme_minimal() + -->
+<!--   labs(x = "Correlation", y = "Count", title = "(NonBlind) Test Case vs Overall") -->
+
+<!-- p2_nonblind <- ggplot(resp_cors[treat == "nonblind"], aes(x = cor_coding)) + -->
+<!--   geom_histogram(bins = 30, fill = "steelblue", color = "white") + -->
+<!--   geom_vline(xintercept = 0, linetype = "dashed", color = "red") + -->
+<!--   theme_minimal() + -->
+<!--   labs(x = "Correlation", y = "Count", title = "(NonBlind) Test Case vs Coding") -->
+
+<!-- grid.arrange(p1_nonblind, p2_nonblind, ncol = 2) -->
+
+<!-- rm(resp_cors, p1_blind, p2_blind, p1_nonblind, p2_nonblind) -->
+
+<!-- ``` -->
+
+<!-- ## Engineers: Time Spent On Page -->
+
+<!-- ```{r Taskmaster_Eng_Graph, eval= FALSE, echo = FALSE, fig.width = 16, fig.height = 20, results = "asis", message = FALSE, warning = FALSE} -->
+
+<!-- # Subset for marking special resume_indices -->
+<!-- special_resumes <- c(1, 5, 8, 11, 14) -->
+<!-- mark_dt <- taskmaster_long_dt[role == "Eng" & resume_index %in% special_resumes] -->
+
+<!-- eng_ids   <- unique(taskmaster_long_dt[role == "Eng", responseid]) -->
+<!-- n_panels  <- length(eng_ids) -->
+<!-- per_page  <- 5 * 6 -->
+<!-- n_pages   <- ceiling(n_panels / per_page) -->
+
+<!-- for (i in seq_len(n_pages)) { -->
+<!--   p <- ggplot( -->
+<!--     taskmaster_long_dt[role == "Eng"], -->
+<!--     aes(x = r_do, group = responseid) -->
+<!--   ) + -->
+<!--     ## (ii) Vertical lines at special resume_indices -->
+<!--     geom_vline( -->
+<!--       data = mark_dt, -->
+<!--       aes(xintercept = r_do), -->
+<!--       color = "gold", alpha = 0.4, linewidth = 3 -->
+<!--     ) + -->
+<!--     ## (i) Blue line connects clipped values -->
+<!--     geom_line(aes(y = timeonpage_clipped), -->
+<!--               color = "steelblue", linewidth = 0.7) + -->
+<!--     geom_point(aes(y = timeonpage_clipped), -->
+<!--                color = "steelblue", size = 1.2) + -->
+<!--     ## TimeOn outliers above upper threshold (dark blue dots) -->
+<!--     geom_point( -->
+<!--       data = taskmaster_long_dt[role == "Eng" & out_On == TRUE], -->
+<!--       aes(x = r_do, y = timeonpage_clipped), -->
+<!--       color = "darkblue", size = 2.2 -->
+<!--     ) + -->
+<!--     ## TimeOn flags below lower threshold (red dots) -->
+<!--     geom_point( -->
+<!--       data = taskmaster_long_dt[role == "Eng" & timeon_flag == TRUE], -->
+<!--       aes(x = r_do, y = timeonpage), -->
+<!--       color = "red", size = 2.2 -->
+<!--     ) + -->
+<!--     ## TimeOff: dashed line + points -->
+<!--     geom_line(aes(y = timeoffpage_clipped), -->
+<!--               color = "grey60", linewidth = 0.7, linetype = "dashed") + -->
+<!--     geom_point(aes(y = timeoffpage_clipped), -->
+<!--                color = "grey60", size = 1.0) + -->
+<!--     ## TimeOff outliers (black dots) -->
+<!--     geom_point( -->
+<!--       data = taskmaster_long_dt[role == "Eng" & out_Off == TRUE], -->
+<!--       aes(x = r_do, y = timeoffpage_clipped), -->
+<!--       color = "black", size = 2.0 -->
+<!--     ) + -->
+<!--     scale_x_continuous(breaks = seq(1, 18, by = 2), limits = c(1, 18)) + -->
+<!--     scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, 25)) + -->
+<!--     facet_wrap_paginate( -->
+<!--       ~ responseid, -->
+<!--       ncol = 5, nrow = 6, page = i, scales = "free" -->
+<!--     ) + -->
+<!--     labs( -->
+<!--       title = sprintf("(Taskmaster) Engineer: Time Spent On / Off Resume — Page %d of %d", i, n_pages), -->
+<!--       x = "Resume Page (1–18) in order shown", -->
+<!--       y = "Time On/Off Page (seconds)" -->
+<!--     ) + -->
+<!--     theme_minimal(base_size = 10) + -->
+<!--     theme( -->
+<!--       plot.subtitle = ggtext::element_markdown(size = 9), -->
+<!--       strip.text    = element_text(size = 7), -->
+<!--       axis.text.x   = element_text(size = 7), -->
+<!--       axis.text.y   = element_text(size = 7) -->
+<!--     ) -->
+<!--   print(p) -->
+<!--   if (i < n_pages) cat("\\newpage\n") -->
+<!-- } -->
+
+<!-- rm(special_resumes, mark_dt, eng_ids, n_panels, per_page, n_pages) -->
+
+<!-- ``` -->
+
+
+
+

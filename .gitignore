@@ -48,6 +48,12 @@ po/*~
 # RStudio Connect folder
 rsconnect/
 
+# Rmd render byproducts that pdflatex / tinytex leave behind despite
+# intermediates_dir = tempdir() in rmarkdown::render(). Useful locally
+# for debugging LaTeX warnings; not worth tracking.
+*.log
+*_files/
+
 # =============================================================================
 # Data files — NEVER commit
 # Per CLAUDE.md rule #3: BH_Empirical is a git repo and may be pushed to a

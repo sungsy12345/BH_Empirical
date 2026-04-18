@@ -60,16 +60,19 @@ source(here("1_Codes", "5_Cleaning.R"))
 ## Create Matching Output
 source(here("1_Codes", "6_Hiring_Simulation.R"))
 
-## ----- Steps below are temporarily disabled. -----
-## Re-enable them one at a time as each Rmd is migrated and its data
-## paths are updated for the new BH_Empirical/1_Codes layout.
-
 ## Analysis
-# rmarkdown::render(here("1_Codes", "7_Descriptive.Rmd"))
-# rmarkdown::render(here("1_Codes", "8A_Preferences.Rmd"))
-# rmarkdown::render(here("1_Codes", "8B_Stage_BH.Rmd"))
-# rmarkdown::render(here("1_Codes", "8C_Dynamic_BH.Rmd"))
-# rmarkdown::render(here("1_Codes", "8C_Dynamic_BH_Jobs.Rmd"))
+rmarkdown::render(
+  here("1_Codes", "7_Descriptive.Rmd"),
+  output_dir        = here("2_Reports"),
+  intermediates_dir = tempdir()
+)
+
+## ----- Steps below are temporarily disabled. -----
+## Re-enable them one at a time as each Rmd is migrated.
+# rmarkdown::render(here("1_Codes", "8A_Preferences.Rmd"),     output_dir = here("2_Reports"), intermediates_dir = tempdir())
+# rmarkdown::render(here("1_Codes", "8B_Stage_BH.Rmd"),        output_dir = here("2_Reports"), intermediates_dir = tempdir())
+# rmarkdown::render(here("1_Codes", "8C_Dynamic_BH.Rmd"),      output_dir = here("2_Reports"), intermediates_dir = tempdir())
+# rmarkdown::render(here("1_Codes", "8C_Dynamic_BH_Jobs.Rmd"), output_dir = here("2_Reports"), intermediates_dir = tempdir())
 
 ## Results
-# rmarkdown::render(here("1_Codes", "9_Final_Results.Rmd"))
+# rmarkdown::render(here("1_Codes", "9_Final_Results.Rmd"),    output_dir = here("2_Reports"), intermediates_dir = tempdir())
