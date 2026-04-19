@@ -230,8 +230,11 @@ firm_dt[!is.na(fl_193_do), c(paste0("r", 1:18, "_DO")) := lapply(tstrsplit(fl_19
 
   #### Firm: Target Groups for Advancing Representation (s5_policy_diversity, multi-select)
   ## Options: 1=White, 2=Black, 3=Hispanic, 4=Asian, 5=Male, 6=Female, 7=Other, 96=DK, 98=NA
+  firm_dt[, firm_targets_white    := fifelse(!is.na(s5_policy_diversity) & grepl("(^|,)\\s*1\\s*(,|$)", s5_policy_diversity), 1L, 0L, na = NA_integer_)]
   firm_dt[, firm_targets_black    := fifelse(!is.na(s5_policy_diversity) & grepl("(^|,)\\s*2\\s*(,|$)", s5_policy_diversity), 1L, 0L, na = NA_integer_)]
   firm_dt[, firm_targets_hispanic := fifelse(!is.na(s5_policy_diversity) & grepl("(^|,)\\s*3\\s*(,|$)", s5_policy_diversity), 1L, 0L, na = NA_integer_)]
+  firm_dt[, firm_targets_asian    := fifelse(!is.na(s5_policy_diversity) & grepl("(^|,)\\s*4\\s*(,|$)", s5_policy_diversity), 1L, 0L, na = NA_integer_)]
+  firm_dt[, firm_targets_male     := fifelse(!is.na(s5_policy_diversity) & grepl("(^|,)\\s*5\\s*(,|$)", s5_policy_diversity), 1L, 0L, na = NA_integer_)]
   firm_dt[, firm_targets_female   := fifelse(!is.na(s5_policy_diversity) & grepl("(^|,)\\s*6\\s*(,|$)", s5_policy_diversity), 1L, 0L, na = NA_integer_)]
   firm_dt[, firm_targets_race_urm := as.integer(firm_targets_black == 1L | firm_targets_hispanic == 1L)]
   firm_dt[, firm_targets_any_urm  := as.integer(firm_targets_black == 1L | firm_targets_hispanic == 1L | firm_targets_female == 1L)]
@@ -315,7 +318,9 @@ firm_dt[!is.na(fl_193_do), c(paste0("r", 1:18, "_DO")) := lapply(tstrsplit(fl_19
                       "pro_dei_race_z", "pro_dei_gender_z", "pro_diverse_z", "pro_hiring_dei_z", "pro_dei_index_z", "pro_dei_basedon_index", "pro_dei_index_3tiers",
                       "div_priority_z", "div_priority_top3",
                       "dei_policy_count", "dei_policy_count_z", "dei_policy_3plus",
-                      "bh_yes", "firm_targets_race_urm", "firm_targets_any_urm", "firm_targets_female",
+                      "bh_yes", "firm_targets_white", "firm_targets_black", "firm_targets_hispanic",
+                      "firm_targets_asian", "firm_targets_male", "firm_targets_female",
+                      "firm_targets_race_urm", "firm_targets_any_urm",
                       "firm_attention_race_z", "firm_attention_gender_z",
                       "firm_id", "s2_firm_size", "firm_size", "firm_size_small", "firm_size_mid", "firm_size_large",
                       "IRR_1", "IRR_2", "IRR_ever", "s3_outside_res",
@@ -347,7 +352,9 @@ firm_dt[!is.na(fl_193_do), c(paste0("r", 1:18, "_DO")) := lapply(tstrsplit(fl_19
                 "pro_dei_race_z", "pro_dei_gender_z", "pro_diverse_z", "pro_hiring_dei_z", "pro_dei_index_z", "pro_dei_basedon_index", "pro_dei_index_3tiers",
                 "div_priority_z", "div_priority_top3",
                 "dei_policy_count", "dei_policy_count_z", "dei_policy_3plus",
-                "bh_yes", "firm_targets_race_urm", "firm_targets_any_urm", "firm_targets_female",
+                "bh_yes", "firm_targets_white", "firm_targets_black", "firm_targets_hispanic",
+                "firm_targets_asian", "firm_targets_male", "firm_targets_female",
+                "firm_targets_race_urm", "firm_targets_any_urm",
                 "firm_attention_race_z", "firm_attention_gender_z",
                 "firm_id", "s2_firm_size", "firm_size", "firm_size_small", "firm_size_mid", "firm_size_large",
                 "IRR_1", "IRR_2", "IRR_ever", "s3_outside_res",
