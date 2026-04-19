@@ -194,9 +194,19 @@ firm_dt[!is.na(fl_193_do), c(paste0("r", 1:18, "_DO")) := lapply(tstrsplit(fl_19
     col_name <- paste0("job_", j)
     firm_dt[, (col_name) := as.integer(sapply(strsplit(s4_jobposition, ","), function(x) as.character(j) %in% trimws(x)))]
   }
-  
+
   rm(j, col_name)
-  
+
+  #### Priority of "Diversity and Representation" in the s4_goals rank
+  ## s4_goals_5 is the rank (1-7, stored as character) assigned to
+  ## "Diversity and Representation"; 1 = top priority, 7 = lowest.
+  firm_dt[, s4_goals_5_rank  := suppressWarnings(as.integer(s4_goals_5))]
+  firm_dt[, div_priority_inv := 8 - s4_goals_5_rank]                          # 7 = top priority
+  firm_dt[, div_priority_top3:= as.integer(s4_goals_5_rank <= 3)]
+  firm_dt[, div_priority_z   := (div_priority_inv - mean(div_priority_inv, na.rm = TRUE)) /
+                                   sd(div_priority_inv, na.rm = TRUE),
+          by = .(role, treat)]
+
 ## Section 5-1: Hiring Policies
   
   #### Firm: Usage of ATS
@@ -209,8 +219,23 @@ firm_dt[!is.na(fl_193_do), c(paste0("r", 1:18, "_DO")) := lapply(tstrsplit(fl_19
     bh_yes = fifelse(s5_bh == 1, 1L, 0L, na = 0L),
     bh_race = fifelse(grepl("3", s5_bh_which), 1L, 0L, na = 0L),
     bh_gender = fifelse(grepl("2", s5_bh_which), 1L, 0L, na = 0L))
-  ]  
-  
+  ]
+
+  #### Firm: Count of DEI Policies (s5_policy_dei; dei_policy_1..6 already in .dta)
+  firm_dt[, dei_policy_count   := dei_policy_1 + dei_policy_2 + dei_policy_3 + dei_policy_4 + dei_policy_5 + dei_policy_6]
+  firm_dt[, dei_policy_3plus   := as.integer(dei_policy_count >= 3)]
+  firm_dt[, dei_policy_count_z := (dei_policy_count - mean(dei_policy_count, na.rm = TRUE)) /
+                                     sd(dei_policy_count, na.rm = TRUE),
+          by = .(role, treat)]
+
+  #### Firm: Target Groups for Advancing Representation (s5_policy_diversity, multi-select)
+  ## Options: 1=White, 2=Black, 3=Hispanic, 4=Asian, 5=Male, 6=Female, 7=Other, 96=DK, 98=NA
+  firm_dt[, firm_targets_black    := fifelse(!is.na(s5_policy_diversity) & grepl("(^|,)\\s*2\\s*(,|$)", s5_policy_diversity), 1L, 0L, na = NA_integer_)]
+  firm_dt[, firm_targets_hispanic := fifelse(!is.na(s5_policy_diversity) & grepl("(^|,)\\s*3\\s*(,|$)", s5_policy_diversity), 1L, 0L, na = NA_integer_)]
+  firm_dt[, firm_targets_female   := fifelse(!is.na(s5_policy_diversity) & grepl("(^|,)\\s*6\\s*(,|$)", s5_policy_diversity), 1L, 0L, na = NA_integer_)]
+  firm_dt[, firm_targets_race_urm := as.integer(firm_targets_black == 1L | firm_targets_hispanic == 1L)]
+  firm_dt[, firm_targets_any_urm  := as.integer(firm_targets_black == 1L | firm_targets_hispanic == 1L | firm_targets_female == 1L)]
+
 ## Section 5-2: DEI Views
 
   #### Pro DEI (Z) Index
@@ -238,7 +263,15 @@ firm_dt[!is.na(fl_193_do), c(paste0("r", 1:18, "_DO")) := lapply(tstrsplit(fl_19
                                       include.lowest = TRUE),
           by = .(role)]
   firm_dt[, pro_dei_index_3tiers := relevel(pro_dei_index_3tiers, ref = "Anti-DEI")]
-  
+
+  #### Firm DEI Attention (perception of firm's current effort; 1=Very low ... 5=Very high)
+  firm_dt[, firm_attention_race_z   := (s5_view_dei_race_f   - mean(s5_view_dei_race_f,   na.rm = TRUE)) /
+                                          sd(s5_view_dei_race_f,   na.rm = TRUE),
+          by = .(role, treat)]
+  firm_dt[, firm_attention_gender_z := (s5_view_dei_gender_f - mean(s5_view_dei_gender_f, na.rm = TRUE)) /
+                                          sd(s5_view_dei_gender_f, na.rm = TRUE),
+          by = .(role, treat)]
+
   #### IRR: (Firm) Currently Hiring
   firm_dt[, `:=`(
     currentlyhiring_yes = fifelse(s1_irr_firm == 1, 1L, 0L, na = 0L))
@@ -276,10 +309,14 @@ firm_dt[!is.na(fl_193_do), c(paste0("r", 1:18, "_DO")) := lapply(tstrsplit(fl_19
   vars_id <- c("responseid", "role", "treat", "resume_ver")
   vars_resp_demo <- c("resp_age", "resp_age_centered", "s2_educ", "s2_income",
                       "resp_python", "resp_java", "resp_javascript", "resp_cplusplus", "resp_csharp",
-                      "resp_gender", "resp_female", "resp_male", "resp_nonbinaryother", 
+                      "resp_gender", "resp_female", "resp_male", "resp_nonbinaryother",
                       "resp_race", "resp_white", "resp_asian", "resp_hispanic", "resp_black", "resp_raceother",
                       "resp_race_gender", "resp_race_gender_detailed",
                       "pro_dei_race_z", "pro_dei_gender_z", "pro_diverse_z", "pro_hiring_dei_z", "pro_dei_index_z", "pro_dei_basedon_index", "pro_dei_index_3tiers",
+                      "div_priority_z", "div_priority_top3",
+                      "dei_policy_count", "dei_policy_count_z", "dei_policy_3plus",
+                      "bh_yes", "firm_targets_race_urm", "firm_targets_any_urm", "firm_targets_female",
+                      "firm_attention_race_z", "firm_attention_gender_z",
                       "firm_id", "s2_firm_size", "firm_size", "firm_size_small", "firm_size_mid", "firm_size_large",
                       "IRR_1", "IRR_2", "IRR_ever", "s3_outside_res",
                       "s4_recruiting_in_years", "s4_recruiting_in_years_centered")
@@ -301,13 +338,17 @@ firm_dt[!is.na(fl_193_do), c(paste0("r", 1:18, "_DO")) := lapply(tstrsplit(fl_19
   #### Wide -> Long Data (Original Blind Group Version / Demo Assigned)
   firm_long_dt <- melt(
     firm_long_dt,
-    id.vars = c("responseid", "role", "treat", "resume_ver", 
+    id.vars = c("responseid", "role", "treat", "resume_ver",
                 "resp_python", "resp_java", "resp_javascript", "resp_cplusplus", "resp_csharp",
                 "resp_age", "resp_age_centered", "s2_educ", "s2_income",
-                "resp_gender", "resp_female", "resp_male", "resp_nonbinaryother", 
+                "resp_gender", "resp_female", "resp_male", "resp_nonbinaryother",
                 "resp_race", "resp_white", "resp_asian", "resp_hispanic", "resp_black", "resp_raceother",
                 "resp_race_gender", "resp_race_gender_detailed",
                 "pro_dei_race_z", "pro_dei_gender_z", "pro_diverse_z", "pro_hiring_dei_z", "pro_dei_index_z", "pro_dei_basedon_index", "pro_dei_index_3tiers",
+                "div_priority_z", "div_priority_top3",
+                "dei_policy_count", "dei_policy_count_z", "dei_policy_3plus",
+                "bh_yes", "firm_targets_race_urm", "firm_targets_any_urm", "firm_targets_female",
+                "firm_attention_race_z", "firm_attention_gender_z",
                 "firm_id", "s2_firm_size", "firm_size", "firm_size_small", "firm_size_mid", "firm_size_large",
                 "IRR_1", "IRR_2", "IRR_ever", "s3_outside_res",
                 "s4_recruiting_in_years", "s4_recruiting_in_years_centered"),
