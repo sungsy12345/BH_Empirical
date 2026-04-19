@@ -69,7 +69,7 @@ rmarkdown::render(
 
 ## ----- Steps below are temporarily disabled. -----
 ## Re-enable them one at a time as each Rmd is migrated.
-# rmarkdown::render(here("1_Codes", "8A_Preferences.Rmd"),     output_dir = here("2_Reports"), intermediates_dir = tempdir())
+rmarkdown::render(here("1_Codes", "8A_Preferences.Rmd"),     output_dir = here("2_Reports"), intermediates_dir = tempdir())
 # rmarkdown::render(here("1_Codes", "8B_Stage_BH.Rmd"),        output_dir = here("2_Reports"), intermediates_dir = tempdir())
 # rmarkdown::render(here("1_Codes", "8C_Dynamic_BH.Rmd"),      output_dir = here("2_Reports"), intermediates_dir = tempdir())
 # rmarkdown::render(here("1_Codes", "8C_Dynamic_BH_Jobs.Rmd"), output_dir = here("2_Reports"), intermediates_dir = tempdir())

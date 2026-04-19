@@ -1,0 +1,3494 @@
+---
+title: "8A_Report_Preferences"
+output:
+  pdf_document:
+    number_sections: true
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{threeparttable}  
+  - \usepackage{float}  
+geometry: margin=0.5in, landscape
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+<!-- ##### ##### ##### ##### ##### Demographic Preferences ##### ##### ##### ##### ##### -->
+
+# Demographic Preferences
+
+<!-- ## Preferences on Overall Score -->
+```{r stage_pref_overall, echo = FALSE, eval = FALSE, results = 'asis'}
+
+## Regression: Overall Scores
+
+    #### HR
+    reg_pref_ovr_hr <- feols(sc_overall_z ~ i(race_gender),
+                             data = firm_long_dt[treat == "nonblind" & role == "HR"],
+                             vcov = ~ responseid)
+
+    reg_pref_ovr_hr_1 <- feols(sc_overall_z ~ i(race_gender) | resume_index,
+                               data = firm_long_dt[treat == "nonblind" & role == "HR"],
+                               vcov = ~ responseid)
+
+    reg_pref_ovr_hr_2 <- feols(sc_overall_z ~ i(race_gender) | resume_index + responseid,
+                               data = firm_long_dt[treat == "nonblind" & role == "HR"],
+                               vcov = ~ responseid)
+
+    reg_pref_ovr_hr_3 <- feols(sc_overall_z ~ i(race_gender) | resume_index + responseid + r_do,
+                               data = firm_long_dt[treat == "nonblind" & role == "HR"],
+                               vcov = ~ responseid)
+
+    #### Engineer
+    reg_pref_ovr_eng <- feols(sc_overall_z ~ i(race_gender),
+                              data = firm_long_dt[treat == "nonblind" & role == "Eng"],
+                              vcov = ~ responseid)
+
+    reg_pref_ovr_eng_1 <- feols(sc_overall_z ~ i(race_gender) | resume_index,
+                                data = firm_long_dt[treat == "nonblind" & role == "Eng"],
+                                vcov = ~ responseid)
+
+    reg_pref_ovr_eng_2 <- feols(sc_overall_z ~ i(race_gender) | resume_index + responseid,
+                                data = firm_long_dt[treat == "nonblind" & role == "Eng"],
+                                vcov = ~ responseid)
+
+    reg_pref_ovr_eng_3 <- feols(sc_overall_z ~ i(race_gender) | resume_index + responseid + r_do,
+                                data = firm_long_dt[treat == "nonblind" & role == "Eng"],
+                                vcov = ~ responseid)
+    
+    
+## Set-up Table
+
+  #### Build dictionary from actual coefficient names
+  rg_raw <- grep("^race_gender", names(coef(reg_pref_ovr_hr)), value = TRUE)
+  
+  rg_labels <- c("White Female",
+                 "Asian Male",
+                 "Asian Female",
+                 "Hispanic Male",
+                 "Hispanic Female")
+  
+  dict_rg <- setNames(rg_labels, rg_raw)
+  
+  dict_all <- c(
+    dict_rg,
+    "sc_overall_z" = "Overall Rating",
+    "resume_index" = "Resume (Content) FE",
+    "responseid"   = "Respondent FE",
+    "r_do"         = "Display Position FE"
+  )
+  
+  panelA <- paste0("Panel A: HR (Non-blind, N = ",
+                   nrow(firm_dt[role == "HR" & treat == "nonblind"]), ")")
+  panelB <- paste0("Panel B: Eng (Non-blind, N = ",
+                   nrow(firm_dt[role == "Eng" & treat == "nonblind"]), ")")
+  
+
+  tbl <- fixest::etable(
+    list(
+      "HR Base"        = reg_pref_ovr_hr,
+      "+ Res FE"       = reg_pref_ovr_hr_1,
+      "+ Resp FE"      = reg_pref_ovr_hr_2,
+      "+ DO FE"        = reg_pref_ovr_hr_3,
+      "Eng Base"       = reg_pref_ovr_eng,
+      "+ Res FE"       = reg_pref_ovr_eng_1,
+      "+ Resp FE"      = reg_pref_ovr_eng_2,
+      "+ DO FE"        = reg_pref_ovr_eng_3
+    ),
+    tex       = TRUE,
+    style.tex = style.tex("aer"),
+    keep      = "%^race_gender",
+    drop      = "%^(Intercept)$",
+    dict      = dict_all,
+    fitstat = c("n", "r2", "ar2"),
+    digits    = 3,
+    se.below  = TRUE,
+    signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.10),
+    notes = c("Standard errors clustered by respondent.", 
+              "Significance levels: * p<0.1, ** p<0.05, *** p<0.01")
+  )
+
+## Column 9: Calculate Difference (HR vs Eng) P Values (Two-Sample Z-Test)
+    
+  #### Extract Coefficients and SEs from the full models
+  b_hr  <- coef(reg_pref_ovr_hr_3)[rg_raw]
+  se_hr <- se(reg_pref_ovr_hr_3)[rg_raw]
+  
+  b_eng  <- coef(reg_pref_ovr_eng_3)[rg_raw]
+  se_eng <- se(reg_pref_ovr_eng_3)[rg_raw]
+  
+  #### Calculate Z-score and P-value
+  z_scores <- (b_hr - b_eng) / sqrt(se_hr^2 + se_eng^2)
+  p_vals   <- 2 * (1 - pnorm(abs(z_scores)))
+  
+  #### Helper to assign stars based on p-values
+  get_stars <- function(p) {
+    if (p <= 0.01) return("***")
+    if (p <= 0.05) return("**")
+    if (p <= 0.10) return("*")
+    return("")
+  }
+  
+  #### Format p-values with stars for the table (3 decimals)
+  p_vals_fmt <- sprintf("%.3f", p_vals)
+  stars <- sapply(p_vals, get_stars)
+  p_vals_with_stars <- paste0(p_vals_fmt, stars)
+  names(p_vals_with_stars) <- rg_raw 
+    
+  #### Helper to assign stars based on p-values
+  get_stars <- function(p) {
+    if (p <= 0.01) return("***")
+    if (p <= 0.05) return("**")
+    if (p <= 0.10) return("*")
+    return("")
+  } 
+  
+  #### Latex Formatting
+  
+    ###### Fix Alignment: Change {lcccccccc} (9 cols) to {lcccc|cccc|c} (10 cols)
+    tbl <- sub("\\{lcccccccc\\}", "{lcccc|cccc|c}", tbl)
+
+    ###### Fix Header: Add the "p-val" column header
+    tbl <- sub(
+      "\\(8\\) \\\\\\\\", 
+      "(8) & \\\\makecell{p-value on\\\\\\\\diff (4)-(8)} \\\\\\\\", 
+      tbl
+    )
+
+    ###### Inject P-value Data Rows
+    # Loop through the exact variable names found in the model
+    for(var in rg_raw) {
+      lbl <- dict_all[var]     # e.g., "White Female"
+      pval <- p_vals_with_stars[var]  # e.g., "0.844"
+      
+      # Find row starting with Label, append "& pval \\"
+      # We use fixed=TRUE for the pattern to be safe, but need regex for the replacement
+      pattern <- paste0("(", lbl, ".*?)\\\\\\\\")
+      replacement <- paste0("\\1 & ", pval, " \\\\\\\\")
+      
+      tbl <- sub(pattern, replacement, tbl)
+    }
+
+## Final Layout Modifications 
+    
+  #### Fix Empty Rows (Standard Errors)
+  tbl <- gsub("(\\s+\\(.*?)\\\\\\\\", "\\1 & \\\\\\\\", tbl)
+  
+  #### Fix Bottom Rows (Stats)
+  bottom_labels <- c("Observations", "R$^2$", "Adjusted R$^2$", 
+                     "Resume .* FE", "Respondent .* FE", "Display .* FE")
+  for(lab in bottom_labels) {
+    tbl <- gsub(paste0("^(", lab, ".*?)\\\\\\\\"), "\\1 & \\\\\\\\", tbl)
+  }
+  
+  #### Fix Top Header Spanning
+  tbl <- sub(
+    "\\\\multicolumn\\{8\\}\\{c\\}\\{Overall Rating\\}", 
+    paste0(
+      "\\\\multicolumn{9}{c}{Outcome: Overall Score (Z)} \\\\\\\\ \\\\cmidrule(lr){2-10} & ",
+      "\\\\multicolumn{4}{c}{", panelA, "} & ",
+      "\\\\multicolumn{4}{c}{", panelB, "} &" 
+    ),
+    tbl
+  )
+
+  #### Center of Page
+  tbl <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering", tbl)
+
+## Print
+cat(tbl)  
+  
+
+## Clean Up
+rm(panelA, panelB, tbl, rg_raw, rg_labels, dict_rg, dict_all,
+   b_eng, b_hr, se_hr, se_eng, pval, p_vals, p_vals_fmt, p_vals_with_stars, stars, replacement, var, z_scores,
+   bottom_labels, lab, lbl, pattern, 
+   reg_pref_ovr_hr, reg_pref_ovr_hr_1, reg_pref_ovr_hr_2, reg_pref_ovr_hr_3, 
+   reg_pref_ovr_eng, reg_pref_ovr_eng_1, reg_pref_ovr_eng_2, reg_pref_ovr_eng_3)
+
+```
+
+
+## Preferences on All Dimensions
+```{r stage_pref_alldimensions, echo = FALSE, results = 'asis'}
+
+## Run All Regressions
+suppressMessages(suppressWarnings({
+  #### HR Models
+  reg_hr_cod <- feols(sc_coding_z ~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
+  reg_hr_fit <- feols(sc_fit_z    ~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
+  reg_hr_sta <- feols(sc_stay_z   ~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
+  reg_hr_ovr <- feols(sc_overall_z~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
+  reg_hr_adv <- feols(sc_advance  ~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
+
+  #### Engineer Models
+  reg_eng_cod <- feols(sc_coding_z ~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
+  reg_eng_fit <- feols(sc_fit_z    ~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
+  reg_eng_sta <- feols(sc_stay_z   ~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
+  reg_eng_ovr <- feols(sc_overall_z~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
+}))
+
+## Setup Labels
+rg_labels <- c("White Female", "Asian Male", "Asian Female", "Hispanic Male", "Hispanic Female")
+rg_raw <- grep("^race_gender", names(coef(reg_hr_cod)), value = TRUE)
+
+dict_dims <- c(
+  setNames(rg_labels, rg_raw),
+  "resume_index" = "Resume (Content) FE",
+  "responseid"   = "Respondent FE",
+  "r_do"         = "Display Position FE"
+)
+
+## Generate Side-by-Side Table (9 columns)
+tbl <- fixest::etable(
+  list(
+    # HR Panel (5 cols)
+    "Coding" = reg_hr_cod, "Fit" = reg_hr_fit, "Stay" = reg_hr_sta, "Overall" = reg_hr_ovr, "Advance" = reg_hr_adv,
+    # Eng Panel (4 cols)
+    "Coding " = reg_eng_cod, "Fit " = reg_eng_fit, "Stay " = reg_eng_sta, "Overall " = reg_eng_ovr
+  ),
+  tex = TRUE, style.tex = style.tex("aer"),
+  placement = "H",
+  keep = "%^race_gender",
+  drop = "%^(Intercept)$",
+  dict = dict_dims,
+  fitstat = c("n", "r2"),
+  digits = 3,
+  se.below = TRUE,
+  notes = c("Standard errors clustered by respondent.", "Significance levels: * p<0.1, ** p<0.05, *** p<0.01")
+)
+
+## Final Layout Modifications 
+
+  #### Header spanning: HR occupies cols 2-6 (5 cols), Eng occupies cols 7-10 (4 cols)
+  tbl <- sub(
+    "\\\\toprule",
+    paste0("\\\\toprule & \\\\multicolumn{5}{c}{Panel A: HR (Non-blind, N = ", nobs(reg_hr_cod)/18, ")} & \\\\multicolumn{4}{c}{Panel B: Engineer (Non-blind, N = ", nobs(reg_eng_cod)/18, ")} \\\\\\\\ \\\\cmidrule(lr){2-6} \\\\cmidrule(lr){7-10}"),
+    tbl
+  )
+  
+  #### Clean up formatting
+  tbl <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering", tbl)
+
+## Print
+cat(tbl)
+
+rm(reg_hr_cod, reg_hr_fit, reg_hr_sta, reg_hr_ovr, reg_hr_adv, 
+   reg_eng_cod, reg_eng_fit, reg_eng_sta, reg_eng_ovr,
+   rg_labels, rg_raw, dict_dims, tbl)
+```
+
+
+
+<!-- ## Functions for Concordance and Heterogeneity  -->
+```{r pref_heterogeneity_functions, eval = TRUE, include = FALSE, echo = FALSE}
+
+## Function for Linear Combination Test - Race Only
+total_effects_lincom_race <- function(model, resp_group) {
+  coefs <- coef(model)
+  vcov_mat <- vcov(model)
+  candidate_demographics <- c("White_Female", "Asian_Male", "Asian_Female", "Hispanic_Male", "Hispanic_Female")
+  res_list <- list()
+
+  for(cand in candidate_demographics) {
+    main_term <- paste0("race_gender::", cand)
+    
+    if(resp_group == "White") {
+      est <- coefs[main_term]
+      var_sum <- vcov_mat[main_term, main_term]
+    } else {
+      # The interaction terms are structured as: resp_var:race_gender::candidate
+      if(resp_group == "Asian") {
+        int_term <- paste0("resp_asian:race_gender::", cand)
+      } else if(resp_group == "Hispanic") {
+        int_term <- paste0("resp_hispanic:race_gender::", cand)
+      } else if(resp_group == "Black") {
+        int_term <- paste0("resp_black:race_gender::", cand)
+      }
+      
+      if(!int_term %in% names(coefs)) {
+        res_list[[cand]] <- data.table(Respondent = resp_group, Candidate = cand, Estimate = NA, SE = NA, Pval = NA, Label = "")
+        next
+      }
+      est <- coefs[main_term] + coefs[int_term]
+      v_main <- vcov_mat[main_term, main_term]
+      v_int  <- vcov_mat[int_term, int_term]
+      cov_mi <- vcov_mat[main_term, int_term]
+      var_sum <- v_main + v_int + 2 * cov_mi
+    }
+    
+    if (is.na(var_sum) || var_sum <= 1e-14) { se <- NA } else { se <- sqrt(var_sum) }
+    if (is.na(se)) { pval <- NA; sig_label <- "" } else {
+      z_score <- est / se
+      pval <- 2 * (1 - pnorm(abs(z_score))) 
+      sig_label <- ""
+      if(pval < 0.01) {sig_label <- "***"} else if(pval < 0.05) {sig_label <- "**"} else if(pval < 0.10) {sig_label <- "*"}
+    }
+    res_list[[cand]] <- data.table(Respondent = resp_group, Candidate = cand, Estimate = est, SE = se, Pval = pval, Label = sig_label)
+  }
+  return(rbindlist(res_list))
+}
+
+## Function for Individually Plotting Total Effects - Race Only
+plot_heterogeneity_race <- function(model, plot_title, x_label, show_y_text = TRUE, resp_counts = NULL, role) {
+  
+  respondent_groups <- c("White", "Asian", "Hispanic", "Black")
+  
+  plot_data <- rbindlist(lapply(respondent_groups, function(g) {
+    dt <- tryCatch(total_effects_lincom_race(model, g), error = function(e) return(NULL))
+    if(!is.null(dt)) {
+      ref_row <- data.table(Respondent = g, Candidate = "White_Male", Estimate = 0, SE = 0, Pval = 1, Label = "")
+      dt <- rbind(dt, ref_row)
+    }
+    return(dt)  
+  }))
+  
+  plot_data <- plot_data[Respondent != "Other"]
+  
+  # Set factor order for Respondent FIRST
+  plot_data[, Respondent := factor(Respondent, levels = c("White", "Asian", "Hispanic", "Black"))]
+  
+  # Add N counts to respondent labels
+  if(!is.null(resp_counts)) {
+    N_col <- ifelse(role == "HR", "N_HR", "N_Eng")
+    resp_counts_subset <- resp_counts[, .(resp_race, N = get(N_col))]
+    plot_data <- plot_data[resp_counts_subset, on = c(Respondent = "resp_race")]
+    plot_data[, Respondent_Label := paste0(Respondent, " (N=", N, ")")]
+    
+    # Set factor order for Respondent_Label explicitly
+    respondent_label_order <- c(
+      paste0("White (N=", resp_counts_subset[resp_race == "White", N], ")"),
+      paste0("Asian (N=", resp_counts_subset[resp_race == "Asian", N], ")"),
+      paste0("Hispanic (N=", resp_counts_subset[resp_race == "Hispanic", N], ")"),
+      paste0("Black (N=", resp_counts_subset[resp_race == "Black", N], ")")
+    )
+    plot_data[, Respondent_Label := factor(Respondent_Label, levels = respondent_label_order)]
+  } else {
+    plot_data[, Respondent_Label := Respondent]
+  }
+  
+  abbrevs <- c("White_Male" = "WM", "White_Female" = "WF", "Asian_Male" = "AM", "Asian_Female" = "AF", "Hispanic_Male" = "HM", "Hispanic_Female" = "HF")
+  plot_data[, Candidate_Abbr := abbrevs[as.character(Candidate)]]
+  plot_data[, Candidate_Abbr := factor(Candidate_Abbr, levels = c("HF", "HM", "AF", "AM", "WF", "WM"))]
+  
+  # Extract race from candidate (White, Asian, Hispanic)
+  plot_data[, Candidate_Race := fcase(
+    Candidate %in% c("White_Male", "White_Female"), "White",
+    Candidate %in% c("Asian_Male", "Asian_Female"), "Asian",
+    Candidate %in% c("Hispanic_Male", "Hispanic_Female"), "Hispanic",
+    default = "Other"
+  )]
+  
+  # Create match status based on race concordance
+  plot_data[, Match_Status := ifelse(as.character(Respondent) == Candidate_Race, "Concordant Race", "Nonconcordant")]
+  plot_data[, Match_Status := factor(Match_Status, levels = c("Nonconcordant", "Concordant Race"))]
+  
+  p <- ggplot(plot_data, aes(x = Estimate, y = Candidate_Abbr)) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+    geom_pointrange(aes(xmin = Estimate - 1.96*SE, xmax = Estimate + 1.96*SE, color = Match_Status), 
+                    size = 0.4, position = position_dodge(width = 0.5), na.rm = TRUE) +
+    geom_text(aes(label = Label, color = Match_Status), 
+              vjust = -0.6, fontface = "bold", size = 3, na.rm = TRUE, show.legend = FALSE) +
+    facet_grid(~ Respondent_Label) +
+    scale_color_manual(values = c("Nonconcordant" = "black", "Concordant Race" = "#D55E00")) +
+    labs(title = plot_title, x = x_label, y = NULL, color = "") + 
+    theme_bw(base_size = 10) +
+    theme(
+      legend.position = "bottom", legend.margin = margin(t = -5, b=0, unit="pt"),
+      strip.text = element_text(face = "bold", size = 8), 
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 7),
+      panel.spacing = unit(0.1, "cm"), plot.margin = margin(5, 5, 5, 5)
+    ) +
+    scale_x_continuous(n.breaks = 3) + coord_cartesian(xlim = c(-1.25, 1.25), clip = "off")
+  
+  if(show_y_text == FALSE) {
+    p <- p + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+  }
+  return(p)
+}
+
+## Function for Linear Combination Test - Race Only (Collapsing on / Ignoring Gender)
+total_effects_lincom_race_collapsedongender <- function(model, resp_group) {
+  coefs <- coef(model)
+  vcov_mat <- vcov(model)
+  candidate_races <- c("White", "Asian", "Hispanic")
+  res_list <- list()
+
+  for(cand_race in candidate_races) {
+    main_term <- paste0("race::", cand_race)
+    
+    if(resp_group == "White") {
+      if(main_term %in% names(coefs)) {
+        est <- coefs[main_term]
+        var_sum <- vcov_mat[main_term, main_term]
+      } else {
+        est <- NA
+        var_sum <- NA
+      }
+    } else {
+      # The interaction terms are structured as: resp_var:race::candidate_race
+      if(resp_group == "Asian") {
+        int_term <- paste0("resp_asian:race::", cand_race)
+      } else if(resp_group == "Hispanic") {
+        int_term <- paste0("resp_hispanic:race::", cand_race)
+      } else if(resp_group == "Black") {
+        int_term <- paste0("resp_black:race::", cand_race)
+      }
+      
+      if(!int_term %in% names(coefs)) {
+        res_list[[cand_race]] <- data.table(Respondent = resp_group, Candidate_Race = cand_race, Estimate = NA, SE = NA, Pval = NA, Label = "")
+        next
+      }
+      
+      if(main_term %in% names(coefs)) {
+        est <- coefs[main_term] + coefs[int_term]
+        v_main <- vcov_mat[main_term, main_term]
+        v_int  <- vcov_mat[int_term, int_term]
+        cov_mi <- vcov_mat[main_term, int_term]
+        var_sum <- v_main + v_int + 2 * cov_mi
+      } else {
+        est <- coefs[int_term]
+        var_sum <- vcov_mat[int_term, int_term]
+      }
+    }
+    
+    if (is.na(var_sum) || var_sum <= 1e-14) { se <- NA } else { se <- sqrt(var_sum) }
+    if (is.na(se)) { pval <- NA; sig_label <- "" } else {
+      z_score <- est / se
+      pval <- 2 * (1 - pnorm(abs(z_score))) 
+      sig_label <- ""
+      if(pval < 0.01) {sig_label <- "***"} else if(pval < 0.05) {sig_label <- "**"} else if(pval < 0.10) {sig_label <- "*"}
+    }
+    res_list[[cand_race]] <- data.table(Respondent = resp_group, Candidate_Race = cand_race, Estimate = est, SE = se, Pval = pval, Label = sig_label)
+  }
+  return(rbindlist(res_list))
+}
+
+## Function for Plotting - Race Only (Collapsing on / Ignoring Gender)
+plot_heterogeneity_race_collapsedongender <- function(model, plot_title, x_label, show_y_text = TRUE, resp_counts = NULL, role) {
+  
+  respondent_groups <- c("White", "Asian", "Hispanic", "Black")
+  
+  plot_data <- rbindlist(lapply(respondent_groups, function(g) {
+    dt <- tryCatch(total_effects_lincom_race_collapsedongender(model, g), error = function(e) return(NULL))
+    if(!is.null(dt)) {
+      ref_row <- data.table(Respondent = g, Candidate_Race = "White", Estimate = 0, SE = 0, Pval = 1, Label = "")
+      dt <- rbind(dt, ref_row)
+    }
+    return(dt)  
+  }))
+  
+  plot_data <- plot_data[Respondent != "Other"]
+  
+  # Set factor order for Respondent FIRST
+  plot_data[, Respondent := factor(Respondent, levels = c("White", "Asian", "Hispanic", "Black"))]
+  
+  # Add N counts to respondent labels
+  if(!is.null(resp_counts)) {
+    N_col <- ifelse(role == "HR", "N_HR", "N_Eng")
+    resp_counts_subset <- resp_counts[, .(resp_race, N = get(N_col))]
+    plot_data <- plot_data[resp_counts_subset, on = c(Respondent = "resp_race")]
+    plot_data[, Respondent_Label := paste0(Respondent, " (N=", N, ")")]
+    
+    # Set factor order for Respondent_Label explicitly
+    respondent_label_order <- c(
+      paste0("White (N=", resp_counts_subset[resp_race == "White", N], ")"),
+      paste0("Asian (N=", resp_counts_subset[resp_race == "Asian", N], ")"),
+      paste0("Hispanic (N=", resp_counts_subset[resp_race == "Hispanic", N], ")"),
+      paste0("Black (N=", resp_counts_subset[resp_race == "Black", N], ")")
+    )
+    plot_data[, Respondent_Label := factor(Respondent_Label, levels = respondent_label_order)]
+  } else {
+    plot_data[, Respondent_Label := Respondent]
+  }
+  
+  plot_data[, Candidate_Race := factor(Candidate_Race, levels = c("Hispanic", "Asian", "White"))]
+  
+  # Create match status based on race concordance
+  plot_data[, Match_Status := ifelse(as.character(Respondent) == as.character(Candidate_Race), "Concordant Race", "Nonconcordant")]
+  plot_data[, Match_Status := factor(Match_Status, levels = c("Nonconcordant", "Concordant Race"))]
+  
+  p <- ggplot(plot_data, aes(x = Estimate, y = Candidate_Race)) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+    geom_pointrange(aes(xmin = Estimate - 1.96*SE, xmax = Estimate + 1.96*SE, color = Match_Status), 
+                    size = 0.4, position = position_dodge(width = 0.5), na.rm = TRUE) +
+    geom_text(aes(label = Label, color = Match_Status), 
+              vjust = -0.6, fontface = "bold", size = 3, na.rm = TRUE, show.legend = FALSE) +
+    facet_grid(~ Respondent_Label) +
+    scale_color_manual(values = c("Nonconcordant" = "black", "Concordant Race" = "#D55E00")) +
+    labs(title = plot_title, x = x_label, y = NULL, color = "") + 
+    theme_bw(base_size = 10) +
+    theme(
+      legend.position = "bottom", legend.margin = margin(t = -5, b=0, unit="pt"),
+      strip.text = element_text(face = "bold", size = 8), 
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 7),
+      panel.spacing = unit(0.1, "cm"), plot.margin = margin(5, 5, 5, 5)
+    ) +
+    scale_x_continuous(n.breaks = 3) + coord_cartesian(xlim = c(-1.25, 1.25), clip = "off")
+  
+  if(show_y_text == FALSE) {
+    p <- p + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+  }
+  return(p)
+}
+
+## Function for Linear Combination Test - Gender Only
+total_effects_lincom_gender <- function(model, resp_group) {
+  coefs <- coef(model)
+  vcov_mat <- vcov(model)
+  candidate_demographics <- c("White_Female", "Asian_Male", "Asian_Female", "Hispanic_Male", "Hispanic_Female")
+  res_list <- list()
+
+  for(cand in candidate_demographics) {
+    main_term <- paste0("race_gender::", cand)
+    
+    if(resp_group == "Male") {
+      est <- coefs[main_term]
+      var_sum <- vcov_mat[main_term, main_term]
+    } else {
+      # For gender heterogeneity: resp_male interaction
+      int_term <- paste0("race_gender::", cand, ":resp_male")
+      
+      if(!int_term %in% names(coefs)) {
+        res_list[[cand]] <- data.table(Respondent = resp_group, Candidate = cand, Estimate = NA, SE = NA, Pval = NA, Label = "")
+        next
+      }
+      # For Female respondents, we need main - interaction (since resp_male=0 for females)
+      est <- coefs[main_term] + coefs[int_term]
+      v_main <- vcov_mat[main_term, main_term]
+      v_int  <- vcov_mat[int_term, int_term]
+      cov_mi <- vcov_mat[main_term, int_term]
+      var_sum <- v_main + v_int + 2 * cov_mi
+    }
+    
+    if (is.na(var_sum) || var_sum <= 1e-14) { se <- NA } else { se <- sqrt(var_sum) }
+    if (is.na(se)) { pval <- NA; sig_label <- "" } else {
+      z_score <- est / se
+      pval <- 2 * (1 - pnorm(abs(z_score))) 
+      sig_label <- ""
+      if(pval < 0.01) {sig_label <- "***"} else if(pval < 0.05) {sig_label <- "**"} else if(pval < 0.10) {sig_label <- "*"}
+    }
+    res_list[[cand]] <- data.table(Respondent = resp_group, Candidate = cand, Estimate = est, SE = se, Pval = pval, Label = sig_label)
+  }
+  return(rbindlist(res_list))
+}
+
+## Function for Individually Plotting Total Effects - Gender Only
+plot_heterogeneity_gender <- function(model, plot_title, x_label, show_y_text = TRUE, resp_counts = NULL, role) {
+  
+  respondent_groups <- c("Male", "Female")
+  
+  plot_data <- rbindlist(lapply(respondent_groups, function(g) {
+    dt <- tryCatch(total_effects_lincom_gender(model, g), error = function(e) return(NULL))
+    if(!is.null(dt)) {
+      ref_row <- data.table(Respondent = g, Candidate = "White_Male", Estimate = 0, SE = 0, Pval = 1, Label = "")
+      dt <- rbind(dt, ref_row)
+    }
+    return(dt)  
+  }))
+
+  # Set factor order for Respondent FIRST
+  plot_data[, Respondent := factor(Respondent, levels = c("Male", "Female"))]
+  
+  # Add N counts to respondent labels
+  if(!is.null(resp_counts)) {
+    N_col <- ifelse(role == "HR", "N_HR", "N_Eng")
+    resp_counts_subset <- resp_counts[, .(resp_gender, N = get(N_col))]
+    plot_data <- plot_data[resp_counts_subset, on = c(Respondent = "resp_gender")]
+    plot_data[, Respondent_Label := paste0(Respondent, " (N=", N, ")")]
+    
+    # Set factor order for Respondent_Label explicitly
+    respondent_label_order <- c(
+      paste0("Male (N=", resp_counts_subset[resp_gender == "Male", N], ")"),
+      paste0("Female (N=", resp_counts_subset[resp_gender == "Female", N], ")")
+    )
+    plot_data[, Respondent_Label := factor(Respondent_Label, levels = respondent_label_order)]
+  } else {
+    plot_data[, Respondent_Label := Respondent]
+  }
+
+  abbrevs <- c("White_Male" = "WM", "White_Female" = "WF", "Asian_Male" = "AM", "Asian_Female" = "AF", "Hispanic_Male" = "HM", "Hispanic_Female" = "HF")
+  plot_data[, Candidate_Abbr := abbrevs[as.character(Candidate)]]
+  plot_data[, Candidate_Abbr := factor(Candidate_Abbr, levels = c("HF", "HM", "AF", "AM", "WF", "WM"))]
+  
+  # Extract gender from candidate
+  plot_data[, Candidate_Gender := fcase(
+    Candidate %in% c("White_Male", "Asian_Male", "Hispanic_Male"), "Male",
+    Candidate %in% c("White_Female", "Asian_Female", "Hispanic_Female"), "Female",
+    default = "Other"
+  )]
+  
+  # Create match status based on gender concordance
+  plot_data[, Match_Status := ifelse(as.character(Respondent) == Candidate_Gender, "Concordant Gender", "Nonconcordant")]
+  plot_data[, Match_Status := factor(Match_Status, levels = c("Nonconcordant", "Concordant Gender"))]
+
+  p <- ggplot(plot_data, aes(x = Estimate, y = Candidate_Abbr)) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+    geom_pointrange(aes(xmin = Estimate - 1.96*SE, xmax = Estimate + 1.96*SE, color = Match_Status), 
+                    size = 0.4, position = position_dodge(width = 0.5), na.rm = TRUE) +
+    geom_text(aes(label = Label, color = Match_Status), 
+              vjust = -0.6, fontface = "bold", size = 3, na.rm = TRUE, show.legend = FALSE) +
+    facet_grid(~ Respondent_Label) +
+    scale_color_manual(values = c("Nonconcordant" = "black", "Concordant Gender" = "#D55E00")) +
+    labs(title = plot_title, x = x_label, y = NULL, color = "") + 
+    theme_bw(base_size = 10) +
+    theme(
+      legend.position = "bottom", legend.margin = margin(t = -5, b=0, unit="pt"),
+      strip.text = element_text(face = "bold", size = 8), 
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 7),
+      panel.spacing = unit(0.1, "cm"), plot.margin = margin(5, 5, 5, 5)
+    ) +
+    scale_x_continuous(n.breaks = 3) + coord_cartesian(xlim = c(-1.25, 1.25), clip = "off")
+
+  if(show_y_text == FALSE) {
+    p <- p + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+  }
+  return(p)
+}
+
+## Function for Linear Combination Test - Gender Only (Collapsing on / Ignoring Race)
+total_effects_lincom_gender_collapsedonrace <- function(model, resp_group) {
+  coefs <- coef(model)
+  vcov_mat <- vcov(model)
+  candidate_genders <- c("Male", "Female")
+  res_list <- list()
+
+  for(cand_gender in candidate_genders) {
+    main_term <- paste0("gender::", cand_gender)
+    
+    if(resp_group == "Male") {
+      if(main_term %in% names(coefs)) {
+        est <- coefs[main_term]
+        var_sum <- vcov_mat[main_term, main_term]
+      } else {
+        est <- NA
+        var_sum <- NA
+      }
+    } else {
+      # For Female respondents: resp_male interaction
+      int_term <- paste0("gender::", cand_gender, ":resp_male")
+      
+      if(!int_term %in% names(coefs)) {
+        res_list[[cand_gender]] <- data.table(Respondent = resp_group, Candidate_Gender = cand_gender, Estimate = NA, SE = NA, Pval = NA, Label = "")
+        next
+      }
+      
+      if(main_term %in% names(coefs)) {
+        est <- coefs[main_term] + coefs[int_term]
+        v_main <- vcov_mat[main_term, main_term]
+        v_int  <- vcov_mat[int_term, int_term]
+        cov_mi <- vcov_mat[main_term, int_term]
+        var_sum <- v_main + v_int + 2 * cov_mi
+      } else {
+        est <- coefs[int_term]
+        var_sum <- vcov_mat[int_term, int_term]
+      }
+    }
+    
+    if (is.na(var_sum) || var_sum <= 1e-14) { se <- NA } else { se <- sqrt(var_sum) }
+    if (is.na(se)) { pval <- NA; sig_label <- "" } else {
+      z_score <- est / se
+      pval <- 2 * (1 - pnorm(abs(z_score))) 
+      sig_label <- ""
+      if(pval < 0.01) {sig_label <- "***"} else if(pval < 0.05) {sig_label <- "**"} else if(pval < 0.10) {sig_label <- "*"}
+    }
+    res_list[[cand_gender]] <- data.table(Respondent = resp_group, Candidate_Gender = cand_gender, Estimate = est, SE = se, Pval = pval, Label = sig_label)
+  }
+  return(rbindlist(res_list))
+}
+
+## Function for Plotting - Gender Only (Collapsing on / Ignoring Race)
+plot_heterogeneity_gender_collapsedonrace <- function(model, plot_title, x_label, show_y_text = TRUE, resp_counts = NULL, role) {
+  
+  respondent_groups <- c("Male", "Female")
+  
+  plot_data <- rbindlist(lapply(respondent_groups, function(g) {
+    dt <- tryCatch(total_effects_lincom_gender_collapsedonrace(model, g), error = function(e) return(NULL))
+    if(!is.null(dt)) {
+      ref_row <- data.table(Respondent = g, Candidate_Gender = "Male", Estimate = 0, SE = 0, Pval = 1, Label = "")
+      dt <- rbind(dt, ref_row)
+    }
+    return(dt)  
+  }))
+  
+  # Set factor order for Respondent FIRST
+  plot_data[, Respondent := factor(Respondent, levels = c("Male", "Female"))]
+  
+  # Add N counts to respondent labels
+  if(!is.null(resp_counts)) {
+    N_col <- ifelse(role == "HR", "N_HR", "N_Eng")
+    resp_counts_subset <- resp_counts[, .(resp_gender, N = get(N_col))]
+    plot_data <- plot_data[resp_counts_subset, on = c(Respondent = "resp_gender")]
+    plot_data[, Respondent_Label := paste0(Respondent, " (N=", N, ")")]
+    
+    # Set factor order for Respondent_Label explicitly
+    respondent_label_order <- c(
+      paste0("Male (N=", resp_counts_subset[resp_gender == "Male", N], ")"),
+      paste0("Female (N=", resp_counts_subset[resp_gender == "Female", N], ")")
+    )
+    plot_data[, Respondent_Label := factor(Respondent_Label, levels = respondent_label_order)]
+  } else {
+    plot_data[, Respondent_Label := Respondent]
+  }
+  
+  plot_data[, Candidate_Gender := factor(Candidate_Gender, levels = c("Female", "Male"))]
+  
+  # Create match status based on gender concordance
+  plot_data[, Match_Status := ifelse(as.character(Respondent) == as.character(Candidate_Gender), "Concordant Gender", "Nonconcordant")]
+  plot_data[, Match_Status := factor(Match_Status, levels = c("Nonconcordant", "Concordant Gender"))]
+  
+  p <- ggplot(plot_data, aes(x = Estimate, y = Candidate_Gender)) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+    geom_pointrange(aes(xmin = Estimate - 1.96*SE, xmax = Estimate + 1.96*SE, color = Match_Status), 
+                    size = 0.4, position = position_dodge(width = 0.5), na.rm = TRUE) +
+    geom_text(aes(label = Label, color = Match_Status), 
+              vjust = -0.6, fontface = "bold", size = 3, na.rm = TRUE, show.legend = FALSE) +
+    facet_grid(~ Respondent_Label) +
+    scale_color_manual(values = c("Nonconcordant" = "black", "Concordant Gender" = "#D55E00")) +
+    labs(title = plot_title, x = x_label, y = NULL, color = "") + 
+    theme_bw(base_size = 10) +
+    theme(
+      legend.position = "bottom", legend.margin = margin(t = -5, b=0, unit="pt"),
+      strip.text = element_text(face = "bold", size = 8), 
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 7),
+      panel.spacing = unit(0.1, "cm"), plot.margin = margin(5, 5, 5, 5)
+    ) +
+    scale_x_continuous(n.breaks = 3) + coord_cartesian(xlim = c(-1.25, 1.25), clip = "off")
+  
+  if(show_y_text == FALSE) {
+    p <- p + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+  }
+  return(p)
+}
+
+## Function for Linear Combination Test - Race and Gender Together
+total_effects_lincom_racegender <- function(model, resp_group) {
+  coefs <- coef(model)
+  vcov_mat <- vcov(model)
+  candidate_demographics <- c("White_Female", "Asian_Male", "Asian_Female", "Hispanic_Male", "Hispanic_Female")
+  res_list <- list()
+
+  for(cand in candidate_demographics) {
+    main_term <- paste0("race_gender::", cand)
+    if(resp_group == "White_Male") {
+      est <- coefs[main_term]
+      var_sum <- vcov_mat[main_term, main_term]
+    } else {
+      int_term <- paste0("resp_race_gender::", resp_group, ":race_gender::", cand)
+      if(!int_term %in% names(coefs)) {
+        res_list[[cand]] <- data.table(Respondent = resp_group, Candidate = cand, Estimate = NA, SE = NA, Pval = NA, Label = "")
+        next
+      }
+      est <- coefs[main_term] + coefs[int_term]
+      v_main <- vcov_mat[main_term, main_term]
+      v_int  <- vcov_mat[int_term, int_term]
+      cov_mi <- vcov_mat[main_term, int_term]
+      var_sum <- v_main + v_int + 2 * cov_mi
+    }
+    
+    if (is.na(var_sum) || var_sum <= 1e-14) { se <- NA } else { se <- sqrt(var_sum) }
+    if (is.na(se)) { pval <- NA; sig_label <- "" } else {
+      z_score <- est / se
+      pval <- 2 * (1 - pnorm(abs(z_score))) 
+      sig_label <- ""
+      if(pval < 0.01) {sig_label <- "***"} else if(pval < 0.05) {sig_label <- "**"} else if(pval < 0.10) {sig_label <- "*"}
+    }
+    res_list[[cand]] <- data.table(Respondent = resp_group, Candidate = cand, Estimate = est, SE = se, Pval = pval, Label = sig_label)
+  }
+  return(rbindlist(res_list))
+}
+
+## Function for Individually Plotting Total Effects - Race and Gender Together
+plot_heterogeneity_racegender <- function(model, plot_title, x_label, show_y_text = TRUE, resp_counts = NULL, role = NULL) {
+  
+  respondent_groups <- c("White_Male", "White_Female", "Asian_Male", "Asian_Female", "Hispanic_Male", "Hispanic_Female")
+  
+  # Generate Data
+  plot_data <- rbindlist(lapply(respondent_groups, function(g) {
+    dt <- tryCatch(total_effects_lincom_racegender(model, g), error = function(e) return(NULL))
+    if(!is.null(dt)) {
+      ref_row <- data.table(Respondent = g, Candidate = "White_Male", Estimate = 0, SE = 0, Pval = 1, Label = "")
+      dt <- rbind(dt, ref_row)
+    }
+    return(dt)  
+  }))
+
+  # Abbreviations Map
+  abbrevs <- c("White_Male" = "WM", "White_Female" = "WF", "Asian_Male" = "AM", "Asian_Female" = "AF", "Hispanic_Male" = "HM", "Hispanic_Female" = "HF")
+  
+  # Process Panel Headers (Respondent Labels)
+  if(!is.null(resp_counts) && !is.null(role)) {
+    N_col <- ifelse(role == "HR", "N_HR", "N_Eng")
+    counts_sub <- resp_counts[, .(resp_race_gender, N = get(N_col))]
+    
+    # FIX: Use merge(all.x=TRUE) to strictly keep only the 6 plotting groups
+    # This drops any NA/Other rows that might be in counts_sub
+    plot_data <- merge(plot_data, counts_sub, by.x = "Respondent", by.y = "resp_race_gender", all.x = TRUE)
+    plot_data[is.na(N), N := 0] # Fill NAs with 0 if missing
+    
+    # Create Label with N (e.g., "WM (N=32)")
+    plot_data[, Panel_Label := paste0(abbrevs[as.character(Respondent)], " (N=", N, ")")]
+    
+    # Create factor order matching standard demographic order
+    ordered_levels <- character(0)
+    for(g in respondent_groups) {
+       n_val <- unique(plot_data[Respondent == g, N])
+       if(length(n_val) > 0) {
+         ordered_levels <- c(ordered_levels, paste0(abbrevs[g], " (N=", n_val, ")"))
+       }
+    }
+    plot_data[, Panel_Label := factor(Panel_Label, levels = ordered_levels)]
+    
+  } else {
+    # Fallback if no counts provided
+    plot_data[, Panel_Label := abbrevs[as.character(Respondent)]]
+    plot_data[, Panel_Label := factor(Panel_Label, levels = c("WM", "WF", "AM", "AF", "HM", "HF"))]
+  }
+
+  # Process Y-Axis (Candidate Labels)
+  plot_data[, Candidate_Abbr := abbrevs[as.character(Candidate)]]
+  plot_data[, Candidate_Abbr := factor(Candidate_Abbr, levels = c("HF", "HM", "AF", "AM", "WF", "WM"))]
+  
+  # Match Status
+  plot_data[, Match_Status := ifelse(as.character(Respondent) == as.character(Candidate), "Concordant Demographic", "Nonconcordant")]
+  plot_data[, Match_Status := factor(Match_Status, levels = c("Nonconcordant", "Concordant Demographic"))]
+
+  # Plot
+  p <- ggplot(plot_data, aes(x = Estimate, y = Candidate_Abbr)) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+    geom_pointrange(aes(xmin = Estimate - 1.96*SE, xmax = Estimate + 1.96*SE, color = Match_Status), 
+                    size = 0.4, position = position_dodge(width = 0.5), na.rm = TRUE) +
+    geom_text(aes(label = Label, color = Match_Status), 
+              vjust = -0.6, fontface = "bold", size = 3, na.rm = TRUE, show.legend = FALSE) +
+    facet_grid(~ Panel_Label) +
+    scale_color_manual(values = c("Nonconcordant" = "black", "Concordant Demographic" = "#D55E00")) + 
+    labs(title = plot_title, x = x_label, y = NULL, color = "") + 
+    theme_bw(base_size = 10) +
+    theme(
+      legend.position = "bottom", legend.margin = margin(t = -5, b=0, unit="pt"),
+      strip.text = element_text(face = "bold", size = 8), 
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 7),
+      panel.spacing = unit(0.1, "cm"), plot.margin = margin(5, 5, 5, 5)
+    ) +
+    scale_x_continuous(n.breaks = 3) + coord_cartesian(xlim = c(-1.25, 1.25), clip = "off")
+
+  if(show_y_text == FALSE) {
+    p <- p + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+  }
+  return(p)
+}
+
+## Function for Linear Combination Test - Detailed Race & Gender
+total_effects_lincom_detailed_race_gender <- function(model, resp_group) {
+  coefs <- coef(model)
+  vcov_mat <- vcov(model)
+  candidate_demographics <- c("White_Female", 
+                              "Chinese_Male", "Chinese_Female", 
+                              "Indian_Male", "Indian_Female", 
+                              "Hispanic_Male", "Hispanic_Female")
+  res_list <- list()
+
+  for(cand in candidate_demographics) {
+    main_term <- paste0("race_gender_detailed::", cand)
+    if(resp_group == "White_Male") {
+      if(main_term %in% names(coefs)) {
+        est <- coefs[main_term]
+        var_sum <- vcov_mat[main_term, main_term]
+      } else {
+        est <- NA; var_sum <- NA
+      }
+    } else {
+      int_term <- paste0("resp_race_gender_detailed::", resp_group, ":race_gender_detailed::", cand)
+      if(!int_term %in% names(coefs)) {
+        res_list[[cand]] <- data.table(Respondent = resp_group, Candidate = cand, Estimate = NA, SE = NA, Pval = NA, Label = "")
+        next
+      }
+      if(main_term %in% names(coefs)) {
+        est <- coefs[main_term] + coefs[int_term]
+        v_main <- vcov_mat[main_term, main_term]
+        v_int  <- vcov_mat[int_term, int_term]
+        cov_mi <- vcov_mat[main_term, int_term]
+        var_sum <- v_main + v_int + 2 * cov_mi
+      } else {
+        est <- coefs[int_term]
+        var_sum <- vcov_mat[int_term, int_term]
+      }
+    }
+    
+    if (is.na(var_sum) || var_sum <= 1e-14) { se <- NA } else { se <- sqrt(var_sum) }
+    if (is.na(se)) { pval <- NA; sig_label <- "" } else {
+      z_score <- est / se
+      pval <- 2 * (1 - pnorm(abs(z_score))) 
+      sig_label <- ""
+      if(pval < 0.01) {sig_label <- "***"} else if(pval < 0.05) {sig_label <- "**"} else if(pval < 0.10) {sig_label <- "*"}
+    }
+    res_list[[cand]] <- data.table(Respondent = resp_group, Candidate = cand, Estimate = est, SE = se, Pval = pval, Label = sig_label)
+  }
+  return(rbindlist(res_list))
+}
+
+## Function for Linear Combination Test - Recentered to Concordant Group
+total_effects_lincom_detailed_race_gender_recentered <- function(model, resp_group) {
+  coefs <- coef(model)
+  vcov_mat <- vcov(model)
+  
+  candidate_demographics <- c("White_Male", "White_Female", 
+                              "Chinese_Male", "Chinese_Female", 
+                              "Indian_Male", "Indian_Female", 
+                              "Hispanic_Male", "Hispanic_Female")
+  
+  # Build linear combination vector for each candidate
+  build_lc <- function(cand) {
+    lc <- rep(0, length(coefs))
+    names(lc) <- names(coefs)
+    
+    if (cand != "White_Male") {
+      main_term <- paste0("race_gender_detailed::", cand)
+      if (main_term %in% names(coefs)) lc[main_term] <- 1
+    }
+    if (resp_group != "White_Male" && cand != "White_Male") {
+      int_term <- paste0("resp_race_gender_detailed::", resp_group, ":race_gender_detailed::", cand)
+      if (int_term %in% names(coefs)) lc[int_term] <- 1
+    }
+    return(lc)
+  }
+  
+  # Get all LC vectors
+  lc_list <- lapply(setNames(candidate_demographics, candidate_demographics), build_lc)
+  
+  # Concordant group LC (reference point)
+  concordant_lc <- lc_list[[resp_group]]
+  
+  # Compute recentered estimates
+  res_list <- list()
+  for (cand in candidate_demographics) {
+    if (cand == resp_group) {
+      # Concordant: by definition 0
+      res_list[[cand]] <- data.table(Respondent = resp_group, Candidate = cand, 
+                                     Estimate = 0, SE = 0, Pval = 1, Label = "")
+      next
+    }
+    
+    diff_lc <- lc_list[[cand]] - concordant_lc
+    est <- as.numeric(diff_lc %*% coefs)
+    var_est <- as.numeric(t(diff_lc) %*% vcov_mat %*% diff_lc)
+    
+    if (is.na(var_est) || var_est <= 1e-14) { se <- NA } else { se <- sqrt(var_est) }
+    if (is.na(se)) { pval <- NA; sig_label <- "" } else {
+      z_score <- est / se
+      pval <- 2 * (1 - pnorm(abs(z_score)))
+      sig_label <- ""
+      if (pval < 0.01) { sig_label <- "***" } 
+      else if (pval < 0.05) { sig_label <- "**" } 
+      else if (pval < 0.10) { sig_label <- "*" }
+    }
+    
+    res_list[[cand]] <- data.table(Respondent = resp_group, Candidate = cand, 
+                                   Estimate = est, SE = se, Pval = pval, Label = sig_label)
+  }
+  
+  return(rbindlist(res_list))
+}
+
+## Function for Plotting - Detailed Race & Gender WITH N COUNTS
+plot_heterogeneity_detailed_race_gender <- function(model, plot_title, x_label, show_y_text = TRUE, resp_counts = NULL, role = NULL) {
+  
+  respondent_groups <- c("White_Male", "White_Female", 
+                         "Chinese_Male", "Chinese_Female",
+                         "Indian_Male", "Indian_Female",
+                         "Hispanic_Male", "Hispanic_Female")
+  
+  plot_data <- rbindlist(lapply(respondent_groups, function(g) {
+    dt <- tryCatch(total_effects_lincom_detailed_race_gender(model, g), error = function(e) return(NULL))
+    if(!is.null(dt)) {
+      ref_row <- data.table(Respondent = g, Candidate = "White_Male", Estimate = 0, SE = 0, Pval = 1, Label = "")
+      dt <- rbind(dt, ref_row)
+    }
+    return(dt)  
+  }))
+
+  # Abbreviations Map
+  abbrevs <- c("White_Male" = "WM", "White_Female" = "WF", 
+               "Chinese_Male" = "ChM", "Chinese_Female" = "ChF",
+               "Indian_Male" = "InM", "Indian_Female" = "InF",
+               "Korean_Male" = "KoM", "Korean_Female" = "KoF",
+               "Hispanic_Male" = "HM", "Hispanic_Female" = "HF")
+  
+  # Process Panel Headers with N counts
+  if(!is.null(resp_counts) && !is.null(role)) {
+    N_col <- ifelse(role == "HR", "N_HR", "N_Eng")
+    counts_sub <- resp_counts[, .(resp_race_gender_detailed, N = get(N_col))]
+    
+    # Safe Merge
+    plot_data <- merge(plot_data, counts_sub, by.x = "Respondent", by.y = "resp_race_gender_detailed", all.x = TRUE)
+    plot_data[is.na(N), N := 0]
+    
+    # Create Label
+    plot_data[, Panel_Label := paste0(abbrevs[as.character(Respondent)], " (N=", N, ")")]
+    
+    # Set Ordered Levels based on respondent_groups order
+    ordered_levels <- character(0)
+    for(g in respondent_groups) {
+       n_val <- unique(plot_data[Respondent == g, N])
+       if(length(n_val) > 0) {
+         ordered_levels <- c(ordered_levels, paste0(abbrevs[g], " (N=", n_val, ")"))
+       }
+    }
+    plot_data[, Panel_Label := factor(Panel_Label, levels = ordered_levels)]
+    
+  } else {
+    plot_data[, Panel_Label := abbrevs[as.character(Respondent)]]
+    plot_data[, Panel_Label := factor(Panel_Label, levels = c("WM", "WF", "ChM", "ChF", "InM", "InF", "KoM", "KoF", "HM", "HF"))]
+  }
+
+  plot_data[, Candidate_Abbr := abbrevs[as.character(Candidate)]]
+  plot_data[, Candidate_Abbr := factor(Candidate_Abbr, levels = c("HF", "HM", "InF", "InM", "ChF", "ChM", "WF", "WM"))]
+  
+  plot_data[, Match_Status := ifelse(as.character(Respondent) == as.character(Candidate), "Concordant Demographic", "Nonconcordant")]
+  plot_data[, Match_Status := factor(Match_Status, levels = c("Nonconcordant", "Concordant Demographic"))]
+
+  p <- ggplot(plot_data, aes(x = Estimate, y = Candidate_Abbr)) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+    geom_pointrange(aes(xmin = Estimate - 1.96*SE, xmax = Estimate + 1.96*SE, color = Match_Status), 
+                    size = 0.4, position = position_dodge(width = 0.5), na.rm = TRUE) +
+    geom_text(aes(label = Label, color = Match_Status), 
+              vjust = -0.6, fontface = "bold", size = 3, na.rm = TRUE, show.legend = FALSE) +
+    facet_grid(~ Panel_Label) +
+    scale_color_manual(values = c("Nonconcordant" = "black", "Concordant Demographic" = "#D55E00")) + 
+    labs(title = plot_title, x = x_label, y = NULL, color = "") + 
+    theme_bw(base_size = 10) +
+    theme(
+      legend.position = "bottom", legend.margin = margin(t = -5, b=0, unit="pt"),
+      strip.text = element_text(face = "bold", size = 8), 
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 7),
+      panel.spacing = unit(0.1, "cm"), plot.margin = margin(5, 5, 5, 5)
+    ) +
+    scale_x_continuous(breaks = c(-1, 0, 1)) + coord_cartesian(xlim = c(-1.4, 1.4), clip = "off")
+
+  if(show_y_text == FALSE) {
+    p <- p + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+  }
+  return(p)
+}
+
+## Function for Plotting - Detailed Race & Gender WITH N COUNTS - Recentered to Concordant Group
+plot_heterogeneity_detailed_race_gender_recentered <- function(model, plot_title, x_label, show_y_text = TRUE, resp_counts = NULL, role = NULL) {
+  
+  respondent_groups <- c("White_Male", "White_Female", 
+                         "Chinese_Male", "Chinese_Female",
+                         "Indian_Male", "Indian_Female",
+                         "Hispanic_Male", "Hispanic_Female")
+  
+  plot_data <- rbindlist(lapply(respondent_groups, function(g) {
+    dt <- tryCatch(total_effects_lincom_detailed_race_gender_recentered(model, g), error = function(e) return(NULL))
+    return(dt)
+  }))
+
+  # Abbreviations Map
+  abbrevs <- c("White_Male" = "WM", "White_Female" = "WF", 
+               "Chinese_Male" = "ChM", "Chinese_Female" = "ChF",
+               "Indian_Male" = "InM", "Indian_Female" = "InF",
+               "Korean_Male" = "KoM", "Korean_Female" = "KoF",
+               "Hispanic_Male" = "HM", "Hispanic_Female" = "HF")
+  
+  # Process Panel Headers with N counts
+  if(!is.null(resp_counts) && !is.null(role)) {
+    N_col <- ifelse(role == "HR", "N_HR", "N_Eng")
+    counts_sub <- resp_counts[, .(resp_race_gender_detailed, N = get(N_col))]
+    
+    # Safe Merge
+    plot_data <- merge(plot_data, counts_sub, by.x = "Respondent", by.y = "resp_race_gender_detailed", all.x = TRUE)
+    plot_data[is.na(N), N := 0]
+    
+    # Create Label
+    plot_data[, Panel_Label := paste0(abbrevs[as.character(Respondent)], " (N=", N, ")")]
+    
+    # Set Ordered Levels based on respondent_groups order
+    ordered_levels <- character(0)
+    for(g in respondent_groups) {
+       n_val <- unique(plot_data[Respondent == g, N])
+       if(length(n_val) > 0) {
+         ordered_levels <- c(ordered_levels, paste0(abbrevs[g], " (N=", n_val, ")"))
+       }
+    }
+    plot_data[, Panel_Label := factor(Panel_Label, levels = ordered_levels)]
+    
+  } else {
+    plot_data[, Panel_Label := abbrevs[as.character(Respondent)]]
+    plot_data[, Panel_Label := factor(Panel_Label, levels = c("WM", "WF", "ChM", "ChF", "InM", "InF", "KoM", "KoF", "HM", "HF"))]
+  }
+
+  plot_data[, Candidate_Abbr := abbrevs[as.character(Candidate)]]
+  plot_data[, Candidate_Abbr := factor(Candidate_Abbr, levels = c("HF", "HM", "InF", "InM", "ChF", "ChM", "WF", "WM"))]
+  
+  plot_data[, Match_Status := ifelse(as.character(Respondent) == as.character(Candidate), "Concordant Demographic", "Nonconcordant")]
+  plot_data[, Match_Status := factor(Match_Status, levels = c("Nonconcordant", "Concordant Demographic"))]
+
+  p <- ggplot(plot_data, aes(x = Estimate, y = Candidate_Abbr)) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+    geom_pointrange(aes(xmin = Estimate - 1.96*SE, xmax = Estimate + 1.96*SE, color = Match_Status), 
+                    size = 0.4, position = position_dodge(width = 0.5), na.rm = TRUE) +
+    geom_text(aes(label = Label, color = Match_Status), 
+              vjust = -0.6, fontface = "bold", size = 3, na.rm = TRUE, show.legend = FALSE) +
+    facet_grid(~ Panel_Label) +
+    scale_color_manual(values = c("Nonconcordant" = "black", "Concordant Demographic" = "#D55E00")) + 
+    labs(title = plot_title, x = x_label, y = NULL, color = "") + 
+    theme_bw(base_size = 10) +
+    theme(
+      legend.position = "bottom", legend.margin = margin(t = -5, b=0, unit="pt"),
+      strip.text = element_text(face = "bold", size = 8), 
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 7),
+      panel.spacing = unit(0.1, "cm"), plot.margin = margin(5, 5, 5, 5)
+    ) +
+    scale_x_continuous(breaks = c(-1, 0, 1)) + coord_cartesian(xlim = c(-1.4, 1.4), clip = "off")
+
+  if(show_y_text == FALSE) {
+    p <- p + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+  }
+  return(p)
+}
+
+##### ##### ##### Functions for Calculating and Plotting Preferences by DEI ##### ##### #####
+
+## Function: Calculate Total Effects for DEI Groups (0 vs 1)
+total_effects_lincom_dei <- function(model, group_val, dei_var_name) {
+  coefs <- coef(model)
+  vcov_mat <- vcov(model)
+  coef_names <- names(coefs)
+  
+  candidate_demographics <- c("White_Female", "Asian_Male", "Asian_Female", "Hispanic_Male", "Hispanic_Female")
+  res_list <- list()
+
+  for(cand in candidate_demographics) {
+    
+    # --- A. Find Main Effect ---
+    # Based on your output: "race_gender::White_Female"
+    term_main <- paste0("race_gender::", cand)
+    
+    # Check if it exists
+    if (!(term_main %in% coef_names)) {
+      term_main <- NULL
+    }
+    
+    # --- B. Find Interaction Effect ---
+    # Based on your output: "race_gender::Candidate:factor(resp_pro_dei_race)::1"
+    term_int <- paste0("race_gender::", cand, ":factor(", dei_var_name, ")::1")
+    
+    # Check if it exists
+    if (!(term_int %in% coef_names)) {
+      term_int <- NULL
+    }
+
+    # --- C. Calculate Estimate & Variance ---
+    est <- NA
+    var_sum <- NA
+    
+    if(group_val == 0) {
+      # Group 0 (Neutral/Anti-DEI): Main Effect Only
+      if(!is.null(term_main)) {
+        est <- coefs[term_main]
+        var_sum <- vcov_mat[term_main, term_main]
+      }
+    } else {
+      # Group 1 (Pro-DEI): Main + Interaction
+      if(!is.null(term_main) && !is.null(term_int)) {
+        est <- coefs[term_main] + coefs[term_int]
+        v1 <- vcov_mat[term_main, term_main]
+        v2 <- vcov_mat[term_int, term_int]
+        cov <- vcov_mat[term_main, term_int]
+        var_sum <- v1 + v2 + 2 * cov
+      } 
+      # Fallback: If interaction dropped due to collinearity, use Main
+      else if (!is.null(term_main)) {
+        est <- coefs[term_main]
+        var_sum <- vcov_mat[term_main, term_main]
+      }
+    }
+    
+    # --- D. Statistics ---
+    if (is.na(var_sum) || var_sum <= 1e-14) { 
+        se <- NA; pval <- NA; sig_label <- "" 
+    } else { 
+        se <- sqrt(var_sum)
+        z_score <- est / se
+        pval <- 2 * (1 - pnorm(abs(z_score))) 
+        sig_label <- fcase(pval < 0.01, "***", pval < 0.05, "**", pval < 0.1, "*", default = "")
+    }
+    
+    res_list[[cand]] <- data.table(Group = group_val, Candidate = cand, Estimate = est, SE = se, Pval = pval, Label = sig_label)
+  }
+  return(rbindlist(res_list))
+}
+
+## Function: Plot DEI Heterogeneity
+plot_heterogeneity_dei <- function(model, plot_title, dei_var_col, resp_counts, role) {
+  
+  # Generate Estimates
+  plot_data <- rbindlist(lapply(c(0, 1), function(g) {
+    dt <- tryCatch(total_effects_lincom_dei(model, g, dei_var_col), error = function(e) return(NULL))
+    if(!is.null(dt)) {
+      ref_row <- data.table(Group = g, Candidate = "White_Male", Estimate = 0, SE = 0, Pval = 1, Label = "")
+      dt <- rbind(dt, ref_row)
+    }
+    return(dt)  
+  }))
+  
+  if(nrow(plot_data) == 0) return(ggplot() + theme_void() + labs(title = "No Data Found"))
+
+  # Get Counts (Robust)
+  N_col <- ifelse(role == "HR", "N_HR", "N_Eng")
+  
+  # Ensure clean matching for counts
+  n_0 <- tryCatch(resp_counts[as.character(get(dei_var_col)) == "0", get(N_col)], error = function(e) 0)
+  if(length(n_0) == 0) n_0 <- 0
+  n_1 <- tryCatch(resp_counts[as.character(get(dei_var_col)) == "1", get(N_col)], error = function(e) 0)
+  if(length(n_1) == 0) n_1 <- 0
+  
+  # Create Labels
+  plot_data[, Panel_Label := fcase(
+    Group == 0, paste0("Neutral/Anti-DEI\n(N=", n_0, ")"),
+    Group == 1, paste0("Pro-DEI\n(N=", n_1, ")")
+  )]
+  plot_data[, Panel_Label := factor(Panel_Label, levels = c(paste0("Pro-DEI\n(N=", n_1, ")"), paste0("Neutral/Anti-DEI\n(N=", n_0, ")")))]
+
+  # Formatting
+  abbrevs <- c("White_Male" = "WM", "White_Female" = "WF", "Asian_Male" = "AM", "Asian_Female" = "AF", "Hispanic_Male" = "HM", "Hispanic_Female" = "HF")
+  plot_data[, Candidate_Abbr := abbrevs[as.character(Candidate)]]
+  plot_data[, Candidate_Abbr := factor(Candidate_Abbr, levels = c("HF", "HM", "AF", "AM", "WF", "WM"))]
+  plot_data[, Color_Group := ifelse(Group == 1, "Pro", "Neutral")]
+
+  # Plot
+  p <- ggplot(plot_data, aes(x = Estimate, y = Candidate_Abbr)) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+    geom_pointrange(aes(xmin = Estimate - 1.96*SE, xmax = Estimate + 1.96*SE, color = Color_Group), 
+                    size = 0.4, position = position_dodge(width = 0.5), na.rm = TRUE) +
+    geom_text(aes(label = Label, color = Color_Group), vjust = -0.6, fontface = "bold", size = 3, na.rm = TRUE, show.legend = FALSE) +
+    facet_grid(~ Panel_Label) +
+    scale_color_manual(values = c("Neutral" = "black", "Pro" = "#D55E00")) +
+    labs(title = plot_title, x = "Discrimination (Z)", y = NULL) + 
+    theme_bw(base_size = 10) +
+    theme(
+      strip.text = element_text(face = "bold", size = 9), 
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 7),
+      panel.spacing = unit(0.1, "cm")
+    ) +
+    scale_x_continuous(n.breaks = 3) + coord_cartesian(xlim = c(-1.25, 1.25), clip = "off")
+
+  return(p)
+}
+
+##### ##### ##### Functions for Calculating and Plotting Preferences by Firm Size ##### ##### #####
+
+## Function: Calculate Total Effects for Firm Size Groups
+total_effects_lincom_firmsize <- function(model, firm_size) {
+  coefs <- coef(model)
+  vcov_mat <- vcov(model)
+  
+  candidate_demographics <- c("White_Female", "Asian_Male", "Asian_Female", "Hispanic_Male", "Hispanic_Female")
+  res_list <- list()
+
+  for(cand in candidate_demographics) {
+    main_term <- paste0("race_gender::", cand)
+    
+    if(firm_size == "small") {
+      # Small firms: Main effect only
+      est <- coefs[main_term]
+      var_sum <- vcov_mat[main_term, main_term]
+      
+    } else if(firm_size == "mid") {
+      # Mid firms: Main + mid interaction
+      int_term <- paste0("race_gender::", cand, ":firm_size_mid")
+      
+      if(!int_term %in% names(coefs)) {
+        res_list[[cand]] <- data.table(FirmSize = firm_size, Candidate = cand, Estimate = NA, SE = NA, Pval = NA, Label = "")
+        next
+      }
+      
+      est <- coefs[main_term] + coefs[int_term]
+      v_main <- vcov_mat[main_term, main_term]
+      v_int  <- vcov_mat[int_term, int_term]
+      cov_mi <- vcov_mat[main_term, int_term]
+      var_sum <- v_main + v_int + 2 * cov_mi
+      
+    } else if(firm_size == "large") {
+      # Large firms: Main + large interaction
+      int_term <- paste0("race_gender::", cand, ":firm_size_large")
+      
+      if(!int_term %in% names(coefs)) {
+        res_list[[cand]] <- data.table(FirmSize = firm_size, Candidate = cand, Estimate = NA, SE = NA, Pval = NA, Label = "")
+        next
+      }
+      
+      est <- coefs[main_term] + coefs[int_term]
+      v_main <- vcov_mat[main_term, main_term]
+      v_int  <- vcov_mat[int_term, int_term]
+      cov_mi <- vcov_mat[main_term, int_term]
+      var_sum <- v_main + v_int + 2 * cov_mi
+    }
+    
+    if (is.na(var_sum) || var_sum <= 1e-14) { se <- NA } else { se <- sqrt(var_sum) }
+    if (is.na(se)) { pval <- NA; sig_label <- "" } else {
+      z_score <- est / se
+      pval <- 2 * (1 - pnorm(abs(z_score))) 
+      sig_label <- ""
+      if(pval < 0.01) {sig_label <- "***"} else if(pval < 0.05) {sig_label <- "**"} else if(pval < 0.10) {sig_label <- "*"}
+    }
+    res_list[[cand]] <- data.table(FirmSize = firm_size, Candidate = cand, Estimate = est, SE = se, Pval = pval, Label = sig_label)
+  }
+  return(rbindlist(res_list))
+}
+
+## Function: Plot Firm Size Heterogeneity
+plot_heterogeneity_firmsize <- function(model, plot_title, x_label, show_y_text = TRUE, firm_counts = NULL, role) {
+  
+  firm_sizes <- c("small", "mid", "large")
+  
+  plot_data <- rbindlist(lapply(firm_sizes, function(fs) {
+    dt <- tryCatch(total_effects_lincom_firmsize(model, fs), error = function(e) return(NULL))
+    if(!is.null(dt)) {
+      ref_row <- data.table(FirmSize = fs, Candidate = "White_Male", Estimate = 0, SE = 0, Pval = 1, Label = "")
+      dt <- rbind(dt, ref_row)
+    }
+    return(dt)  
+  }))
+  
+  # Set factor order for FirmSize FIRST
+  plot_data[, FirmSize := factor(FirmSize, levels = c("small", "mid", "large"))]
+  
+  # Add N counts to firm size labels
+  if(!is.null(firm_counts)) {
+    N_col <- ifelse(role == "HR", "N_HR", "N_Eng")
+    firm_counts_subset <- firm_counts[, .(firm_size, N = get(N_col))]
+    plot_data <- plot_data[firm_counts_subset, on = c(FirmSize = "firm_size")]
+    plot_data[, FirmSize_Label := paste0(toupper(substring(FirmSize, 1, 1)), substring(FirmSize, 2), " (N=", N, ")")]
+    
+    # Set factor order for FirmSize_Label explicitly
+    firmsize_label_order <- c(
+      paste0("Small (N=", firm_counts_subset[firm_size == "small", N], ")"),
+      paste0("Mid (N=", firm_counts_subset[firm_size == "mid", N], ")"),
+      paste0("Large (N=", firm_counts_subset[firm_size == "large", N], ")")
+    )
+    plot_data[, FirmSize_Label := factor(FirmSize_Label, levels = firmsize_label_order)]
+  } else {
+    plot_data[, FirmSize_Label := paste0(toupper(substring(FirmSize, 1, 1)), substring(FirmSize, 2))]
+    plot_data[, FirmSize_Label := factor(FirmSize_Label, levels = c("Small", "Mid", "Large"))]
+  }
+  
+  abbrevs <- c("White_Male" = "WM", "White_Female" = "WF", "Asian_Male" = "AM", "Asian_Female" = "AF", "Hispanic_Male" = "HM", "Hispanic_Female" = "HF")
+  plot_data[, Candidate_Abbr := abbrevs[as.character(Candidate)]]
+  plot_data[, Candidate_Abbr := factor(Candidate_Abbr, levels = c("HF", "HM", "AF", "AM", "WF", "WM"))]
+  
+  p <- ggplot(plot_data, aes(x = Estimate, y = Candidate_Abbr)) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+    geom_pointrange(aes(xmin = Estimate - 1.96*SE, xmax = Estimate + 1.96*SE), 
+                    color = "black",
+                    size = 0.4, position = position_dodge(width = 0.5), na.rm = TRUE) +
+    geom_text(aes(label = Label), 
+              color = "black",
+              vjust = -0.6, fontface = "bold", size = 3, na.rm = TRUE) +
+    facet_grid(~ FirmSize_Label) +
+    labs(title = plot_title, x = x_label, y = NULL) + 
+    theme_bw(base_size = 10) +
+    theme(
+      strip.text = element_text(face = "bold", size = 8), 
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 7),
+      panel.spacing = unit(0.1, "cm"), plot.margin = margin(5, 5, 5, 5)
+    ) +
+    scale_x_continuous(n.breaks = 3) + coord_cartesian(xlim = c(-1.25, 1.25), clip = "off")
+  
+  if(show_y_text == FALSE) {
+    p <- p + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+  }
+  return(p)
+}
+
+##### ##### ##### Functions for Plotting Side-by-Side ##### ##### #####
+
+## Function for Plotting HR and Engineer Graphs Side-by-Side on One Dimension
+hetero_side_by_side_plots <- function(p_hr, p_eng, title_text) {
+  #### Combine Graphs
+  legend <- get_legend(p_hr + theme(legend.box.margin = margin(0, 0, 0, 12)))
+  prow <- plot_grid(
+    p_hr + theme(legend.position="none"),
+    p_eng + theme(legend.position="none"),
+    align = 'vh', 
+    labels = NULL, 
+    hjust = -1, 
+    nrow = 1, 
+    rel_widths = c(1, 0.95)
+  )
+  
+  #### Add y-axis label
+  y_label <- ggdraw() + 
+    draw_label("Applicant Demographic", size = 10, fontface = "bold", angle = 90)
+  
+  #### Combine y-axis label with plots
+  prow_with_ylabel <- plot_grid(
+    y_label,
+    prow,
+    ncol = 2,
+    rel_widths = c(0.02, 1)
+  )
+  
+  #### Output Plots Side-by-Side
+  combined_plot <- plot_grid(prow_with_ylabel, legend, ncol = 1, rel_heights = c(1, .1))
+  
+  ###### Title
+  title <- ggdraw() + 
+    draw_label(title_text, fontface = "bold", size = 14, hjust = 0.5)
+  
+  ###### Caption
+  caption <- ggdraw() + 
+    draw_label("*** p < 0.01, ** p < 0.05, * p < 0.10", 
+    fontface = "plain", size = 9, hjust = 0.5)
+  
+  ##### Add Title and Caption
+  final_plot <- plot_grid(
+    title,
+    combined_plot,
+    caption,
+    ncol = 1,
+    rel_heights = c(0.05, 1, 0.05)
+  )
+  
+  return(final_plot)
+}
+
+## Function for Plotting HR and Engineer Graphs Side-by-Side on Concordance
+plot_simple_concordance <- function(model_hr, model_eng = NULL, title) {
+  
+  # Helper to extract data from a model
+  get_data <- function(m, role_label) {
+    if(is.null(m)) return(NULL) # Safety check
+    
+    ests <- broom::tidy(m, conf.int = TRUE)
+    term_name <- grep("concordance", ests$term, value=TRUE)
+    row <- ests[ests$term == term_name, ]
+    
+    data.table(
+      Role = role_label,
+      Estimate = row$estimate,
+      Conf.Low = row$conf.low,
+      Conf.High = row$conf.high,
+      Pval = row$p.value
+    )
+  }
+  
+  # 1. Get HR Data
+  dt_hr <- get_data(model_hr, "HR Managers")
+  
+  # 2. Get Eng Data (Only if model provided)
+  if (!is.null(model_eng)) {
+    dt_eng <- get_data(model_eng, "Engineers")
+    dt <- rbind(dt_hr, dt_eng)
+  } else {
+    dt <- dt_hr
+  }
+  
+  # Add Significance Labels
+  dt[, Label := fcase(
+    Pval < 0.01, "***",
+    Pval < 0.05, "**",
+    Pval < 0.10, "*",
+    default = ""
+  )]
+  
+  # Plot
+  ggplot(dt, aes(x = Estimate, y = Role)) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+    geom_pointrange(aes(xmin = Conf.Low, xmax = Conf.High), 
+                    color = "#D55E00", size = 0.8) +
+    geom_text(aes(label = Label), vjust = -0.5, fontface = "bold", size = 4) +
+    labs(title = title, x = "Preference for Own Group", y = "") +
+    theme_bw(base_size = 11) +
+    scale_x_continuous(limits = c(-0.5, 0.5))
+}
+
+```
+
+
+\newpage
+### By Concordant Race (Detailed Asian Categorization)
+
+```{r concordant_race, echo = FALSE, results = 'asis'}
+models_hr_concordance_race  <- suppressMessages(suppressWarnings(
+    feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ concordance_race_detailed | resume_index + responseid + r_do,
+          data = firm_long_dt[treat=="nonblind" & role=="HR" & resp_race %in% c("White", "Asian", "Hispanic")], vcov=~responseid)
+))
+names(models_hr_concordance_race) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z", "sc_advance")
+
+models_eng_concordance_race <- suppressMessages(suppressWarnings(
+    feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ concordance_race_detailed | resume_index + responseid + r_do, 
+          data = firm_long_dt[treat=="nonblind" & role=="Eng" & resp_race %in% c("White", "Asian", "Hispanic")], vcov=~responseid)
+))
+names(models_eng_concordance_race) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z")
+
+chk <- "\\checkmark"
+
+tbl <- etable(
+  c(models_hr_concordance_race, models_eng_concordance_race),
+  tex = TRUE, style.tex = style.tex("aer"),
+  keep = "%concordance",
+  fitstat = c("n", "ar2"),
+  drop.section = "fixef",
+  digits = 3, se.below = TRUE,
+  dict = c("concordance_race_detailed" = "Concordant Race"),
+  signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+  extralines = list(
+    "Resume (Content) FE" = rep(chk, 9),
+    "Respondent FE" = rep(chk, 9),
+    "Display Position FE" = rep(chk, 9)
+  ),
+  title = "Effect of Racial Concordance on Scores",
+  notes = "Standard errors clustered by respondent."
+)
+
+# Inject spanning headers
+n_hr <- uniqueN(firm_long_dt[treat == "nonblind" & role == "HR", responseid])
+n_eng <- uniqueN(firm_long_dt[treat == "nonblind" & role == "Eng", responseid])
+
+tbl <- sub(
+    "\\\\toprule",
+    paste0("\\\\toprule & \\\\multicolumn{5}{c}{\\\\textbf{Panel A: HR (Non-blind, N = ", n_hr, ")}} & \\\\multicolumn{4}{c}{\\\\textbf{Panel B: Engineer (Non-blind, N = ", n_eng, ")}} \\\\\\\\ \\\\cmidrule(lr){2-6} \\\\cmidrule(lr){7-10}"),
+    tbl
+)
+
+# Remove auto-generated dep var row
+tbl <- gsub("\\s*&\\s*\\\\multicolumn\\{9\\}\\{c\\}\\{.*?\\}\\\\\\\\", "", tbl)
+
+tbl_final <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering \\\\footnotesize", tbl)
+
+cat(tbl_final)
+
+rm(models_hr_concordance_race, models_eng_concordance_race,
+   chk, n_hr, n_eng, tbl, tbl_final)
+```
+
+
+### By Concordant Gender (Male / Female Only)
+
+```{r concordant_gender, echo = FALSE, results = 'asis'}
+
+models_hr_concordance_gender  <- suppressMessages(suppressWarnings(
+  feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ concordance_gender | resume_index + responseid + r_do, 
+        data = firm_long_dt[treat=="nonblind" & role=="HR" & resp_gender %in% c("Male", "Female")], vcov=~responseid)
+  ))
+names(models_hr_concordance_gender) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z", "sc_advance")
+
+
+models_eng_concordance_gender <- suppressMessages(suppressWarnings(
+  feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ concordance_gender | resume_index + responseid + r_do,
+        data = firm_long_dt[treat=="nonblind" & role=="Eng" & resp_gender %in% c("Male", "Female")], vcov=~responseid)
+))
+names(models_eng_concordance_gender) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z")
+
+chk <- "\\checkmark"
+
+tbl <- etable(
+  c(models_hr_concordance_gender, models_eng_concordance_gender),
+  tex = TRUE, style.tex = style.tex("aer"),
+  keep = "%concordance",
+  fitstat = c("n", "ar2"),
+  drop.section = "fixef",
+  digits = 3, se.below = TRUE,
+  dict = c("concordance_gender" = "Concordant Gender"),
+  signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+  extralines = list(
+    "Resume (Content) FE" = rep(chk, 9),
+    "Respondent FE" = rep(chk, 9),
+    "Display Position FE" = rep(chk, 9)
+  ),
+  title = "Effect of Racial Concordance on Scores",
+  notes = "Standard errors clustered by respondent."
+)
+
+# Inject spanning headers
+n_hr <- uniqueN(firm_long_dt[treat == "nonblind" & role == "HR", responseid])
+n_eng <- uniqueN(firm_long_dt[treat == "nonblind" & role == "Eng", responseid])
+
+tbl <- sub(
+    "\\\\toprule",
+    paste0("\\\\toprule & \\\\multicolumn{5}{c}{\\\\textbf{Panel A: HR (Non-blind, N = ", n_hr, ")}} & \\\\multicolumn{4}{c}{\\\\textbf{Panel B: Engineer (Non-blind, N = ", n_eng, ")}} \\\\\\\\ \\\\cmidrule(lr){2-6} \\\\cmidrule(lr){7-10}"),
+    tbl
+)
+
+# Remove auto-generated dep var row
+tbl <- gsub("\\s*&\\s*\\\\multicolumn\\{9\\}\\{c\\}\\{.*?\\}\\\\\\\\", "", tbl)
+
+tbl_final <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering \\\\footnotesize", tbl)
+
+cat(tbl_final)
+
+rm(models_hr_concordance_gender, models_eng_concordance_gender,
+   chk, n_hr, n_eng, tbl, tbl_final)
+
+```
+
+<!-- ### By Concordant Race and Gender -->
+
+```{r concordant_racegender, echo = FALSE, eval = FALSE, results = 'asis'}
+
+models_hr_concordance_racegender <- suppressMessages(suppressWarnings(
+  feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ concordance_race_gender | resume_index + responseid + r_do_bythree, 
+        data = firm_long_dt[treat=="nonblind" & role=="HR" & resp_race_gender %in% c("White_Male", "White_Female", "Asian_Male", "Asian_Female", "Hispanic_Male", "Hispanic_Female")], vcov=~responseid)
+))
+names(models_hr_concordance_racegender) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z", "sc_advance")
+
+models_eng_concordance_racegender <- suppressMessages(suppressWarnings(
+  feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ concordance_race_gender | resume_index + responseid + r_do_bythree, 
+        data = firm_long_dt[treat=="nonblind" & role=="Eng" & resp_race_gender %in% c("White_Male", "White_Female", "Asian_Male", "Asian_Female", "Hispanic_Male", "Hispanic_Female")], vcov=~responseid)
+))
+names(models_eng_concordance_racegender) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z")
+
+chk <- "\\checkmark"
+
+tbl <- etable(
+  c(models_hr_concordance_racegender, models_eng_concordance_racegender),
+  tex = TRUE, style.tex = style.tex("aer"),
+  keep = "%concordance",
+  fitstat = c("n", "ar2"),
+  drop.section = "fixef",
+  digits = 3, se.below = TRUE,
+  dict = c("concordance_race" = "Concordant Race"),
+  signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+  extralines = list(
+    "Resume (Content) FE" = rep(chk, 9),
+    "Respondent FE" = rep(chk, 9),
+    "Display Position FE" = rep(chk, 9)
+  ),
+  title = "Effect of Racial Concordance on Scores",
+  notes = "Standard errors clustered by respondent."
+)
+
+# Inject spanning headers
+n_hr <- uniqueN(firm_long_dt[treat == "nonblind" & role == "HR", responseid])
+n_eng <- uniqueN(firm_long_dt[treat == "nonblind" & role == "Eng", responseid])
+
+tbl <- sub(
+    "\\\\toprule",
+    paste0("\\\\toprule & \\\\multicolumn{5}{c}{\\\\textbf{Panel A: HR (Non-blind, N = ", n_hr, ")}} & \\\\multicolumn{4}{c}{\\\\textbf{Panel B: Engineer (Non-blind, N = ", n_eng, ")}} \\\\\\\\ \\\\cmidrule(lr){2-6} \\\\cmidrule(lr){7-10}"),
+    tbl
+)
+
+# Remove auto-generated dep var row
+tbl <- gsub("\\s*&\\s*\\\\multicolumn\\{9\\}\\{c\\}\\{.*?\\}\\\\\\\\", "", tbl)
+
+tbl_final <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering \\\\footnotesize", tbl)
+
+cat(tbl_final)
+
+rm(models_hr_concordance_racegender, models_eng_concordance_racegender,
+   chk, n_hr, n_eng, tbl, tbl_final)
+
+```
+
+### By Concordant Race and Gender (Detailed Asian Categorization)
+
+```{r concordant_racegender_detailed, echo = FALSE, results = 'asis'}
+
+models_hr_concordance_detailed <- suppressMessages(suppressWarnings(
+  feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ concordance_race_gender_detailed | resume_index + responseid + r_do_bythree, 
+        data = firm_long_dt[treat=="nonblind" & role=="HR" & resp_race_gender_detailed %in% c("White_Male", "White_Female", "Hispanic_Male", "Hispanic_Female", "Chinese_Male", "Chinese_Female", "Indian_Male", "Indian_Female")], vcov=~responseid)
+))
+names(models_hr_concordance_detailed) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z", "sc_advance")
+
+models_eng_concordance_detailed <- suppressMessages(suppressWarnings(
+  feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ concordance_race_gender_detailed | resume_index + responseid + r_do_bythree, 
+        data = firm_long_dt[treat=="nonblind" & role=="Eng" & resp_race_gender_detailed %in% c("White_Male", "White_Female", "Hispanic_Male", "Hispanic_Female", "Chinese_Male", "Chinese_Female", "Indian_Male", "Indian_Female")], vcov=~responseid)
+))
+names(models_eng_concordance_detailed) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z")
+
+chk <- "\\checkmark"
+
+tbl <- etable(
+  c(models_hr_concordance_detailed, models_eng_concordance_detailed),
+  tex = TRUE, style.tex = style.tex("aer"),
+  keep = "%concordance",
+  fitstat = c("n", "ar2"),
+  drop.section = "fixef",
+  digits = 3, se.below = TRUE,
+  dict = c("concordance_race_gender_detailed" = "Concordant Race Gender"),
+  signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+  extralines = list(
+    "Resume (Content) FE" = rep(chk, 9),
+    "Respondent FE" = rep(chk, 9),
+    "Display Position FE" = rep(chk, 9)
+  ),
+  title = "Effect of Racial Concordance on Scores",
+  notes = "Standard errors clustered by respondent."
+)
+
+# Inject spanning headers
+n_hr <- uniqueN(firm_long_dt[treat == "nonblind" & role == "HR", responseid])
+n_eng <- uniqueN(firm_long_dt[treat == "nonblind" & role == "Eng", responseid])
+
+tbl <- sub(
+    "\\\\toprule",
+    paste0("\\\\toprule & \\\\multicolumn{5}{c}{\\\\textbf{Panel A: HR (Non-blind, N = ", n_hr, ")}} & \\\\multicolumn{4}{c}{\\\\textbf{Panel B: Engineer (Non-blind, N = ", n_eng, ")}} \\\\\\\\ \\\\cmidrule(lr){2-6} \\\\cmidrule(lr){7-10}"),
+    tbl
+)
+
+# Remove auto-generated dep var row
+tbl <- gsub("\\s*&\\s*\\\\multicolumn\\{9\\}\\{c\\}\\{.*?\\}\\\\\\\\", "", tbl)
+
+tbl_final <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering \\\\footnotesize", tbl)
+
+cat(tbl_final)
+
+rm(models_hr_concordance_detailed, models_eng_concordance_detailed,
+   chk, n_hr, n_eng, tbl, tbl_final)
+
+```
+
+
+#### Who drives Engineers' Bias Against Concordant Race Gender Groups
+
+\vspace{0.25cm}
+Below graph centers the concordant group.
+
+```{r stage_pref_heterogeneity_detailed_ovr_only, eval = TRUE, echo = FALSE, out.width="100%", fig.width=14, fig.height=5, fig.align='center', results='asis'}
+
+# --- 1. Regressions ---
+
+models_hr_hetero_detailed <- suppressMessages(suppressWarnings(
+    feols(
+    c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
+      i(race_gender_detailed, ref = "White_Male") + 
+      i(resp_race_gender_detailed, race_gender_detailed, ref = "White_Male") 
+    | resume_index + responseid + r_do_bythree,
+    data = firm_long_dt[treat == "nonblind" & role == "HR" & resp_race_gender_detailed %in% c("White_Male", "White_Female", "Hispanic_Male", "Hispanic_Female", "Chinese_Male", "Chinese_Female", "Indian_Male", "Indian_Female")],
+    vcov = ~ responseid
+  )
+))
+names(models_hr_hetero_detailed) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z", "sc_advance")
+
+models_eng_hetero_detailed <- suppressMessages(suppressWarnings(
+    feols(
+    c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
+      i(race_gender_detailed, ref = "White_Male") + 
+      i(resp_race_gender_detailed, race_gender_detailed, ref = "White_Male") 
+    | resume_index + responseid + r_do_bythree,
+    data = firm_long_dt[treat == "nonblind" & role == "Eng" & resp_race_gender_detailed %in% c("White_Male", "White_Female", "Hispanic_Male", "Hispanic_Female", "Chinese_Male", "Chinese_Female", "Indian_Male", "Indian_Female")],
+    vcov = ~ responseid
+  )
+))
+names(models_eng_hetero_detailed) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z")
+
+# --- 2. Calculate Counts for Labels ---
+
+resp_counts_hetero_detailed <- firm_long_dt[treat == "nonblind" & resp_race_gender_detailed %in% c("White_Male", "White_Female", "Hispanic_Male", "Hispanic_Female", "Chinese_Male", "Chinese_Female", "Indian_Male", "Indian_Female") & race_gender_detailed %in% c("White_Male", "White_Female", "Hispanic_Male", "Hispanic_Female", "Chinese_Male", "Chinese_Female", "Indian_Male", "Indian_Female"), .(
+  N_HR = uniqueN(responseid[role == "HR"]),
+  N_Eng = uniqueN(responseid[role == "Eng"])
+), by = .(resp_race_gender_detailed)]
+
+# --- 3. Generate Plots ---
+  
+#### Overall
+p_ovr_hr_det <- plot_heterogeneity_detailed_race_gender_recentered(models_hr_hetero_detailed$sc_overall_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_detailed, "HR")
+p_ovr_eng_det <- plot_heterogeneity_detailed_race_gender_recentered(models_eng_hetero_detailed$sc_overall_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_detailed, "Eng")
+
+#### Coding
+p_coding_hr_det <- plot_heterogeneity_detailed_race_gender_recentered(models_hr_hetero_detailed$sc_coding_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_detailed, "HR")
+p_coding_eng_det <- plot_heterogeneity_detailed_race_gender_recentered(models_eng_hetero_detailed$sc_coding_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_detailed, "Eng")
+
+#### Fit
+p_fit_hr_det <- plot_heterogeneity_detailed_race_gender_recentered(models_hr_hetero_detailed$sc_fit_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_detailed, "HR")
+p_fit_eng_det <- plot_heterogeneity_detailed_race_gender_recentered(models_eng_hetero_detailed$sc_fit_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_detailed, "Eng")
+
+#### Stay
+p_stay_hr_det <- plot_heterogeneity_detailed_race_gender_recentered(models_hr_hetero_detailed$sc_stay_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_detailed, "HR")
+p_stay_eng_det <- plot_heterogeneity_detailed_race_gender_recentered(models_eng_hetero_detailed$sc_stay_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_detailed, "Eng")
+
+#### Advance
+p_advance_hr_det <- plot_heterogeneity_detailed_race_gender_recentered(models_hr_hetero_detailed$sc_advance, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_detailed, "HR")  
+p_empty <- ggplot() + annotate("text", x = 0, y = 0, label = "Engineers: Not Measured", size = 5, color = "gray50") + theme_void()
+
+# --- 4. Print ---
+suppressWarnings({
+  
+  # Overall
+  p_full_interaction <- hetero_side_by_side_plots(p_ovr_hr_det, p_ovr_eng_det, "Overall (Z)")
+  print(cowplot::plot_grid(p_full_interaction, ncol=1, rel_heights=c(0.4, 1.2)))
+  cat("\\newpage\n")
+
+  # # Coding
+  # p_full_interaction <- hetero_side_by_side_plots(p_coding_hr_det, p_coding_eng_det, "Coding (Z)")
+  # print(cowplot::plot_grid(p_full_interaction, ncol=1, rel_heights=c(0.4, 1.2)))
+  # cat("\\newpage\n")
+  # 
+  # # Fit
+  # p_full_interaction <- hetero_side_by_side_plots(p_fit_hr_det, p_fit_eng_det, "Fit (Z)")
+  # print(cowplot::plot_grid(p_full_interaction, ncol=1, rel_heights=c(0.4, 1.2)))
+  # cat("\\newpage\n")
+  # 
+  # # Stay
+  # p_full_interaction <- hetero_side_by_side_plots(p_stay_hr_det, p_stay_eng_det, "Stay (Z)")
+  # print(cowplot::plot_grid(p_full_interaction, ncol=1, rel_heights=c(0.4, 1.2)))
+  # cat("\\newpage\n")
+  # 
+  # # Advance
+  # p_full_interaction <- hetero_side_by_side_plots(p_advance_hr_det, p_empty, "Advance (0/1, LPM)")
+  # print(cowplot::plot_grid(p_full_interaction, ncol=1, rel_heights=c(0.4, 1.2)))
+})
+
+Plot_Pref_Hetero_ConcodanceDetailed <- p_full_interaction
+
+rm(models_hr_hetero_detailed, models_eng_hetero_detailed,
+   resp_counts_hetero_detailed,
+   p_ovr_hr_det, p_ovr_eng_det,
+   p_coding_hr_det, p_coding_eng_det,
+   p_fit_hr_det, p_fit_eng_det,
+   p_stay_hr_det, p_stay_eng_det,
+   p_advance_hr_det,
+   p_full_interaction
+)
+
+```
+
+\clearpage
+## By DEI
+
+The DEI Index is constructed as the row-wise mean of z-scored responses to four survey items capturing views on race-based DEI (`s5_view_dei_race`), gender-based DEI (`s5_view_dei_gender`), workplace diversity (`s5_view_diverse`), and DEI in hiring (`s5_view_hiring_dei`), and is then re-standardized within role $\times$ treatment cells.
+
+```{r dei_continuous, eval = TRUE, echo = FALSE, fig.width=9, fig.height=6, fig.align='center', warning=FALSE, message=FALSE, results='asis'}
+
+# ==============================================================================
+# HELPER FUNCTION (reused from before, generalized for any xvar)
+# ==============================================================================
+urm_premium_curve <- function(model, data, role_label,
+                              xvar, urm = "urm_tech",
+                              grid_n = 100, grid_q = c(0.05, 0.95)) {
+  b <- coef(model)
+  V <- vcov(model)
+  int_name <- paste0(urm, ":", xvar)
+  stopifnot(urm %in% names(b), int_name %in% names(b))
+  x_lo <- quantile(data[[xvar]], probs = grid_q[1], na.rm = TRUE)
+  x_hi <- quantile(data[[xvar]], probs = grid_q[2], na.rm = TRUE)
+  x_grid <- seq(x_lo, x_hi, length.out = grid_n)
+  beta  <- b[urm];       gamma  <- b[int_name]
+  var_b <- V[urm, urm];  var_g  <- V[int_name, int_name];  cov_bg <- V[urm, int_name]
+  delta_hat <- beta + gamma * x_grid
+  se_hat    <- sqrt(pmax(0, var_b + x_grid^2 * var_g + 2 * x_grid * cov_bg))
+  out <- data.table(role = role_label, x = x_grid, delta = delta_hat, se = se_hat)
+  out[, `:=`(lo = delta - 1.96 * se, hi = delta + 1.96 * se)]
+  out[]
+}
+
+dt_hr  <- firm_long_dt[treat == "nonblind" & role == "HR"]
+dt_eng <- firm_long_dt[treat == "nonblind" & role == "Eng"]
+
+# ==============================================================================
+# TABLE: Side-by-side comparison of both indices
+# ==============================================================================
+m_hr_single_coding   <- feols(sc_coding_z  ~ urm_tech * pro_hiring_dei_z | responseid + resume_index + r_do, data = dt_hr,  vcov = ~responseid)
+m_hr_single_overall  <- feols(sc_overall_z ~ urm_tech * pro_hiring_dei_z | responseid + resume_index + r_do, data = dt_hr,  vcov = ~responseid)
+m_eng_single_coding  <- feols(sc_coding_z  ~ urm_tech * pro_hiring_dei_z | responseid + resume_index + r_do, data = dt_eng, vcov = ~responseid)
+m_eng_single_overall <- feols(sc_overall_z ~ urm_tech * pro_hiring_dei_z | responseid + resume_index + r_do, data = dt_eng, vcov = ~responseid)
+
+m_hr_index_coding    <- feols(sc_coding_z  ~ urm_tech * pro_dei_index_z  | responseid + resume_index + r_do, data = dt_hr,  vcov = ~responseid)
+m_hr_index_overall   <- feols(sc_overall_z ~ urm_tech * pro_dei_index_z  | responseid + resume_index + r_do, data = dt_hr,  vcov = ~responseid)
+m_eng_index_coding   <- feols(sc_coding_z  ~ urm_tech * pro_dei_index_z  | responseid + resume_index + r_do, data = dt_eng, vcov = ~responseid)
+m_eng_index_overall  <- feols(sc_overall_z ~ urm_tech * pro_dei_index_z  | responseid + resume_index + r_do, data = dt_eng, vcov = ~responseid)
+
+chk <- "\\checkmark"
+
+tbl <- etable(
+  list(m_hr_index_coding,  m_hr_index_overall,
+       m_hr_single_coding, m_hr_single_overall,
+       m_eng_index_coding,  m_eng_index_overall,
+       m_eng_single_coding, m_eng_single_overall),
+  tex = TRUE, style.tex = style.tex("aer"),
+  keep = c("%urm_tech$", "%:"),
+  fitstat = c("n", "ar2"),
+  drop.section = "fixef",
+  digits = 3, se.below = TRUE,
+  dict = c("urm_tech"           = "URM",
+           "pro_hiring_dei_z"   = "Single Item (Z)",
+           "pro_dei_index_z"    = "DEI Index (Z)"),
+  signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+  extralines = list(
+    "Resume FE"      = rep(chk, 8),
+    "Respondent FE"  = rep(chk, 8),
+    "Position FE"    = rep(chk, 8)
+  ),
+  title = "URM Premium by Pro-DEI Attitude: Composite Index and Single Item",
+  notes = "Standard errors clustered by respondent. Odd columns = Coding Score (Z); Even columns = Overall Score (Z)."
+)
+
+# Inject spanning headers: 2 panels x 2 measures x 2 index versions = 8 cols
+tbl <- sub(
+  "\\\\toprule",
+  paste0("\\\\toprule",
+         " & \\\\multicolumn{4}{c}{\\\\textbf{Panel A: HR}} ",
+         " & \\\\multicolumn{4}{c}{\\\\textbf{Panel B: Engineer}} \\\\\\\\ ",
+         "\\\\cmidrule(lr){2-5} \\\\cmidrule(lr){6-9}",
+         " & \\\\multicolumn{2}{c}{DEI Index} & \\\\multicolumn{2}{c}{Single Item}",
+         " & \\\\multicolumn{2}{c}{DEI Index} & \\\\multicolumn{2}{c}{Single Item} \\\\\\\\ ",
+         "\\\\cmidrule(lr){2-3}\\\\cmidrule(lr){4-5}\\\\cmidrule(lr){6-7}\\\\cmidrule(lr){8-9}"),
+  tbl
+)
+tbl <- gsub("\\s*&\\s*\\\\multicolumn\\{8\\}\\{c\\}\\{.*?\\}\\\\\\\\", "", tbl)
+tbl <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering \\\\footnotesize", tbl)
+tbl <- gsub("\\\\begin\\{table\\}", "\\\\begin{table}\n\\\\resizebox{\\\\textwidth}{!}{", tbl)
+tbl <- gsub("\\\\end\\{table\\}", "}\n\\\\end{table}", tbl)
+
+cat(tbl)
+
+# ==============================================================================
+# PLOTS: Single item (top row) vs DEI Index (bottom row)
+# ==============================================================================
+make_curve_panel <- function(curves, title_label) {
+  ggplot(curves, aes(x = x, y = delta)) +
+    geom_ribbon(aes(ymin = lo, ymax = hi), alpha = 0.20) +
+    geom_line(linewidth = 1) +
+    geom_hline(yintercept = 0, linetype = "dashed", linewidth = 0.4) +
+    coord_cartesian(ylim = c(-0.5, 0.7)) +
+    facet_wrap(~ role, nrow = 1) +
+    labs(title = title_label, x = NULL, y = "Predicted URM premium") +
+    theme_bw() +
+    theme(plot.title = element_text(face = "bold", size = 9),
+          axis.title = element_text(size = 8),
+          axis.text  = element_text(size = 8),
+          strip.text = element_text(size = 8))
+}
+
+# Row 1: Single item, Coding
+curves_single_coding <- rbindlist(list(
+  urm_premium_curve(m_hr_single_coding,  dt_hr,  "HR",       xvar = "pro_hiring_dei_z"),
+  urm_premium_curve(m_eng_single_coding, dt_eng, "Engineer", xvar = "pro_hiring_dei_z")
+))[, role := factor(role, levels = c("HR", "Engineer"))]
+
+# Row 1: Single item, Overall
+curves_single_overall <- rbindlist(list(
+  urm_premium_curve(m_hr_single_overall,  dt_hr,  "HR",       xvar = "pro_hiring_dei_z"),
+  urm_premium_curve(m_eng_single_overall, dt_eng, "Engineer", xvar = "pro_hiring_dei_z")
+))[, role := factor(role, levels = c("HR", "Engineer"))]
+
+# Row 2: DEI Index, Coding
+curves_index_coding <- rbindlist(list(
+  urm_premium_curve(m_hr_index_coding,  dt_hr,  "HR",       xvar = "pro_dei_index_z"),
+  urm_premium_curve(m_eng_index_coding, dt_eng, "Engineer", xvar = "pro_dei_index_z")
+))[, role := factor(role, levels = c("HR", "Engineer"))]
+
+# Row 2: DEI Index, Overall
+curves_index_overall <- rbindlist(list(
+  urm_premium_curve(m_hr_index_overall,  dt_hr,  "HR",       xvar = "pro_dei_index_z"),
+  urm_premium_curve(m_eng_index_overall, dt_eng, "Engineer", xvar = "pro_dei_index_z")
+))[, role := factor(role, levels = c("HR", "Engineer"))]
+
+p1 <- make_curve_panel(curves_single_coding,  "Coding Score - Whether DEI Improves Quality of Hiring")
+p2 <- make_curve_panel(curves_single_overall, "Overall Score - Whether DEI Improves Quality of Hiring")
+p3 <- make_curve_panel(curves_index_coding,   "Coding Score - DEI Index")
+p4 <- make_curve_panel(curves_index_overall,  "Overall Score - DEI Index")
+
+# Add shared x-axis label only to bottom row
+x_label <- "Pro-DEI attitude (Z-score)"
+p1 <- p1 + labs(x = x_label)
+p2 <- p2 + labs(x = x_label)
+
+(p4 + p3) / (p2 + p1) +
+  plot_annotation(
+    title   = "URM Premium by Pro-DEI Attitude",
+    subtitle = "Top row: composite DEI index  |  Bottom row: single-item measure",
+    theme = theme(plot.title    = element_text(face = "bold", size = 11),
+                  plot.subtitle = element_text(size = 9, color = "gray40"))
+  )
+
+Plot_Heterogeniety_DEI_Index <- p4
+
+rm(dt_hr, dt_eng, urm_premium_curve, make_curve_panel,
+   m_hr_single_coding, m_hr_single_overall, m_eng_single_coding, m_eng_single_overall,
+   m_hr_index_coding,  m_hr_index_overall,  m_eng_index_coding,  m_eng_index_overall,
+   curves_single_coding, curves_single_overall, curves_index_coding, curves_index_overall,
+   p1, p2, p3, p4, chk, tbl, x_label)
+```
+
+\newpage
+```{r dei_discrete, eval=TRUE, echo=FALSE, fig.width=9, fig.height=6, fig.align='center', warning=FALSE, message=FALSE, results='asis'}
+
+dt_hr  <- firm_long_dt[treat == "nonblind" & role == "HR"]
+dt_eng <- firm_long_dt[treat == "nonblind" & role == "Eng"]
+
+# ==============================================================================
+# MODELS: urm_tech * 3-tier DEI (Anti-DEI is reference)
+# ==============================================================================
+m_hr_coding   <- feols(sc_coding_z  ~ urm_tech * pro_dei_index_3tiers | responseid + resume_index + r_do, data = dt_hr,  vcov = ~responseid)
+m_hr_overall  <- feols(sc_overall_z ~ urm_tech * pro_dei_index_3tiers | responseid + resume_index + r_do, data = dt_hr,  vcov = ~responseid)
+m_eng_coding  <- feols(sc_coding_z  ~ urm_tech * pro_dei_index_3tiers | responseid + resume_index + r_do, data = dt_eng, vcov = ~responseid)
+m_eng_overall <- feols(sc_overall_z ~ urm_tech * pro_dei_index_3tiers | responseid + resume_index + r_do, data = dt_eng, vcov = ~responseid)
+
+chk <- "\\checkmark"
+
+tbl <- etable(
+  list(m_hr_coding, m_hr_overall, m_eng_coding, m_eng_overall),
+  tex = TRUE, style.tex = style.tex("aer"),
+  keep = c("%urm_tech$", "%:"),
+  fitstat = c("n", "ar2"),
+  drop.section = "fixef",
+  digits = 3, se.below = TRUE,
+  dict = c("urm_tech"                                      = "URM",
+           "pro_dei_index_3tiers::Mid-DEI"                 = "Mid-DEI",
+           "pro_dei_index_3tiers::Pro-DEI"                 = "Pro-DEI",
+           "urm_tech:pro_dei_index_3tiers::Mid-DEI"        = "URM $\\times$ Mid-DEI",
+           "urm_tech:pro_dei_index_3tiers::Pro-DEI"        = "URM $\\times$ Pro-DEI"),
+  signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+  extralines = list(
+    "Resume FE"     = rep(chk, 4),
+    "Respondent FE" = rep(chk, 4),
+    "Position FE"   = rep(chk, 4)
+  ),
+  title = "URM Premium by DEI Attitude Tier (Base: Anti-DEI)",
+  notes = "Standard errors clustered by respondent. Base group: Anti-DEI (bottom tercile). Odd columns = Coding Score (Z); Even columns = Overall Score (Z)."
+)
+
+tbl <- sub(
+  "\\\\toprule",
+  paste0("\\\\toprule",
+         " & \\\\multicolumn{2}{c}{\\\\textbf{Panel A: HR}}",
+         " & \\\\multicolumn{2}{c}{\\\\textbf{Panel B: Engineer}} \\\\\\\\ ",
+         "\\\\cmidrule(lr){2-3} \\\\cmidrule(lr){4-5}"),
+  tbl
+)
+tbl <- gsub("\\s*&\\s*\\\\multicolumn\\{4\\}\\{c\\}\\{.*?\\}\\\\\\\\", "", tbl)
+tbl <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering \\\\footnotesize", tbl)
+tbl <- gsub("\\\\begin\\{table\\}", "\\\\begin{table}\n\\\\resizebox{\\\\textwidth}{!}{", tbl)
+tbl <- gsub("\\\\end\\{table\\}", "}\n\\\\end{table}", tbl)
+
+cat(tbl)
+
+# ==============================================================================
+# PLOT: Marginal URM premium by DEI tier (equivalent to curve plots)
+# ==============================================================================
+make_tier_plot <- function(model, role_label, outcome_label) {
+  b <- coef(model)
+  V <- vcov(model)
+  
+  # Find the exact coefficient names as stored by fixest
+  int_mid <- names(b)[grepl("urm_tech.*Mid", names(b))]
+  int_pro <- names(b)[grepl("urm_tech.*Pro", names(b))]
+  
+  tiers <- c("Anti-DEI", "Mid-DEI", "Pro-DEI")
+  
+  # Anti-DEI: just urm_tech main effect
+  est_anti <- b["urm_tech"]
+  se_anti  <- sqrt(V["urm_tech", "urm_tech"])
+  
+  # Mid-DEI: urm_tech + interaction
+  est_mid <- b["urm_tech"] + b[int_mid]
+  se_mid  <- sqrt(V["urm_tech","urm_tech"] + V[int_mid,int_mid] + 2*V["urm_tech",int_mid])
+  
+  # Pro-DEI: urm_tech + interaction
+  est_pro <- b["urm_tech"] + b[int_pro]
+  se_pro  <- sqrt(V["urm_tech","urm_tech"] + V[int_pro,int_pro] + 2*V["urm_tech",int_pro])
+  
+  data.table(
+    tier    = factor(tiers, levels = tiers),
+    delta   = c(est_anti, est_mid, est_pro),
+    se      = c(se_anti,  se_mid,  se_pro),
+    role    = role_label,
+    outcome = outcome_label
+  )[, `:=`(lo = delta - 1.96*se, hi = delta + 1.96*se)]
+}
+
+plot_df <- rbindlist(list(
+  make_tier_plot(m_hr_coding,   "HR",       "Coding Score (Z)"),
+  make_tier_plot(m_hr_overall,  "HR",       "Overall Score (Z)"),
+  make_tier_plot(m_eng_coding,  "Engineer", "Coding Score (Z)"),
+  make_tier_plot(m_eng_overall, "Engineer", "Overall Score (Z)")
+))
+plot_df[, role    := factor(role,    levels = c("HR", "Engineer"))]
+plot_df[, outcome := factor(outcome, levels = c("Coding Score (Z)", "Overall Score (Z)"))]
+
+ggplot(plot_df, aes(x = tier, y = delta, color = tier, shape = tier)) +
+  geom_hline(yintercept = 0, linetype = "dashed", linewidth = 0.4) +
+  geom_pointrange(aes(ymin = lo, ymax = hi), size = 0.6) +
+  scale_color_manual(values = c("Anti-DEI" = "black", "Mid-DEI" = "steelblue", "Pro-DEI" = "indianred1")) +
+  scale_shape_manual(values = c("Anti-DEI" = 16, "Mid-DEI" = 15, "Pro-DEI" = 17)) +
+  coord_cartesian(ylim = c(-0.5, 0.7)) +
+  facet_grid(outcome ~ role) +
+  labs(title    = "URM Premium by Pro-DEI Attitude Tier",
+       subtitle = "Base group: Anti-DEI. Points show marginal URM premium within each tier.",
+       x = "DEI Attitude Tier", y = "Predicted URM Premium (Z-Score)",
+       color = NULL, shape = NULL) +
+  theme_bw() +
+  theme(legend.position  = "top",
+        plot.title       = element_text(face = "bold", size = 11),
+        plot.subtitle    = element_text(size = 9, color = "gray40"),
+        axis.text.x      = element_text(size = 8),
+        strip.text       = element_text(size = 8))
+
+rm(dt_hr, dt_eng,
+   m_hr_coding, m_hr_overall, m_eng_coding, m_eng_overall,
+   make_tier_plot, plot_df, chk, tbl)
+```
+
+
+
+```{r urm_positive_imp, eval = FALSE, echo = FALSE}
+## URM Tech (urm_tech) on Positive Impact of DEI Policy
+feols(c(sc_coding_z, sc_overall_z) ~ 
+            urm_tech * pro_hiring_dei_z
+          | responseid + resume_index + r_do,
+          data = firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
+
+# feols(c(sc_coding_z, sc_overall_z) ~ 
+#             urm_tech * pro_hiring_dei_z * resp_age_centered
+#           | responseid + resume_index + r_do,
+#           data = firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
+
+feols(c(sc_coding_z, sc_overall_z) ~ 
+            urm_tech * pro_hiring_dei_z
+          | responseid + resume_index + r_do,
+          data = firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
+
+# feols(c(sc_coding_z, sc_overall_z) ~ 
+#             urm_tech * pro_hiring_dei_z * resp_age_centered
+#           | responseid + resume_index + r_do,
+#           data = firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
+```
+
+
+\newpage
+
+```{r heterogeneity_pro_dei, eval = TRUE, echo = FALSE, eval = FALSE, include = FALSE}
+## URM Tech (urm_tech) on Pro DEI Index
+feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
+            urm_tech * pro_dei_index_z
+          | responseid + resume_index + r_do,
+          data = firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
+
+feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
+            urm_tech * pro_dei_index_z * resp_age_centered
+          | responseid + resume_index + r_do,
+          data = firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
+
+feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
+            urm_tech * pro_dei_index_z
+          | responseid + resume_index + r_do,
+          data = firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
+
+feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
+            urm_tech * pro_dei_index_z * resp_age_centered
+          | responseid + resume_index + r_do,
+          data = firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
+
+## URM Gender (urm_gender) on Pro Gender DEI Index
+feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
+            urm_gender * pro_dei_gender_z
+          | responseid + resume_index + r_do,
+          data = firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
+
+feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
+            urm_gender * pro_dei_gender_z * resp_age_centered
+          | responseid + resume_index + r_do,
+          data = firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
+
+feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
+            urm_gender * pro_dei_gender_z
+          | responseid + resume_index + r_do,
+          data = firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
+
+feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
+            urm_gender * pro_dei_gender_z * resp_age_centered
+          | responseid + resume_index + r_do,
+          data = firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
+
+## URM Race (urm_race) on Pro Race DEI Index
+feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
+            urm_race * pro_dei_race_z
+          | responseid + resume_index + r_do,
+          data = firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
+
+feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
+            urm_race * pro_dei_race_z * resp_age_centered
+          | responseid + resume_index + r_do,
+          data = firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
+
+feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
+            urm_race * pro_dei_race_z
+          | responseid + resume_index + r_do,
+          data = firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
+
+feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
+            urm_race * pro_dei_race_z * resp_age_centered
+          | responseid + resume_index + r_do,
+          data = firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
+```
+
+
+
+```{r stage_pref_heterogeneity_dei, eval = TRUE, echo = FALSE, eval = FALSE, out.width="100%", fig.width=14, fig.height=11, fig.align='center', results='asis'}
+
+## Regressions: Heterogeneity by DEI Views
+
+## ========== BINARY DEI (Pro vs Anti/Neutral) ==========
+
+  #### HR (Race View - Binary) - WITH SC_ADVANCE
+  models_hr_dei_race_binary <- suppressMessages(suppressWarnings(
+    feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
+            i(race_gender, ref = "White_Male") + 
+            i(race_gender, factor(resp_pro_dei_race), ref2 = "0") +
+            resp_age + I(resp_age^2) + I(resp_age^3)
+          | resume_index + r_do_bythree + resp_gender + resp_race + s2_educ + s2_income,
+          data = firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
+  ))
+  names(models_hr_dei_race_binary) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z", "sc_advance")
+
+  #### Engineer (Race View - Binary) - NO SC_ADVANCE
+  models_eng_dei_race_binary <- suppressMessages(suppressWarnings(
+    feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
+            i(race_gender, ref = "White_Male") + 
+            i(race_gender, factor(resp_pro_dei_race), ref2 = "0") +
+            resp_age + I(resp_age^2) + I(resp_age^3)
+          | resume_index + r_do_bythree + resp_gender + resp_race + s2_educ + s2_income,
+          data = firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
+  ))
+  names(models_eng_dei_race_binary) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z")
+
+  #### HR (Gender View - Binary) - WITH SC_ADVANCE
+  models_hr_dei_gender_binary <- suppressMessages(suppressWarnings(
+    feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
+            i(race_gender, ref = "White_Male") + 
+            i(race_gender, factor(resp_pro_dei_gender), ref2 = "0") +
+            resp_age + I(resp_age^2) + I(resp_age^3)
+          | resume_index + r_do_bythree + resp_gender + resp_race + s2_educ + s2_income,
+          data = firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
+  ))
+  names(models_hr_dei_gender_binary) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z", "sc_advance")
+
+  #### Engineer (Gender View - Binary) - NO SC_ADVANCE
+  models_eng_dei_gender_binary <- suppressMessages(suppressWarnings(
+    feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
+            i(race_gender, ref = "White_Male") + 
+            i(race_gender, factor(resp_pro_dei_gender), ref2 = "0") +
+            resp_age + I(resp_age^2) + I(resp_age^3)
+          | resume_index + r_do_bythree + resp_gender + resp_race + s2_educ + s2_income,
+          data = firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
+  ))
+  names(models_eng_dei_gender_binary) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z")
+
+## ========== CONTINUOUS DEI (1-5 Scale) ==========
+
+  #### HR (Race View - Continuous) - WITH SC_ADVANCE
+  models_hr_dei_race_continuous <- suppressMessages(suppressWarnings(
+    feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
+            i(race_gender, ref = "White_Male") + 
+            i(race_gender, s5_view_dei_race, ref = "White_Male") +
+            resp_age + I(resp_age^2) + I(resp_age^3)
+          | resume_index + r_do_bythree + resp_gender + resp_race + s2_educ + s2_income,
+          data = firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
+  ))
+  names(models_hr_dei_race_continuous) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z", "sc_advance")
+
+  #### Engineer (Race View - Continuous) - NO SC_ADVANCE
+  models_eng_dei_race_continuous <- suppressMessages(suppressWarnings(
+    feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
+            i(race_gender, ref = "White_Male") + 
+            i(race_gender, s5_view_dei_race, ref = "White_Male") +
+            resp_age + I(resp_age^2) + I(resp_age^3)
+          | resume_index + r_do_bythree + resp_gender + resp_race + s2_educ + s2_income,
+          data = firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
+  ))
+  names(models_eng_dei_race_continuous) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z")
+
+  #### HR (Gender View - Continuous) - WITH SC_ADVANCE
+  models_hr_dei_gender_continuous <- suppressMessages(suppressWarnings(
+    feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
+            i(race_gender, ref = "White_Male") + 
+            i(race_gender, s5_view_dei_gender, ref = "White_Male") +
+            resp_age + I(resp_age^2) + I(resp_age^3)
+          | resume_index + r_do_bythree + resp_gender + resp_race + s2_educ + s2_income,
+          data = firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
+  ))
+  names(models_hr_dei_gender_continuous) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z", "sc_advance")
+
+  #### Engineer (Gender View - Continuous) - NO SC_ADVANCE
+  models_eng_dei_gender_continuous <- suppressMessages(suppressWarnings(
+    feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
+            i(race_gender, ref = "White_Male") + 
+            i(race_gender, s5_view_dei_gender, ref = "White_Male") +
+            resp_age + I(resp_age^2) + I(resp_age^3)
+          | resume_index + r_do_bythree + resp_gender + resp_race + s2_educ + s2_income,
+          data = firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
+  ))
+  names(models_eng_dei_gender_continuous) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z")
+
+## Coefficient maps
+coef_map_race_binary <- c(
+  "race_gender::White_Female" = "WF",
+  "race_gender::Asian_Male" = "AM",
+  "race_gender::Asian_Female" = "AF",
+  "race_gender::Hispanic_Male" = "HM",
+  "race_gender::Hispanic_Female" = "HF",
+  "race_gender::White_Male:factor(resp_pro_dei_race)::1" = "WM × Pro-DEI (Race)",
+  "race_gender::White_Female:factor(resp_pro_dei_race)::1" = "WF × Pro-DEI (Race)",
+  "race_gender::Asian_Male:factor(resp_pro_dei_race)::1" = "AM × Pro-DEI (Race)",
+  "race_gender::Asian_Female:factor(resp_pro_dei_race)::1" = "AF × Pro-DEI (Race)",
+  "race_gender::Hispanic_Male:factor(resp_pro_dei_race)::1" = "HM × Pro-DEI (Race)",
+  "race_gender::Hispanic_Female:factor(resp_pro_dei_race)::1" = "HF × Pro-DEI (Race)"
+)
+
+coef_map_race_continuous <- c(
+  "race_gender::White_Female" = "WF",
+  "race_gender::Asian_Male" = "AM",
+  "race_gender::Asian_Female" = "AF",
+  "race_gender::Hispanic_Male" = "HM",
+  "race_gender::Hispanic_Female" = "HF",
+  "race_gender::White_Male:s5_view_dei_race" = "WM × Pro DEI Scale (Race)",
+  "race_gender::White_Female:s5_view_dei_race" = "WF × Pro DEI Scale (Race)",
+  "race_gender::Asian_Male:s5_view_dei_race" = "AM × Pro DEI Scale (Race)",
+  "race_gender::Asian_Female:s5_view_dei_race" = "AF × Pro DEI Scale (Race)",
+  "race_gender::Hispanic_Male:s5_view_dei_race" = "HM × Pro DEI Scale (Race)",
+  "race_gender::Hispanic_Female:s5_view_dei_race" = "HF × Pro DEI Scale (Race)"
+)
+
+coef_map_gender_binary <- c(
+  "race_gender::White_Female" = "WF",
+  "race_gender::Asian_Male" = "AM",
+  "race_gender::Asian_Female" = "AF",
+  "race_gender::Hispanic_Male" = "HM",
+  "race_gender::Hispanic_Female" = "HF",
+  "race_gender::White_Male:factor(resp_pro_dei_gender)::1" = "WM × Pro-DEI (Gender)",
+  "race_gender::White_Female:factor(resp_pro_dei_gender)::1" = "WF × Pro-DEI (Gender)",
+  "race_gender::Asian_Male:factor(resp_pro_dei_gender)::1" = "AM × Pro-DEI (Gender)",
+  "race_gender::Asian_Female:factor(resp_pro_dei_gender)::1" = "AF × Pro-DEI (Gender)",
+  "race_gender::Hispanic_Male:factor(resp_pro_dei_gender)::1" = "HM × Pro-DEI (Gender)",
+  "race_gender::Hispanic_Female:factor(resp_pro_dei_gender)::1" = "HF × Pro-DEI (Gender)"
+)
+
+coef_map_gender_continuous <- c(
+  "race_gender::White_Female" = "WF",
+  "race_gender::Asian_Male" = "AM",
+  "race_gender::Asian_Female" = "AF",
+  "race_gender::Hispanic_Male" = "HM",
+  "race_gender::Hispanic_Female" = "HF",
+  "race_gender::White_Male:s5_view_dei_gender" = "WM × Pro DEI Scale (Gender)",
+  "race_gender::White_Female:s5_view_dei_gender" = "WF × Pro DEI Scale (Gender)",
+  "race_gender::Asian_Male:s5_view_dei_gender" = "AM × Pro DEI Scale (Gender)",
+  "race_gender::Asian_Female:s5_view_dei_gender" = "AF × Pro DEI Scale (Gender)",
+  "race_gender::Hispanic_Male:s5_view_dei_gender" = "HM × Pro DEI Scale (Gender)",
+  "race_gender::Hispanic_Female:s5_view_dei_gender" = "HF × Pro DEI Scale (Gender)"
+)
+
+## ========== PAGE 1: RACE DEI HETEROGENEITY - 2x2 LAYOUT ==========
+cat("\\subsection*{Heterogeneity by Race DEI View}\n\n")
+cat("Reference group: White Male. Respondent fixed effects are NOT included to allow identification of all DEI interaction terms. Respondent characteristics (age, age$^2$, age$^3$, gender, race, education, income) are included as controls.\n\n")
+
+cat("\\begin{table}[H]\n")
+cat("\\centering\n")
+cat("\\begin{minipage}[t]{0.48\\textwidth}\n")
+cat("\\centering\n")
+cat("\\textbf{HR - Binary Race DEI}\n\n")
+modelsummary(
+  models_hr_dei_race_binary,
+  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  coef_map = coef_map_race_binary,
+  gof_map = c("nobs", "r.squared"),
+  output = "kableExtra",
+  table.attr = "style='width:100%;'"
+) %>%
+  kable_styling(font_size = 7, latex_options = "HOLD_position")
+cat("\\end{minipage}\n")
+cat("\\hfill\n")
+cat("\\begin{minipage}[t]{0.48\\textwidth}\n")
+cat("\\centering\n")
+cat("\\textbf{Engineer - Binary Race DEI}\n\n")
+modelsummary(
+  models_eng_dei_race_binary,
+  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  coef_map = coef_map_race_binary,
+  gof_map = c("nobs", "r.squared"),
+  output = "kableExtra",
+  table.attr = "style='width:100%;'"
+) %>%
+  kable_styling(font_size = 7, latex_options = "HOLD_position")
+cat("\\end{minipage}\n")
+cat("\\end{table}\n\n")
+
+cat("\\vspace{0.5cm}\n\n")
+
+cat("\\begin{table}[H]\n")
+cat("\\centering\n")
+cat("\\begin{minipage}[t]{0.48\\textwidth}\n")
+cat("\\centering\n")
+cat("\\textbf{HR - Continuous Race DEI}\n\n")
+modelsummary(
+  models_hr_dei_race_continuous,
+  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  coef_map = coef_map_race_continuous,
+  gof_map = c("nobs", "r.squared"),
+  output = "kableExtra",
+  table.attr = "style='width:100%;'"
+) %>%
+  kable_styling(font_size = 7, latex_options = "HOLD_position")
+cat("\\end{minipage}\n")
+cat("\\hfill\n")
+cat("\\begin{minipage}[t]{0.48\\textwidth}\n")
+cat("\\centering\n")
+cat("\\textbf{Engineer - Continuous Race DEI}\n\n")
+modelsummary(
+  models_eng_dei_race_continuous,
+  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  coef_map = coef_map_race_continuous,
+  gof_map = c("nobs", "r.squared"),
+  output = "kableExtra",
+  table.attr = "style='width:100%;'"
+) %>%
+  kable_styling(font_size = 7, latex_options = "HOLD_position")
+cat("\\end{minipage}\n")
+cat("\\end{table}\n\n")
+
+cat("\\newpage\n")
+
+## ========== PAGE 2: GENDER DEI HETEROGENEITY - 2x2 LAYOUT ==========
+cat("\\subsection*{Heterogeneity by Gender DEI View}\n\n")
+cat("Reference group: White Male. Respondent fixed effects are NOT included to allow identification of all DEI interaction terms. Respondent characteristics (age, age$^2$, age$^3$, gender, race, education, income) are included as controls.\n\n")
+
+cat("\\begin{table}[H]\n")
+cat("\\centering\n")
+cat("\\begin{minipage}[t]{0.48\\textwidth}\n")
+cat("\\centering\n")
+cat("\\textbf{HR - Binary Gender DEI}\n\n")
+modelsummary(
+  models_hr_dei_gender_binary,
+  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  coef_map = coef_map_gender_binary,
+  gof_map = c("nobs", "r.squared"),
+  output = "kableExtra",
+  table.attr = "style='width:100%;'"
+) %>%
+  kable_styling(font_size = 7, latex_options = "HOLD_position")
+cat("\\end{minipage}\n")
+cat("\\hfill\n")
+cat("\\begin{minipage}[t]{0.48\\textwidth}\n")
+cat("\\centering\n")
+cat("\\textbf{Engineer - Binary Gender DEI}\n\n")
+modelsummary(
+  models_eng_dei_gender_binary,
+  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  coef_map = coef_map_gender_binary,
+  gof_map = c("nobs", "r.squared"),
+  output = "kableExtra",
+  table.attr = "style='width:100%;'"
+) %>%
+  kable_styling(font_size = 7, latex_options = "HOLD_position")
+cat("\\end{minipage}\n")
+cat("\\end{table}\n\n")
+
+cat("\\vspace{0.5cm}\n\n")
+
+cat("\\begin{table}[H]\n")
+cat("\\centering\n")
+cat("\\begin{minipage}[t]{0.48\\textwidth}\n")
+cat("\\centering\n")
+cat("\\textbf{HR - Continuous Gender DEI}\n\n")
+modelsummary(
+  models_hr_dei_gender_continuous,
+  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  coef_map = coef_map_gender_continuous,
+  gof_map = c("nobs", "r.squared"),
+  output = "kableExtra",
+  table.attr = "style='width:100%;'"
+) %>%
+  kable_styling(font_size = 7, latex_options = "HOLD_position")
+cat("\\end{minipage}\n")
+cat("\\hfill\n")
+cat("\\begin{minipage}[t]{0.48\\textwidth}\n")
+cat("\\centering\n")
+cat("\\textbf{Engineer - Continuous Gender DEI}\n\n")
+modelsummary(
+  models_eng_dei_gender_continuous,
+  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  coef_map = coef_map_gender_continuous,
+  gof_map = c("nobs", "r.squared"),
+  output = "kableExtra",
+  table.attr = "style='width:100%;'"
+) %>%
+  kable_styling(font_size = 7, latex_options = "HOLD_position")
+cat("\\end{minipage}\n")
+cat("\\end{table}\n\n")
+
+## Clean up
+rm(models_hr_dei_race_binary, models_eng_dei_race_binary, 
+   models_hr_dei_gender_binary, models_eng_dei_gender_binary,
+   models_hr_dei_race_continuous, models_eng_dei_race_continuous,
+   models_hr_dei_gender_continuous, models_eng_dei_gender_continuous,
+   coef_map_race_binary, coef_map_race_continuous,
+   coef_map_gender_binary, coef_map_gender_continuous)
+```
+
+\clearpage
+### Non-linear Demographic Biases for Low vs High Quality Candidates (GPA & Coding Score)
+
+```{r nonlinear_preferences, echo = FALSE, include = FALSE}
+
+# ==============================================================================
+# HELPER FUNCTIONS
+# ==============================================================================
+extract_split_data <- function(model_split, role_label, tier_labels) {
+  plot_list <- list()
+  for (i in seq_along(model_split)) {
+    df <- as.data.frame(coeftable(model_split[[i]]))
+    df$Term <- rownames(df)
+    df$Tier <- tier_labels[i]
+    plot_list[[i]] <- df
+  }
+  plot_df <- do.call(rbind, plot_list)
+  plot_df$Term <- gsub("race_gender::", "", plot_df$Term)
+  plot_df$Term <- gsub("_", " ", plot_df$Term)
+  plot_df$Term <- factor(plot_df$Term, levels = unique(plot_df$Term))
+  plot_df$stars <- ifelse(plot_df$`Pr(>|t|)` < 0.01, "***",
+                   ifelse(plot_df$`Pr(>|t|)` < 0.05, "**",
+                   ifelse(plot_df$`Pr(>|t|)` < 0.1, "*", "")))
+  plot_df$Role <- role_label
+  plot_df$Tier <- factor(plot_df$Tier, levels = tier_labels)
+  return(plot_df)
+}
+
+make_split_plot <- function(plot_df, title_label, color_vals, shape_vals, show_y = TRUE) {
+  p <- ggplot(plot_df, aes(x = Term, y = Estimate, color = Tier, shape = Tier)) +
+    geom_hline(yintercept = 0, color = "black", linewidth = 0.5) +
+    geom_pointrange(aes(ymin = Estimate - 1.96 * `Std. Error`,
+                        ymax = Estimate + 1.96 * `Std. Error`),
+                    position = position_dodge(width = 0.6), size = 0.4) +
+    geom_text(aes(label = stars, y = Estimate + 1.96 * `Std. Error` + 0.02),
+              position = position_dodge(width = 0.6), size = 3.5, vjust = 0, 
+              color = "black", show.legend = FALSE) +
+    scale_color_manual(values = color_vals) +
+    scale_shape_manual(values = shape_vals) +
+    scale_y_continuous(expand = expansion(mult = c(0.1, 0.15))) +
+    coord_cartesian(ylim = c(-0.65, 0.65)) +
+    labs(title = title_label,
+         x = "Applicant Demographic (vs. White Male)",
+         y = "Predicted Premium (Overall Z-Score)",
+         color = "Tier:", shape = "Tier:") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+          axis.text.y = element_text(size = 8),
+          axis.title = element_text(size = 9),
+          legend.position = "top",
+          legend.title = element_text(face = "bold", size = 8),
+          legend.text = element_text(size = 8),
+          plot.title = element_text(face = "bold", size = 9),
+          plot.margin = margin(5, 10, 5, 5, "pt"))
+  if (!show_y) p <- p + theme(axis.title.y = element_blank())
+  return(p)
+}
+```
+
+
+#### HR
+
+```{r nonlinear_pref_HR, eval = TRUE, echo = FALSE, fig.width=9, fig.height=6, fig.align='center'}
+
+# ==============================================================================
+# (GPA) High / Mid / Low - Six Demographics
+# ==============================================================================
+hr_gpa_split <- feols(sc_overall_z ~ i(race_gender, ref="White_Male") | 
+                      resume_index + responseid + r_do, 
+                      split = ~gpa_tier3, cluster = ~responseid,
+                      data = firm_long_dt[treat == "nonblind" & role == "HR" & s3_outside_res == 0])
+
+gpa_tier3s <- c("Low GPA", "Mid GPA", "Top GPA")
+gpa_colors <- c("Low GPA" = "black", "Mid GPA" = "steelblue", "Top GPA" = "indianred1")
+gpa_shapes <- c("Low GPA" = 16, "Mid GPA" = 15, "Top GPA" = 17)
+
+hr_gpa_df <- extract_split_data(hr_gpa_split, "HR", gpa_tier3s)
+
+# gpa_tier2s <- c("Non_Elite_GPA", "Elite_GPA")
+# gpa_colors <- c("Non_Elite_GPA" = "black", "Elite_GPA" = "steelblue")
+# gpa_shapes <- c("Non_Elite_GPA" = 16, "Elite_GPA" = 15)
+# 
+# hr_gpa_df <- extract_split_data(hr_gpa_split, "HR", gpa_tier2s)
+
+p_hr_gpa <- make_split_plot(hr_gpa_df, "HR: Premium by GPA Tier", gpa_colors, gpa_shapes, show_y = TRUE)
+
+# ==============================================================================
+# (GPA) High / Mid / Low - URM
+# ==============================================================================
+
+hr_urm_gpa_split <- feols(sc_overall_z ~ urm_tech | 
+                          resume_index + responseid + r_do, 
+                          split = ~gpa_tier3, cluster = ~responseid,
+                          data = firm_long_dt[treat == "nonblind" & role == "HR" & s3_outside_res == 0])
+
+hr_urm_gpa_df   <- extract_split_data(hr_urm_gpa_split,  "HR",       gpa_tier3s)
+
+p_hr_urm_gpa   <- make_split_plot(hr_urm_gpa_df,  "HR: URM Premium by GPA Tier",   gpa_colors,  gpa_shapes,  show_y = TRUE)
+
+# ==============================================================================
+# Coding Ability (Top vs Bottom Coding Score or Test Cases) - Six Demographics
+# ==============================================================================
+hr_test_split <- feols(sc_overall_z ~ i(race_gender, ref="White_Male") | 
+                       resume_index + responseid + r_do, 
+                       split = ~top_half_coder, cluster = ~responseid,
+                       data = firm_long_dt[treat == "nonblind" & role == "HR" & s3_outside_res == 0])
+
+test_tiers <- c("Bottom 50% Coders", "Top 50% Coders")
+test_colors <- c("Bottom 50% Coders" = "black", "Top 50% Coders" = "indianred1")
+test_shapes <- c("Bottom 50% Coders" = 16, "Top 50% Coders" = 17)
+
+hr_test_df <- extract_split_data(hr_test_split, "HR", test_tiers)
+
+p_hr_test <- make_split_plot(hr_test_df, "HR: Premium by Coding Ability", test_colors, test_shapes, show_y = TRUE)
+
+# ==============================================================================
+# Coding Ability (Top vs Bottom Coding Score or Test Cases) - URM
+# ==============================================================================
+
+hr_urm_test_split <- feols(sc_overall_z ~ urm_tech | 
+                           resume_index + responseid + r_do, 
+                           split = ~top_half_coder, cluster = ~responseid,
+                           data = firm_long_dt[treat == "nonblind" & role == "HR" & s3_outside_res == 0])
+
+hr_urm_test_df  <- extract_split_data(hr_urm_test_split,  "HR",       test_tiers)
+
+p_hr_urm_test  <- make_split_plot(hr_urm_test_df,  "HR: URM Premium by Coding Ability",  test_colors, test_shapes, show_y = TRUE)
+
+
+# ==============================================================================
+# Output
+# ==============================================================================
+(p_hr_gpa + p_hr_test + plot_layout(guides = "collect")) /
+(p_hr_urm_gpa + p_hr_urm_test + plot_layout(guides = "collect")) +
+  plot_layout(guides = "collect") &
+  theme(legend.position = "top")
+
+```
+
+\newpage
+#### Engineer
+
+```{r nonlinear_pref_Eng, eval = TRUE, echo = FALSE, fig.width=9, fig.height=6, fig.align='center'}
+
+# ==============================================================================
+# (GPA) High / Mid / Low - Six Demographics
+# ==============================================================================
+eng_gpa_split <- feols(sc_overall_z ~ i(race_gender, ref="White_Male") | 
+                       resume_index + responseid + r_do, 
+                       split = ~gpa_tier3, cluster = ~responseid,
+                       data = firm_long_dt[treat == "nonblind" & role == "Eng" & s3_outside_res == 0])
+
+gpa_tier3s <- c("Low GPA", "Mid GPA", "Top GPA")
+gpa_colors <- c("Low GPA" = "black", "Mid GPA" = "steelblue", "Top GPA" = "indianred1")
+gpa_shapes <- c("Low GPA" = 16, "Mid GPA" = 15, "Top GPA" = 17)
+
+eng_gpa_df <- extract_split_data(eng_gpa_split, "Engineer", gpa_tier3s)
+
+# gpa_tier2s <- c("Non_Elite_GPA", "Elite_GPA")
+# gpa_colors <- c("Non_Elite_GPA" = "black", "Elite_GPA" = "steelblue")
+# gpa_shapes <- c("Non_Elite_GPA" = 16, "Elite_GPA" = 15)
+# 
+# eng_gpa_df <- extract_split_data(eng_gpa_split, "Engineer", gpa_tier2s)
+
+p_eng_gpa <- make_split_plot(eng_gpa_df, "Engineer: Premium by GPA Tier", gpa_colors, gpa_shapes, show_y = FALSE)
+
+# ==============================================================================
+# (GPA) High / Mid / Low - URM
+# ==============================================================================
+
+eng_urm_gpa_split <- feols(sc_overall_z ~ urm_tech | 
+                           resume_index + responseid + r_do, 
+                           split = ~gpa_tier3, cluster = ~responseid,
+                           data = firm_long_dt[treat == "nonblind" & role == "Eng" & s3_outside_res == 0])
+
+eng_urm_gpa_df  <- extract_split_data(eng_urm_gpa_split, "Engineer", gpa_tier3s)
+
+p_eng_urm_gpa  <- make_split_plot(eng_urm_gpa_df, "Engineer: URM Premium by GPA Tier",  gpa_colors,  gpa_shapes,  show_y = FALSE)
+
+# ==============================================================================
+# Coding Ability (Top vs Bottom Coding Score or Test Cases) - Six Demographics
+# ==============================================================================
+eng_test_split <- feols(sc_overall_z ~ i(race_gender, ref="White_Male") | 
+                        resume_index + responseid + r_do, 
+                        split = ~top_half_coder, cluster = ~responseid,
+                        data = firm_long_dt[treat == "nonblind" & role == "Eng" & s3_outside_res == 0])
+
+test_tiers <- c("Bottom 50% Coders", "Top 50% Coders")
+test_colors <- c("Bottom 50% Coders" = "black", "Top 50% Coders" = "indianred1")
+test_shapes <- c("Bottom 50% Coders" = 16, "Top 50% Coders" = 17)
+
+eng_test_df <- extract_split_data(eng_test_split, "Engineer", test_tiers)
+
+p_eng_test <- make_split_plot(eng_test_df, "Engineer: Premium by Coding Ability", test_colors, test_shapes, show_y = FALSE)
+
+# ==============================================================================
+# Coding Ability (Top vs Bottom Coding Score or Test Cases) - URM
+# ==============================================================================
+eng_urm_test_split <- feols(sc_overall_z ~ urm_tech | 
+                            resume_index + responseid + r_do, 
+                            split = ~top_half_coder, cluster = ~responseid,
+                            data = firm_long_dt[treat == "nonblind" & role == "Eng" & s3_outside_res == 0])
+
+eng_urm_test_df <- extract_split_data(eng_urm_test_split, "Engineer", test_tiers)
+
+p_eng_urm_test <- make_split_plot(eng_urm_test_df, "Engineer: URM Premium by Coding Ability", test_colors, test_shapes, show_y = FALSE)
+
+
+# ==============================================================================
+# Output
+# ==============================================================================
+(p_eng_gpa + p_eng_test + plot_layout(guides = "collect")) /
+(p_eng_urm_gpa + p_eng_urm_test + plot_layout(guides = "collect")) +
+  plot_layout(guides = "collect") &
+  theme(legend.position = "top")
+
+
+```
+
+\newpage
+###### (Eng) Signal from GPA vs Coding Test
+
+```{r Horserace, echo = FALSE, eval = TRUE, results='asis'}
+
+eng_horse_race <- feols(sc_overall_z ~ urm_tech + urm_tech:test_case_z + urm_tech:gpa_z | 
+                        resume_index + responseid + r_do, 
+                        cluster = ~responseid,
+                        data = firm_long_dt[treat == "nonblind" & role == "Eng" & s3_outside_res == 0])
+
+tbl <- etable(
+  eng_horse_race,
+  tex = TRUE, style.tex = style.tex("aer"),
+  fitstat = c("n", "ar2"),
+  drop.section = "fixef",
+  digits = 3, se.below = TRUE,
+  dict = c("urm_tech"    = "URM",
+           "test_case_z" = "Coding Score (Z)",
+           "gpa_z"       = "GPA (Z)"),
+  signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+  title = "Signal from GPA vs. Coding Test: Engineer (Non-blind)",
+  notes = "Standard errors clustered by respondent. Sample restricted to non-blind condition, Engineer role."
+)
+
+# Inject FE rows manually before \bottomrule
+tbl <- sub(
+  "\\\\bottomrule",
+  "Resume FE & $\\\\checkmark$ \\\\\\\\\nRespondent FE & $\\\\checkmark$ \\\\\\\\\nPosition FE & $\\\\checkmark$ \\\\\\\\\n\\\\bottomrule",
+  tbl
+)
+
+tbl <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering \\\\footnotesize", tbl)
+
+cat(tbl)
+
+rm(eng_horse_race, tbl)
+
+```
+
+
+\clearpage
+### Heterogeneity by Firm Size
+```{r stage_pref_heterogeneity_by_firmsize, eval = TRUE, echo = FALSE, out.width="100%", fig.width=14, fig.height=4.5, fig.align='center', results='asis'}
+
+## Regressions: Heterogeneity by Firm Size
+## Note: Small firms are the reference group (omitted)
+## Only includes respondents with valid firm size responses (s2_firm_size != 96)
+
+  #### HR
+  models_hr_hetero_firmsize <- suppressMessages(suppressWarnings(
+    feols(
+      c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
+        i(race_gender, ref = "White_Male") + 
+        i(race_gender, firm_size_mid, ref = "White_Male") +
+        i(race_gender, firm_size_large, ref = "White_Male")
+      | resume_index + responseid + r_do,
+      data = firm_long_dt[treat == "nonblind" & role == "HR" & s2_firm_size != 96],
+      vcov = ~ responseid
+    )
+  ))
+  names(models_hr_hetero_firmsize) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z", "sc_advance")
+  
+  #### Engineer
+  models_eng_hetero_firmsize <- suppressMessages(suppressWarnings(
+    feols(
+      c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
+        i(race_gender, ref = "White_Male") + 
+        i(race_gender, firm_size_mid, ref = "White_Male") +
+        i(race_gender, firm_size_large, ref = "White_Male")
+      | resume_index + responseid + r_do,
+      data = firm_long_dt[treat == "nonblind" & role == "Eng" & s2_firm_size != 96],
+      vcov = ~ responseid
+    )
+  ))
+  names(models_eng_hetero_firmsize) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z")
+
+## Calculate respondent counts for labeling
+resp_counts_hetero_firmsize <- firm_long_dt[treat == "nonblind" & s2_firm_size != 96, .(
+  N_HR = uniqueN(responseid[role == "HR"]),
+  N_Eng = uniqueN(responseid[role == "Eng"])
+), by = .(
+  firm_size = fcase(
+    firm_size_small == 1, "small",
+    firm_size_mid == 1, "mid",
+    firm_size_large == 1, "large"
+  )
+)]
+
+## Create plots for each outcome
+  #### Overall
+  p_ovr_hr_firmsize <- plot_heterogeneity_firmsize(models_hr_hetero_firmsize$sc_overall_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_firmsize, "HR")
+  p_ovr_eng_firmsize <- plot_heterogeneity_firmsize(models_eng_hetero_firmsize$sc_overall_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_firmsize, "Eng")
+  
+  #### Coding
+  p_coding_hr_firmsize <- plot_heterogeneity_firmsize(models_hr_hetero_firmsize$sc_coding_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_firmsize, "HR")
+  p_coding_eng_firmsize <- plot_heterogeneity_firmsize(models_eng_hetero_firmsize$sc_coding_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_firmsize, "Eng")
+  
+  #### Fit
+  p_fit_hr_firmsize <- plot_heterogeneity_firmsize(models_hr_hetero_firmsize$sc_fit_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_firmsize, "HR")
+  p_fit_eng_firmsize <- plot_heterogeneity_firmsize(models_eng_hetero_firmsize$sc_fit_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_firmsize, "Eng")
+  
+  #### Stay
+  p_stay_hr_firmsize <- plot_heterogeneity_firmsize(models_hr_hetero_firmsize$sc_stay_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_firmsize, "HR")
+  p_stay_eng_firmsize <- plot_heterogeneity_firmsize(models_eng_hetero_firmsize$sc_stay_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_firmsize, "Eng")
+  
+  #### Advance (HR only)
+  p_advance_hr_firmsize <- plot_heterogeneity_firmsize(models_hr_hetero_firmsize$sc_advance, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_firmsize, "HR")
+
+## Print plots
+suppressWarnings({
+  print(hetero_side_by_side_plots(p_ovr_hr_firmsize, p_ovr_eng_firmsize, "Overall (Z) by Firm Size"))
+  print(hetero_side_by_side_plots(p_coding_hr_firmsize, p_coding_eng_firmsize, "Coding (Z) by Firm Size"))
+  print(hetero_side_by_side_plots(p_fit_hr_firmsize, p_fit_eng_firmsize, "Fit (Z) by Firm Size"))
+  print(hetero_side_by_side_plots(p_stay_hr_firmsize, p_stay_eng_firmsize, "Stay (Z) by Firm Size"))
+  print(hetero_side_by_side_plots(p_advance_hr_firmsize, p_empty, "Advance (0/1, LPM) by Firm Size"))
+})
+
+## Clean up
+rm(models_hr_hetero_firmsize, models_eng_hetero_firmsize,
+   resp_counts_hetero_firmsize,
+   p_ovr_hr_firmsize, p_ovr_eng_firmsize,
+   p_coding_hr_firmsize, p_coding_eng_firmsize,
+   p_fit_hr_firmsize, p_fit_eng_firmsize,
+   p_stay_hr_firmsize, p_stay_eng_firmsize,
+   p_advance_hr_firmsize
+)
+```
+
+
+```{r, include = FALSE, eval = FALSE, echo = TRUE}
+
+rm(p_empty,
+   total_effects_lincom_gender, total_effects_lincom_gender_collapsedonrace,
+   total_effects_lincom_race, total_effects_lincom_race_collapsedongender,
+   total_effects_lincom_racegender, total_effects_lincom_detailed_race_gender,
+   total_effects_lincom_firmsize, 
+   total_effects_lincom_dei,
+   plot_heterogeneity_gender, plot_heterogeneity_gender_collapsedonrace,
+   plot_heterogeneity_race, plot_heterogeneity_race_collapsedongender,
+   plot_heterogeneity_racegender, plot_heterogeneity_race_collapsedongender,
+   plot_heterogeneity_detailed_race_gender,
+   plot_heterogeneity_firmsize,
+   plot_heterogeneity_dei,
+   plot_simple_concordance,
+   hetero_side_by_side_plots
+)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- ##### ##### ##### ##### ##### ARCHIVED: Heterogeneity in Preferences ##### ##### ##### ##### ##### -->
+
+
+<!-- ## By Race -->
+<!-- Note: Concordance graphs drop responses by demographic groups not represented in the resume's hypothetical names. (i.e. Drops responses by Blacks) -->
+
+```{r stage_pref_heterogeneity_by_race, eval = FALSE, echo = FALSE, out.width="100%", fig.width=14, fig.height=10, fig.align='center', results='asis'}
+
+## Regressions: Heterogeneity by Respondent Race
+
+  #### HR
+  models_hr_hetero_race <- suppressMessages(suppressWarnings(
+    feols(
+      c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
+        i(race_gender, ref = "White_Male") * resp_asian + 
+        i(race_gender, ref = "White_Male") * resp_hispanic + 
+        i(race_gender, ref = "White_Male") * resp_black + 
+        i(race_gender, ref = "White_Male") * resp_raceother | 
+        resume_index + responseid + r_do,
+      data = firm_long_dt[treat == "nonblind" & role == "HR"],
+      vcov = ~ responseid
+    )
+  ))
+  names(models_hr_hetero_race) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z", "sc_advance")
+  
+  models_hr_hetero_race_collapsedongender <- suppressMessages(suppressWarnings(
+    feols(
+      c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
+        i(race, ref = "White") * resp_asian + 
+        i(race, ref = "White") * resp_hispanic + 
+        i(race, ref = "White") * resp_black + 
+        i(race, ref = "White") * resp_raceother | 
+        resume_index + responseid + r_do,
+      data = firm_long_dt[treat == "nonblind" & role == "HR"],
+      vcov = ~ responseid
+    )
+  ))
+  names(models_hr_hetero_race_collapsedongender) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z", "sc_advance")
+  
+  models_hr_concordance_race  <- suppressMessages(suppressWarnings(
+    feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ concordance_race | resume_index + responseid + r_do,
+          data = firm_long_dt[treat=="nonblind" & role=="HR"], vcov=~responseid)
+    ))
+  names(models_hr_concordance_race) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z", "sc_advance")
+  
+  #### Engineer
+  models_eng_hetero_race <- suppressMessages(suppressWarnings(
+    feols(
+      c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~
+        i(race_gender, ref = "White_Male") * resp_asian + 
+        i(race_gender, ref = "White_Male") * resp_hispanic + 
+        i(race_gender, ref = "White_Male") * resp_black + 
+        i(race_gender, ref = "White_Male") * resp_raceother | 
+        resume_index + responseid + r_do,
+      data = firm_long_dt[treat == "nonblind" & role == "Eng"],
+      vcov = ~ responseid
+    )
+  ))
+  names(models_eng_hetero_race) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z")
+  
+  models_eng_hetero_race_collapsedongender <- suppressMessages(suppressWarnings(
+    feols(
+      c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~
+        i(race, ref = "White") * resp_asian + 
+        i(race, ref = "White") * resp_hispanic + 
+        i(race, ref = "White") * resp_black + 
+        i(race, ref = "White") * resp_raceother | 
+        resume_index + responseid + r_do,
+      data = firm_long_dt[treat == "nonblind" & role == "Eng"],
+      vcov = ~ responseid
+    )
+  ))
+  names(models_eng_hetero_race_collapsedongender) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z")
+
+  models_eng_concordance_race <- suppressMessages(suppressWarnings(
+    feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ concordance_race | resume_index + responseid + r_do, 
+          data = firm_long_dt[treat=="nonblind" & role=="Eng"], vcov=~responseid)
+    ))
+  names(models_eng_concordance_race) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z")
+  
+## Calculate respondent counts for labeling
+resp_counts_hetero_race <- firm_long_dt[treat == "nonblind", .(
+  N_HR = uniqueN(responseid[role == "HR"]),
+  N_Eng = uniqueN(responseid[role == "Eng"])
+), by = .(
+  resp_race = fcase(
+    resp_white == 1, "White",
+    resp_asian == 1, "Asian", 
+    resp_hispanic == 1, "Hispanic",
+    resp_black == 1, "Black",
+    default = "Other"
+  )
+)][resp_race != "Other"]
+
+
+## Create plots for each outcome
+  #### Overall
+  p_ovr_hr_race <- plot_heterogeneity_race(models_hr_hetero_race$sc_overall_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_race, "HR")
+  p_ovr_eng_race <- plot_heterogeneity_race(models_eng_hetero_race$sc_overall_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_race, "Eng")
+  p_ovr_hr_race_collapsedongender <- plot_heterogeneity_race_collapsedongender(models_hr_hetero_race_collapsedongender$sc_overall_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_race, "HR")
+  p_ovr_eng_race_collapsedongender <- plot_heterogeneity_race_collapsedongender(models_eng_hetero_race_collapsedongender$sc_overall_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_race, "Eng")
+  p_ovr_race_concordance <- plot_simple_concordance(models_hr_concordance_race$sc_overall_z, models_eng_concordance_race$sc_overall_z, "Overall (Z) - Collapsed on Concordance (Race) - Includes only Wh/As/Hp Respondents")
+  
+  #### Coding
+  p_coding_hr_race <- plot_heterogeneity_race(models_hr_hetero_race$sc_coding_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_race, "HR")
+  p_coding_eng_race <- plot_heterogeneity_race(models_eng_hetero_race$sc_coding_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_race, "Eng")
+  p_coding_hr_race_collapsedongender <- plot_heterogeneity_race_collapsedongender(models_hr_hetero_race_collapsedongender$sc_coding_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_race, "HR")
+  p_coding_eng_race_collapsedongender <- plot_heterogeneity_race_collapsedongender(models_eng_hetero_race_collapsedongender$sc_coding_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_race, "Eng")
+  p_coding_race_concordance <- plot_simple_concordance(models_hr_concordance_race$sc_coding_z, models_eng_concordance_race$sc_coding_z, "Coding (Z) - Collapsed on Concordance (Race) - Includes only Wh/As/Hp Respondents")
+
+  #### Fit
+  p_fit_hr_race <- plot_heterogeneity_race(models_hr_hetero_race$sc_fit_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_race, "HR")
+  p_fit_eng_race <- plot_heterogeneity_race(models_eng_hetero_race$sc_fit_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_race, "Eng")
+  p_fit_hr_race_collapsedongender <- plot_heterogeneity_race_collapsedongender(models_hr_hetero_race_collapsedongender$sc_fit_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_race, "HR")
+  p_fit_eng_race_collapsedongender <- plot_heterogeneity_race_collapsedongender(models_eng_hetero_race_collapsedongender$sc_fit_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_race, "Eng")
+  p_fit_race_concordance <- plot_simple_concordance(models_hr_concordance_race$sc_fit_z, models_eng_concordance_race$sc_fit_z, "Fit (Z) - Collapsed on Concordance (Race) - Includes only Wh/As/Hp Respondents")
+
+  #### Stay
+  p_stay_hr_race <- plot_heterogeneity_race(models_hr_hetero_race$sc_stay_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_race, "HR")
+  p_stay_eng_race <- plot_heterogeneity_race(models_eng_hetero_race$sc_stay_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_race, "Eng")
+  p_stay_hr_race_collapsedongender <- plot_heterogeneity_race_collapsedongender(models_hr_hetero_race_collapsedongender$sc_stay_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_race, "HR")
+  p_stay_eng_race_collapsedongender <- plot_heterogeneity_race_collapsedongender(models_eng_hetero_race_collapsedongender$sc_stay_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_race, "Eng")
+  p_stay_race_concordance <- plot_simple_concordance(models_hr_concordance_race$sc_stay_z, models_eng_concordance_race$sc_stay_z, "Stay (Z) - Collapsed on Concordance (Race) - Includes only Wh/As/Hp Respondents")
+
+  #### Advance
+  p_advance_hr_race <- plot_heterogeneity_race(models_hr_hetero_race$sc_advance, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_race, "HR")
+  p_advance_hr_race_collapsedongender <- plot_heterogeneity_race_collapsedongender(models_hr_hetero_race_collapsedongender$sc_advance, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_race, "HR")
+  p_advance_race_concordance <- plot_simple_concordance(models_hr_concordance_race$sc_advance, NULL, title = "Advance (LPM) - Concordance (Race) - Includes only Wh/As/Hp Respondents"
+)
+  p_empty <- ggplot() + annotate("text", x = 0, y = 0, label = "Engineers: Not Measured", size = 5, color = "gray50") + theme_void()
+  
+suppressWarnings({
+  
+  # --- 1. Overall ---
+  # Create Layouts
+  p_conc_ovr_centered <- cowplot::plot_grid(NULL, p_ovr_race_concordance, NULL, ncol=3, rel_widths=c(0.25, 0.5, 0.25))
+  p_mid_ovr <- hetero_side_by_side_plots(p_ovr_hr_race_collapsedongender, p_ovr_eng_race_collapsedongender, "Overall (Z) - Collapsed on Gender")
+  p_bot_ovr <- hetero_side_by_side_plots(p_ovr_hr_race, p_ovr_eng_race, "Overall (Z)")
+
+  # Stack and Print
+  print(cowplot::plot_grid(p_conc_ovr_centered, p_mid_ovr, p_bot_ovr, ncol=1, rel_heights=c(0.4, 1, 1)))
+  cat("\\newpage\n")
+
+  # --- 2. Coding ---
+  p_conc_cod_centered <- cowplot::plot_grid(NULL, p_coding_race_concordance, NULL, ncol=3, rel_widths=c(0.25, 0.5, 0.25))
+  p_mid_cod <- hetero_side_by_side_plots(p_coding_hr_race_collapsedongender, p_coding_eng_race_collapsedongender, "Coding (Z) - Collapsed on Gender")
+  p_bot_cod <- hetero_side_by_side_plots(p_coding_hr_race, p_coding_eng_race, "Coding (Z)")
+
+  print(cowplot::plot_grid(p_conc_cod_centered, p_mid_cod, p_bot_cod, ncol=1, rel_heights=c(0.4, 1, 1)))
+  cat("\\newpage\n")
+
+  # --- 3. Fit ---
+  p_conc_fit_centered <- cowplot::plot_grid(NULL, p_fit_race_concordance, NULL, ncol=3, rel_widths=c(0.25, 0.5, 0.25))
+  p_mid_fit <- hetero_side_by_side_plots(p_fit_hr_race_collapsedongender, p_fit_eng_race_collapsedongender, "Fit (Z) - Collapsed on Gender")
+  p_bot_fit <- hetero_side_by_side_plots(p_fit_hr_race, p_fit_eng_race, "Fit (Z)")
+
+  print(cowplot::plot_grid(p_conc_fit_centered, p_mid_fit, p_bot_fit, ncol=1, rel_heights=c(0.4, 1, 1)))
+  cat("\\newpage\n")
+
+  # --- 4. Stay ---
+  p_conc_stay_centered <- cowplot::plot_grid(NULL, p_stay_race_concordance, NULL, ncol=3, rel_widths=c(0.25, 0.5, 0.25))
+  p_mid_stay <- hetero_side_by_side_plots(p_stay_hr_race_collapsedongender, p_stay_eng_race_collapsedongender, "Stay (Z) - Collapsed on Gender")
+  p_bot_stay <- hetero_side_by_side_plots(p_stay_hr_race, p_stay_eng_race, "Stay (Z)")
+
+  print(cowplot::plot_grid(p_conc_stay_centered, p_mid_stay, p_bot_stay, ncol=1, rel_heights=c(0.4, 1, 1)))
+  cat("\\newpage\n")
+
+  # --- 5. Advance ---
+  p_conc_adv_centered <- cowplot::plot_grid(NULL, p_advance_race_concordance, NULL, ncol=3, rel_widths=c(0.25, 0.5, 0.25))
+  p_mid_adv <- hetero_side_by_side_plots(p_advance_hr_race_collapsedongender, p_empty, "Advance (0/1, LPM) - Collapsed on Gender")
+  p_bot_adv <- hetero_side_by_side_plots(p_advance_hr_race, p_empty, "Advance (0/1, LPM)")
+
+  print(cowplot::plot_grid(p_conc_adv_centered, p_mid_adv, p_bot_adv, ncol=1, rel_heights=c(0.4, 1, 1)))
+})
+
+# rm(models_hr_hetero_race, models_hr_hetero_race_collapsedongender, models_hr_concordance_race,
+#    models_eng_hetero_race, models_eng_hetero_race_collapsedongender, models_eng_concordance_race, 
+#    resp_counts_hetero_race, p_ovr_hr_race, p_ovr_eng_race, p_ovr_hr_race_collapsedongender, p_ovr_eng_race_collapsedongender, p_ovr_race_concordance,
+#    p_coding_hr_race, p_coding_eng_race, p_coding_hr_race_collapsedongender, p_coding_eng_race_collapsedongender, p_coding_race_concordance,
+#    p_fit_hr_race, p_fit_eng_race, p_fit_hr_race_collapsedongender, p_fit_eng_race_collapsedongender, p_fit_race_concordance,
+#    p_stay_hr_race, p_stay_eng_race, p_stay_hr_race_collapsedongender, p_stay_eng_race_collapsedongender, p_stay_race_concordance,
+#    p_advance_hr_race, p_advance_hr_race_collapsedongender, p_advance_race_concordance, 
+#    p_mid_ovr, p_bot_ovr, p_conc_ovr_centered,
+#    p_mid_cod, p_bot_cod, p_conc_cod_centered, 
+#    p_mid_fit, p_bot_fit, p_conc_fit_centered,
+#    p_mid_stay, p_bot_stay, p_conc_stay_centered,
+#    p_mid_adv, p_bot_adv, p_conc_adv_centered)
+
+```
+
+<!-- \clearpage -->
+<!-- ## By Gender -->
+<!-- Note: Concordance graphs drop responses by demographic groups not represented in the resume's hypothetical names. (i.e. Drops responses by Nonbinary) -->
+
+```{r stage_pref_heterogeneity_by_gender, eval = FALSE, echo = FALSE, out.width="100%", fig.width=14, fig.height=4.5, fig.align='center', results='asis'}
+
+## Regressions: Heterogeneity by Respondent Gender
+  
+  #### HR
+  models_hr_concordance_gender  <- suppressMessages(suppressWarnings(
+    feols(sc_overall_z ~ concordance_race | resume_index + responseid + r_do, 
+          data = firm_long_dt[treat=="nonblind" & role=="HR"], vcov=~responseid)
+    ))
+  models_eng_concordance_gender <- suppressMessages(suppressWarnings(
+    feols(sc_overall_z ~ concordance_race | resume_index + responseid + r_do,
+          data = firm_long_dt[treat=="nonblind" & role=="Eng"], vcov=~responseid)
+  ))
+
+  models_hr_hetero_gender <- suppressMessages(suppressWarnings(
+    feols(
+      c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
+        i(race_gender, ref = "White_Male") + 
+        i(race_gender, resp_male, ref = "White_Male") 
+      | resume_index + responseid + r_do,
+      data = firm_long_dt[treat == "nonblind" & role == "HR"],
+      vcov = ~ responseid
+    )
+  ))
+  names(models_hr_hetero_gender) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z", "sc_advance")
+  
+  models_hr_hetero_gender_collapsedonrace <- suppressMessages(suppressWarnings(
+    feols(
+      c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
+        i(gender, ref = "Male") + 
+        i(gender, resp_male, ref = "Male") 
+      | resume_index + responseid + r_do,
+      data = firm_long_dt[treat == "nonblind" & role == "HR"],
+      vcov = ~ responseid
+    )
+  ))
+  names(models_hr_hetero_gender_collapsedonrace) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z", "sc_advance")
+  
+  #### Engineer
+  models_eng_hetero_gender <- suppressMessages(suppressWarnings(
+    feols(
+      c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
+        i(race_gender, ref = "White_Male") + 
+        i(race_gender, resp_male, ref = "White_Male") 
+      | resume_index + responseid + r_do,
+      data = firm_long_dt[treat == "nonblind" & role == "Eng"],
+      vcov = ~ responseid
+    )
+  ))
+  names(models_eng_hetero_gender) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z")
+  
+  models_eng_hetero_gender_collapsedonrace <- suppressMessages(suppressWarnings(
+    feols(
+      c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
+        i(gender, ref = "Male") + 
+        i(gender, resp_male, ref = "Male") 
+      | resume_index + responseid + r_do,
+      data = firm_long_dt[treat == "nonblind" & role == "Eng"],
+      vcov = ~ responseid
+    )
+  ))
+  names(models_eng_hetero_gender_collapsedonrace) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z")
+
+## Calculate respondent counts for labeling
+resp_counts_hetero_gender <- firm_long_dt[treat == "nonblind", .(
+  N_HR = uniqueN(responseid[role == "HR"]),
+  N_Eng = uniqueN(responseid[role == "Eng"])
+), by = .(
+  resp_gender = ifelse(resp_male == 1, "Male", "Female")
+)]
+
+## Create plots for each outcome
+  #### Overall
+  p_ovr_hr_gender <- plot_heterogeneity_gender(models_hr_hetero_gender$sc_overall_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_gender, "HR")
+  p_ovr_eng_gender <- plot_heterogeneity_gender(models_eng_hetero_gender$sc_overall_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_gender, "Eng")
+  p_ovr_hr_gender_collapsedonrace <- plot_heterogeneity_gender_collapsedonrace(models_hr_hetero_gender_collapsedonrace$sc_overall_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_gender, "HR")
+  p_ovr_eng_gender_collapsedonrace <- plot_heterogeneity_gender_collapsedonrace(models_eng_hetero_gender_collapsedonrace$sc_overall_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_gender, "Eng")
+  
+  #### Coding
+  p_coding_hr_gender <- plot_heterogeneity_gender(models_hr_hetero_gender$sc_coding_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_gender, "HR")
+  p_coding_eng_gender <- plot_heterogeneity_gender(models_eng_hetero_gender$sc_coding_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_gender, "Eng")
+  p_coding_hr_gender_collapsedonrace <- plot_heterogeneity_gender_collapsedonrace(models_hr_hetero_gender_collapsedonrace$sc_coding_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_gender, "HR")
+  p_coding_eng_gender_collapsedonrace <- plot_heterogeneity_gender_collapsedonrace(models_eng_hetero_gender_collapsedonrace$sc_coding_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_gender, "Eng")
+  
+  #### Fit
+  p_fit_hr_gender <- plot_heterogeneity_gender(models_hr_hetero_gender$sc_fit_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_gender, "HR")
+  p_fit_eng_gender <- plot_heterogeneity_gender(models_eng_hetero_gender$sc_fit_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_gender, "Eng")
+  p_fit_hr_gender_collapsedonrace <- plot_heterogeneity_gender_collapsedonrace(models_hr_hetero_gender_collapsedonrace$sc_fit_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_gender, "HR")
+  p_fit_eng_gender_collapsedonrace <- plot_heterogeneity_gender_collapsedonrace(models_eng_hetero_gender_collapsedonrace$sc_fit_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_gender, "Eng")
+  
+  #### Stay
+  p_stay_hr_gender <- plot_heterogeneity_gender(models_hr_hetero_gender$sc_stay_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_gender, "HR")
+  p_stay_eng_gender <- plot_heterogeneity_gender(models_eng_hetero_gender$sc_stay_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_gender, "Eng")
+  p_stay_hr_gender_collapsedonrace <- plot_heterogeneity_gender_collapsedonrace(models_hr_hetero_gender_collapsedonrace$sc_stay_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_gender, "HR")
+  p_stay_eng_gender_collapsedonrace <- plot_heterogeneity_gender_collapsedonrace(models_eng_hetero_gender_collapsedonrace$sc_stay_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_gender, "Eng")
+  
+  #### Advance
+  p_advance_hr_gender <- plot_heterogeneity_gender(models_hr_hetero_gender$sc_advance, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_gender, "HR")
+  p_advance_hr_gender_collapsedonrace <- plot_heterogeneity_gender_collapsedonrace(models_hr_hetero_gender_collapsedonrace$sc_advance, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_gender, "HR")
+
+## Print plots
+suppressWarnings({
+  print(hetero_side_by_side_plots(p_ovr_hr_gender_collapsedonrace, p_ovr_eng_gender_collapsedonrace, "Overall (Z) - Collapsed on Race / Concordance - Includes only M/F respondents"))
+  print(hetero_side_by_side_plots(p_ovr_hr_gender, p_ovr_eng_gender, "Overall (Z)"))
+  
+  print(hetero_side_by_side_plots(p_coding_hr_gender_collapsedonrace, p_coding_eng_gender_collapsedonrace, "Coding (Z) - Collapsed on Race / Concordance - Includes only M/F respondents"))
+  print(hetero_side_by_side_plots(p_coding_hr_gender, p_coding_eng_gender, "Coding (Z)"))
+  
+  print(hetero_side_by_side_plots(p_fit_hr_gender_collapsedonrace, p_fit_eng_gender_collapsedonrace, "Fit (Z) - Collapsed on Race / Concordance - Includes only M/F respondents"))
+  print(hetero_side_by_side_plots(p_fit_hr_gender, p_fit_eng_gender, "Fit (Z)"))
+  
+  print(hetero_side_by_side_plots(p_stay_hr_gender_collapsedonrace, p_stay_eng_gender_collapsedonrace, "Stay (Z) - Collapsed on Race / Concordance - Includes only M/F respondents"))
+  print(hetero_side_by_side_plots(p_stay_hr_gender, p_stay_eng_gender, "Stay (Z)"))
+  
+  print(hetero_side_by_side_plots(p_advance_hr_gender_collapsedonrace, p_empty, "Advance (0/1, LPM) - Collapsed on Race / Concordance - Includes only M/F respondents"))
+  print(hetero_side_by_side_plots(p_advance_hr_gender, p_empty, "Advance (0/1, LPM)"))
+})
+
+
+rm(models_hr_concordance_gender, models_eng_concordance_gender, 
+   models_hr_hetero_gender, models_hr_hetero_gender_collapsedonrace, 
+   models_eng_hetero_gender, models_eng_hetero_gender_collapsedonrace, 
+   resp_counts_hetero_gender,
+   p_ovr_hr_gender, p_ovr_eng_gender, p_ovr_hr_gender_collapsedonrace, p_ovr_eng_gender_collapsedonrace, 
+   p_coding_hr_gender, p_coding_eng_gender, p_coding_hr_gender_collapsedonrace, p_coding_eng_gender_collapsedonrace, 
+   p_fit_hr_gender, p_fit_eng_gender, p_fit_hr_gender_collapsedonrace, p_fit_eng_gender_collapsedonrace, 
+   p_stay_hr_gender, p_stay_eng_gender, p_stay_hr_gender_collapsedonrace, p_stay_eng_gender_collapsedonrace, 
+   p_advance_hr_gender, p_advance_hr_gender_collapsedonrace
+)
+```
+
+<!-- \clearpage -->
+<!-- ## By Race_Gender -->
+<!-- Note: Concordance graphs drop responses by demographic groups not represented in the resume's hypothetical names. (i.e. Drops responses by Blacks, Nonbinary) -->
+
+```{r stage_pref_heterogeneity_racegender, eval = FALSE, echo = FALSE, out.width="100%", fig.width=14, fig.height=10, fig.align='center', results='asis'}
+
+# --- 1. Regressions ---
+
+  # A. Concordance Models (Top: Binary Match vs. No Match)
+  models_hr_concordance_racegender <- suppressMessages(suppressWarnings(
+    feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ concordance_race_gender | resume_index + responseid + r_do_bythree, 
+          data = firm_long_dt[treat=="nonblind" & role=="HR"], vcov=~responseid)
+  ))
+  names(models_hr_concordance_racegender) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z", "sc_advance")
+
+  models_eng_concordance_racegender <- suppressMessages(suppressWarnings(
+    feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ concordance_race_gender | resume_index + responseid + r_do_bythree, 
+          data = firm_long_dt[treat=="nonblind" & role=="Eng"], vcov=~responseid)
+  ))
+  names(models_eng_concordance_racegender) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z")
+
+  # B. Full Interaction Models (Bottom: Original Detailed Breakdown)
+  models_hr_hetero_racegender <- suppressMessages(suppressWarnings(
+      feols(
+      c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
+        i(race_gender, ref = "White_Male") + 
+        i(resp_race_gender, race_gender, ref = "White_Male") 
+      | resume_index + responseid + r_do_bythree,
+      data = firm_long_dt[treat == "nonblind" & role == "HR"],
+      vcov = ~ responseid
+    )
+  ))
+  names(models_hr_hetero_racegender) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z", "sc_advance")
+
+  models_eng_hetero_racegender <- suppressMessages(suppressWarnings(
+      feols(
+      c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
+        i(race_gender, ref = "White_Male") + 
+        i(resp_race_gender, race_gender, ref = "White_Male") 
+      | resume_index + responseid + r_do_bythree,
+      data = firm_long_dt[treat == "nonblind" & role == "Eng" & resp_race_gender != "Other"],
+      vcov = ~ responseid
+    )
+  ))
+  names(models_eng_hetero_racegender) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z")
+
+# --- 2. Calculate Counts for Labels (FIXED: Filter out NAs) ---
+  resp_counts_hetero_racegender <- firm_long_dt[treat == "nonblind" & !is.na(resp_race_gender) & resp_race_gender != "Other", .(
+    N_HR = uniqueN(responseid[role == "HR"]),
+    N_Eng = uniqueN(responseid[role == "Eng"])
+  ), by = .(resp_race_gender)]
+
+# --- 3. Generate Plots ---
+  
+  #### Overall
+  p_ovr_conc <- plot_simple_concordance(models_hr_concordance_racegender$sc_overall_z, models_eng_concordance_racegender$sc_overall_z, "Overall (Z) - Concordance Premium (Race & Gender)")
+  p_ovr_hr <- plot_heterogeneity_racegender(models_hr_hetero_racegender$sc_overall_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_racegender, "HR")
+  p_ovr_eng <- plot_heterogeneity_racegender(models_eng_hetero_racegender$sc_overall_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_racegender, "Eng")
+
+  #### Coding
+  p_cod_conc <- plot_simple_concordance(models_hr_concordance_racegender$sc_coding_z, models_eng_concordance_racegender$sc_coding_z, "Coding (Z) - Concordance Premium (Race & Gender)")
+  p_cod_hr <- plot_heterogeneity_racegender(models_hr_hetero_racegender$sc_coding_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_racegender, "HR")
+  p_cod_eng <- plot_heterogeneity_racegender(models_eng_hetero_racegender$sc_coding_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_racegender, "Eng")
+
+  #### Fit
+  p_fit_conc <- plot_simple_concordance(models_hr_concordance_racegender$sc_fit_z, models_eng_concordance_racegender$sc_fit_z, "Fit (Z) - Concordance Premium (Race & Gender)")
+  p_fit_hr <- plot_heterogeneity_racegender(models_hr_hetero_racegender$sc_fit_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_racegender, "HR")
+  p_fit_eng <- plot_heterogeneity_racegender(models_eng_hetero_racegender$sc_fit_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_racegender, "Eng")
+
+  #### Stay
+  p_stay_conc <- plot_simple_concordance(models_hr_concordance_racegender$sc_stay_z, models_eng_concordance_racegender$sc_stay_z, "Stay (Z) - Concordance Premium (Race & Gender)")
+  p_stay_hr <- plot_heterogeneity_racegender(models_hr_hetero_racegender$sc_stay_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_racegender, "HR")
+  p_stay_eng <- plot_heterogeneity_racegender(models_eng_hetero_racegender$sc_stay_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_racegender, "Eng")
+
+  #### Advance (HR only for Concordance, Empty for Eng)
+  p_adv_conc <- plot_simple_concordance(models_hr_concordance_racegender$sc_advance, NULL, title = "Advance (LPM) - Concordance Premium (Race & Gender)")
+  p_adv_hr <- plot_heterogeneity_racegender(models_hr_hetero_racegender$sc_advance, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_racegender, "HR")
+  p_empty <- ggplot() + annotate("text", x = 0, y = 0, label = "Engineers: Not Measured", size = 5, color = "gray50") + theme_void()
+
+# --- 4. Print (Two Rows Per Page) ---
+suppressWarnings({
+  
+  # Overall
+  p_conc_centered <- cowplot::plot_grid(NULL, p_ovr_conc, NULL, ncol=3, rel_widths=c(0.25, 0.5, 0.25))
+  p_full_interaction <- hetero_side_by_side_plots(p_ovr_hr, p_ovr_eng, "Overall (Z)")
+  print(cowplot::plot_grid(p_conc_centered, p_full_interaction, ncol=1, rel_heights=c(0.4, 1.2)))
+  cat("\\newpage\n")
+
+  # Coding
+  p_conc_centered <- cowplot::plot_grid(NULL, p_cod_conc, NULL, ncol=3, rel_widths=c(0.25, 0.5, 0.25))
+  p_full_interaction <- hetero_side_by_side_plots(p_cod_hr, p_cod_eng, "Coding (Z)")
+  print(cowplot::plot_grid(p_conc_centered, p_full_interaction, ncol=1, rel_heights=c(0.4, 1.2)))
+  cat("\\newpage\n")
+
+  # Fit
+  p_conc_centered <- cowplot::plot_grid(NULL, p_fit_conc, NULL, ncol=3, rel_widths=c(0.25, 0.5, 0.25))
+  p_full_interaction <- hetero_side_by_side_plots(p_fit_hr, p_fit_eng, "Fit (Z)")
+  print(cowplot::plot_grid(p_conc_centered, p_full_interaction, ncol=1, rel_heights=c(0.4, 1.2)))
+  cat("\\newpage\n")
+
+  # Stay
+  p_conc_centered <- cowplot::plot_grid(NULL, p_stay_conc, NULL, ncol=3, rel_widths=c(0.25, 0.5, 0.25))
+  p_full_interaction <- hetero_side_by_side_plots(p_stay_hr, p_stay_eng, "Stay (Z)")
+  print(cowplot::plot_grid(p_conc_centered, p_full_interaction, ncol=1, rel_heights=c(0.4, 1.2)))
+  cat("\\newpage\n")
+
+  # Advance
+  p_conc_centered <- cowplot::plot_grid(NULL, p_adv_conc, NULL, ncol=3, rel_widths=c(0.25, 0.5, 0.25))
+  p_full_interaction <- hetero_side_by_side_plots(p_adv_hr, p_empty, "Advance (0/1)")
+  print(cowplot::plot_grid(p_conc_centered, p_full_interaction, ncol=1, rel_heights=c(0.4, 1.2)))
+})
+
+rm(models_hr_concordance_racegender, models_eng_concordance_racegender, 
+   models_hr_hetero_racegender, models_eng_hetero_racegender, 
+   resp_counts_hetero_racegender,
+   p_ovr_conc, p_ovr_hr, p_ovr_eng, 
+   p_cod_conc, p_cod_hr, p_cod_eng, 
+   p_fit_conc, p_fit_hr, p_fit_eng, 
+   p_stay_conc, p_stay_hr, p_stay_eng, 
+   p_adv_conc, p_adv_hr, 
+   p_conc_centered, p_full_interaction
+)
+```
+
+<!-- \clearpage -->
+<!-- ## By Race_Gender_Detailed -->
+<!-- Note: Concordance graphs drop responses by demographic groups not represented in the resume's hypothetical names. (i.e. Drops responses by Koreans, Japanese, Pakistani) -->
+
+```{r stage_pref_heterogeneity_detailed, eval = FALSE, echo = FALSE, out.width="100%", fig.width=14, fig.height=9.5, fig.align='center', results='asis'}
+
+# --- 1. Regressions ---
+
+  # A. Concordance Models (Top)
+  models_hr_concordance_detailed <- suppressMessages(suppressWarnings(
+    feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ concordance_race_gender_detailed | resume_index + responseid + r_do_bythree, 
+          data = firm_long_dt[treat=="nonblind" & role=="HR"], vcov=~responseid)
+  ))
+  names(models_hr_concordance_detailed) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z", "sc_advance")
+
+  models_eng_concordance_detailed <- suppressMessages(suppressWarnings(
+    feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ concordance_race_gender_detailed | resume_index + responseid + r_do_bythree, 
+          data = firm_long_dt[treat=="nonblind" & role=="Eng"], vcov=~responseid)
+  ))
+  names(models_eng_concordance_detailed) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z")
+
+  # B. Full Interaction Models (Bottom)
+  models_hr_hetero_detailed <- suppressMessages(suppressWarnings(
+      feols(
+      c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
+        i(race_gender_detailed, ref = "White_Male") + 
+        i(resp_race_gender_detailed, race_gender_detailed, ref = "White_Male") 
+      | resume_index + responseid + r_do_bythree,
+      data = firm_long_dt[treat == "nonblind" & role == "HR"],
+      vcov = ~ responseid
+    )
+  ))
+  names(models_hr_hetero_detailed) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z", "sc_advance")
+
+  models_eng_hetero_detailed <- suppressMessages(suppressWarnings(
+      feols(
+      c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
+        i(race_gender_detailed, ref = "White_Male") + 
+        i(resp_race_gender_detailed, race_gender_detailed, ref = "White_Male") 
+      | resume_index + responseid + r_do_bythree,
+      data = firm_long_dt[treat == "nonblind" & role == "Eng" & resp_race_gender != "Other"],
+      vcov = ~ responseid
+    )
+  ))
+  names(models_eng_hetero_detailed) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z")
+
+# --- 2. Calculate Counts for Labels ---
+  resp_counts_hetero_detailed <- firm_long_dt[treat == "nonblind" & !is.na(resp_race_gender_detailed) & resp_race_gender_detailed != "Other", .(
+    N_HR = uniqueN(responseid[role == "HR"]),
+    N_Eng = uniqueN(responseid[role == "Eng"])
+  ), by = .(resp_race_gender_detailed)]
+
+# --- 3. Generate Plots ---
+  
+  #### Overall
+  p_ovr_conc <- plot_simple_concordance(models_hr_concordance_detailed$sc_overall_z, models_eng_concordance_detailed$sc_overall_z, "Overall (Z) - Concordance (Detailed Race/Gender)")
+  p_ovr_hr_det <- plot_heterogeneity_detailed_race_gender(models_hr_hetero_detailed$sc_overall_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_detailed, "HR")
+  p_ovr_eng_det <- plot_heterogeneity_detailed_race_gender(models_eng_hetero_detailed$sc_overall_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_detailed, "Eng")
+
+  #### Coding
+  p_cod_conc <- plot_simple_concordance(models_hr_concordance_detailed$sc_coding_z, models_eng_concordance_detailed$sc_coding_z, "Coding (Z) - Concordance (Detailed Race/Gender)")
+  p_coding_hr_det <- plot_heterogeneity_detailed_race_gender(models_hr_hetero_detailed$sc_coding_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_detailed, "HR")
+  p_coding_eng_det <- plot_heterogeneity_detailed_race_gender(models_eng_hetero_detailed$sc_coding_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_detailed, "Eng")
+
+  #### Fit
+  p_fit_conc <- plot_simple_concordance(models_hr_concordance_detailed$sc_fit_z, models_eng_concordance_detailed$sc_fit_z, "Fit (Z) - Concordance (Detailed Race/Gender)")
+  p_fit_hr_det <- plot_heterogeneity_detailed_race_gender(models_hr_hetero_detailed$sc_fit_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_detailed, "HR")
+  p_fit_eng_det <- plot_heterogeneity_detailed_race_gender(models_eng_hetero_detailed$sc_fit_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_detailed, "Eng")
+
+  #### Stay
+  p_stay_conc <- plot_simple_concordance(models_hr_concordance_detailed$sc_stay_z, models_eng_concordance_detailed$sc_stay_z, "Stay (Z) - Concordance (Detailed Race/Gender)")
+  p_stay_hr_det <- plot_heterogeneity_detailed_race_gender(models_hr_hetero_detailed$sc_stay_z, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_detailed, "HR")
+  p_stay_eng_det <- plot_heterogeneity_detailed_race_gender(models_eng_hetero_detailed$sc_stay_z, "Engineers", "Discrimination (Z)", FALSE, resp_counts_hetero_detailed, "Eng")
+
+  #### Advance
+  p_adv_conc <- plot_simple_concordance(models_hr_concordance_detailed$sc_advance, NULL, title = "Advance (LPM) - Concordance (Detailed Race/Gender)")
+  p_advance_hr_det <- plot_heterogeneity_detailed_race_gender(models_hr_hetero_detailed$sc_advance, "Human Resources", "Discrimination (Z)", TRUE, resp_counts_hetero_detailed, "HR")  
+  p_empty <- ggplot() + annotate("text", x = 0, y = 0, label = "Engineers: Not Measured", size = 5, color = "gray50") + theme_void()
+
+# --- 4. Print ---
+suppressWarnings({
+  
+  # Overall
+  p_conc_centered <- cowplot::plot_grid(NULL, p_ovr_conc, NULL, ncol=3, rel_widths=c(0.25, 0.5, 0.25))
+  p_full_interaction <- hetero_side_by_side_plots(p_ovr_hr_det, p_ovr_eng_det, "Overall (Z)")
+  print(cowplot::plot_grid(p_conc_centered, p_full_interaction, ncol=1, rel_heights=c(0.4, 1.2)))
+  cat("\\newpage\n")
+
+  # Coding
+  p_conc_centered <- cowplot::plot_grid(NULL, p_cod_conc, NULL, ncol=3, rel_widths=c(0.25, 0.5, 0.25))
+  p_full_interaction <- hetero_side_by_side_plots(p_coding_hr_det, p_coding_eng_det, "Coding (Z)")
+  print(cowplot::plot_grid(p_conc_centered, p_full_interaction, ncol=1, rel_heights=c(0.4, 1.2)))
+  cat("\\newpage\n")
+
+  # Fit
+  p_conc_centered <- cowplot::plot_grid(NULL, p_fit_conc, NULL, ncol=3, rel_widths=c(0.25, 0.5, 0.25))
+  p_full_interaction <- hetero_side_by_side_plots(p_fit_hr_det, p_fit_eng_det, "Fit (Z)")
+  print(cowplot::plot_grid(p_conc_centered, p_full_interaction, ncol=1, rel_heights=c(0.4, 1.2)))
+  cat("\\newpage\n")
+
+  # Stay
+  p_conc_centered <- cowplot::plot_grid(NULL, p_stay_conc, NULL, ncol=3, rel_widths=c(0.25, 0.5, 0.25))
+  p_full_interaction <- hetero_side_by_side_plots(p_stay_hr_det, p_stay_eng_det, "Stay (Z)")
+  print(cowplot::plot_grid(p_conc_centered, p_full_interaction, ncol=1, rel_heights=c(0.4, 1.2)))
+  cat("\\newpage\n")
+
+  # Advance
+  p_conc_centered <- cowplot::plot_grid(NULL, p_adv_conc, NULL, ncol=3, rel_widths=c(0.25, 0.5, 0.25))
+  p_full_interaction <- hetero_side_by_side_plots(p_advance_hr_det, p_empty, "Advance (0/1, LPM)")
+  print(cowplot::plot_grid(p_conc_centered, p_full_interaction, ncol=1, rel_heights=c(0.4, 1.2)))
+})
+
+
+rm(models_hr_concordance_detailed, models_eng_concordance_detailed, 
+   models_hr_hetero_detailed, models_eng_hetero_detailed, 
+   resp_counts_hetero_detailed, 
+   p_ovr_conc, p_ovr_hr_det, p_ovr_eng_det, 
+   p_cod_conc, p_coding_hr_det, p_coding_eng_det, 
+   p_fit_conc, p_fit_hr_det, p_fit_eng_det, 
+   p_stay_conc, p_stay_hr_det, p_stay_eng_det, 
+   p_adv_conc, p_advance_hr_det,
+   p_conc_centered, p_full_interaction
+)
+```
