@@ -2237,11 +2237,11 @@ models_trp <- list("HR (Race)" = m_hr_r, "Eng (Race)" = m_eng_r,
 
 dict_trp <- c(
   "urm_tech" = "URM (WF, AF, HM, HF)",
-  "urm_tech:div_priority_z" = "URM $\\times$ Div Priority",
+  "urm_tech:div_priority_z" = "URM $\\times$ Respondent Prioritizes Diversity",
   "urm_tech:firm_attention_race_z" = "URM $\\times$ Firm DEI Attn",
   "urm_tech:firm_attention_gender_z" = "URM $\\times$ Firm DEI Attn",
-  "urm_tech:div_priority_z:firm_attention_race_z"   = "URM $\\times$ Div Prio $\\times$ Firm Attn",
-  "urm_tech:div_priority_z:firm_attention_gender_z" = "URM $\\times$ Div Prio $\\times$ Firm Attn"
+  "urm_tech:div_priority_z:firm_attention_race_z"   = "URM $\\times$ Respondent Prioritizes Diversity $\\times$ Firm DEI Attn",
+  "urm_tech:div_priority_z:firm_attention_gender_z" = "URM $\\times$ Respondent Prioritizes Diversity $\\times$ Firm DEI Attn"
 )
 
 tbl_trp <- etable(
@@ -2289,12 +2289,52 @@ rm(dt_hr_nb, dt_eng_nb, chk, fit_triple_urm, m_hr_r, m_eng_r, m_hr_g, m_eng_g,
 
 \scriptsize `div_priority_z` = z-score of (8 $-$ `s4_goals_5`), the revealed priority of "Diversity and Representation" in the respondent's ranking of seven hiring goals. `firm_attention_race_z` / `firm_attention_gender_z` = z-scores of `s5_view_dei_race_f` / `s5_view_dei_gender_f`, the respondent's perception of their firm's current DEI attention level. Standard errors clustered by respondent. Sample: non-blind arm. \normalsize
 
+\vspace{1em}
+
+Reading the HR Overall regression at $\pm 1\sigma$ of each covariate (for Hispanic Male applicants, vs White Male), the four quadrants give the most direct picture of the substitution mechanism:
+
+```{r dei_final_quadrant, eval = TRUE, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+dt_hr_q <- firm_long_dt[treat == "nonblind" & role == "HR"]
+m_q <- feols(
+  sc_overall_z ~ i(race_gender, ref = "White_Male") * div_priority_z * firm_attention_race_z
+  | responseid + resume_index + r_do,
+  data = dt_hr_q, vcov = ~ responseid
+)
+b <- coef(m_q)
+b_hm     <- b["race_gender::Hispanic_Male"]
+b_hm_div <- b["div_priority_z:race_gender::Hispanic_Male"]
+b_hm_atn <- b["firm_attention_race_z:race_gender::Hispanic_Male"]
+b_hm_tri <- b["div_priority_z:firm_attention_race_z:race_gender::Hispanic_Male"]
+q <- function(div, atn) b_hm + b_hm_div*div + b_hm_atn*atn + b_hm_tri*div*atn
+
+tab <- data.frame(
+  Personal = c("Low personal priority ($-1\\sigma$)", "High personal priority ($+1\\sigma$)"),
+  Low  = sprintf("%+.2f", c(q(-1,-1), q(+1,-1))),
+  High = sprintf("%+.2f", c(q(-1,+1), q(+1,+1)))
+)
+knitr::kable(
+  tab, format = "latex", booktabs = TRUE, escape = FALSE,
+  col.names = c(" ", "Low Firm Race Attn", "High Firm Race Attn"),
+  caption = "Predicted Hispanic Male premium (vs. White Male) on HR Overall rating, at quadrants of (personal diversity priority $\\times$ firm race-DEI attention)."
+) |>
+  kableExtra::kable_styling(latex_options = "HOLD_position", font_size = 9) |>
+  kableExtra::add_header_above(c(" " = 1, "Firm Race-DEI Attention" = 2))
+rm(dt_hr_q, m_q, b, b_hm, b_hm_div, b_hm_atn, b_hm_tri, q, tab)
+```
+
+The largest HM premium ($+0.74\sigma$) sits in the (high personal priority, low firm attention) cell --- the "individual compensates for firm inattention" case. At firms already emphasizing race-DEI (right column), HM premia collapse regardless of personal priority. The backlash quadrant (low personal priority, high firm attention) is modestly negative, not extreme.
+
+\vspace{0.5em}
+
+> *Implication*: Neither stated DEI attitudes nor observable firm DEI behaviors, taken singly, explain variation in demographic premia. However, the combination of strong personal diversity priority and a firm that does not visibly act on it is associated with a substantially larger Hispanic-Male premium among HR evaluators --- a pattern consistent with individual-level substitution for perceived firm inattention, rather than backlash against firm over-emphasis.
+
+<!--
 \clearpage
 ## By DEI (Original)
 
 The DEI Index used in this section is constructed as the row-wise mean of z-scored responses to four survey items capturing views on race-based DEI (`s5_view_dei_race`), gender-based DEI (`s5_view_dei_gender`), workplace diversity (`s5_view_diverse`), and DEI in hiring (`s5_view_hiring_dei`), and is then re-standardized within role $\times$ treatment cells. See "By DEI (New)" below for an alternative construction that drops `s5_view_hiring_dei` and matches the proxy to the demographic dimension being tested.
 
-```{r dei_continuous, eval = TRUE, echo = FALSE, fig.width=9, fig.height=6, fig.align='center', warning=FALSE, message=FALSE, results='asis'}
+```{r dei_continuous, eval = FALSE, echo = FALSE, fig.width=9, fig.height=6, fig.align='center', warning=FALSE, message=FALSE, results='asis'}
 
 # ==============================================================================
 # HELPER FUNCTION (reused from before, generalized for any xvar)
@@ -2448,7 +2488,7 @@ rm(dt_hr, dt_eng, urm_premium_curve, make_curve_panel,
 ```
 
 \newpage
-```{r dei_discrete, eval=TRUE, echo=FALSE, fig.width=9, fig.height=6, fig.align='center', warning=FALSE, message=FALSE, results='asis'}
+```{r dei_discrete, eval=FALSE, echo=FALSE, fig.width=9, fig.height=6, fig.align='center', warning=FALSE, message=FALSE, results='asis'}
 
 dt_hr  <- firm_long_dt[treat == "nonblind" & role == "HR"]
 dt_eng <- firm_long_dt[treat == "nonblind" & role == "Eng"]
@@ -2594,7 +2634,7 @@ feols(c(sc_coding_z, sc_overall_z) ~
 
 \newpage
 
-```{r heterogeneity_pro_dei, eval = TRUE, echo = FALSE, eval = FALSE, include = FALSE}
+```{r heterogeneity_pro_dei, eval = FALSE, echo = FALSE, eval = FALSE, include = FALSE}
 ## URM Tech (urm_tech) on Pro DEI Index
 feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
             urm_tech * pro_dei_index_z
@@ -2661,7 +2701,7 @@ feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~
 
 
 
-```{r stage_pref_heterogeneity_dei, eval = TRUE, echo = FALSE, eval = FALSE, out.width="100%", fig.width=14, fig.height=11, fig.align='center', results='asis'}
+```{r stage_pref_heterogeneity_dei, eval = FALSE, echo = FALSE, eval = FALSE, out.width="100%", fig.width=14, fig.height=11, fig.align='center', results='asis'}
 
 ## Regressions: Heterogeneity by DEI Views
 
@@ -2961,482 +3001,9 @@ rm(models_hr_dei_race_binary, models_eng_dei_race_binary,
    coef_map_gender_binary, coef_map_gender_continuous)
 ```
 
+-->
 \clearpage
-## By DEI (New)
-
-The original "By DEI" section above interacts an under-represented-minority indicator with a four-item DEI index (`pro_dei_index_z`). The new analysis below makes two refinements suggested by the survey-item structure: (i) **match** the heterogeneity proxy to the demographic dimension being tested — race-DEI view (`pro_dei_race_z`) for race premia, gender-DEI view (`pro_dei_gender_z`) for gender premia; and (ii) **drop** `s5_view_hiring_dei` from any composite, since it is an empirical belief about the *effect* of DEI on hiring quality and is therefore prone to mechanical correlation with the demographic-evaluation behavior we are trying to measure. We also report two composite indices built only from the normative items — one with and one without the personal diversity preference (`s5_view_diverse`) — and `s5_view_diverse` standalone for completeness. All specifications use White Male as the reference applicant and are restricted to the non-blind arm. Composite indices are constructed inline as the row-mean of the named components, then re-standardized within the analysis sample.
-
-```{r dei_new_setup, eval = TRUE, echo = FALSE, include = FALSE}
-## Working data: non-blind only, by role
-dt_hr  <- copy(firm_long_dt[treat == "nonblind" & role == "HR"])
-dt_eng <- copy(firm_long_dt[treat == "nonblind" & role == "Eng"])
-
-## Build composite indices, restandardized to within-sample SD = 1
-zstd <- function(x) (x - mean(x, na.rm = TRUE)) / sd(x, na.rm = TRUE)
-build_idx <- function(d, comps) zstd(rowMeans(as.matrix(d[, ..comps]), na.rm = FALSE))
-
-dt_hr [, pro_dei_norm_z := build_idx(.SD, c("pro_dei_race_z", "pro_dei_gender_z"))]
-dt_eng[, pro_dei_norm_z := build_idx(.SD, c("pro_dei_race_z", "pro_dei_gender_z"))]
-dt_hr [, pro_dei_full_z := build_idx(.SD, c("pro_dei_race_z", "pro_dei_gender_z", "pro_diverse_z"))]
-dt_eng[, pro_dei_full_z := build_idx(.SD, c("pro_dei_race_z", "pro_dei_gender_z", "pro_diverse_z"))]
-
-## Helper: fit four feols models for a given continuous proxy.
-## `spec = "race_gender"` uses the 6-way demographic cut (White_Male ref);
-## `spec = "urm_tech"`   collapses to URM (WF,AF,HM,HF) vs Majority (WM,AM).
-fit_hetro <- function(proxy, spec = c("race_gender", "urm_tech")) {
-  spec <- match.arg(spec)
-  fmla <- if (spec == "race_gender") {
-    function(y) as.formula(sprintf(
-      "%s ~ i(race_gender, ref='White_Male') + i(race_gender, %s, ref='White_Male') | responseid + resume_index + r_do",
-      y, proxy))
-  } else {
-    function(y) as.formula(sprintf(
-      "%s ~ urm_tech + urm_tech:%s | responseid + resume_index + r_do",
-      y, proxy))
-  }
-  list(
-    "HR: Coding"   = feols(fmla("sc_coding_z"),  data = dt_hr,  vcov = ~ responseid),
-    "HR: Overall"  = feols(fmla("sc_overall_z"), data = dt_hr,  vcov = ~ responseid),
-    "Eng: Coding"  = feols(fmla("sc_coding_z"),  data = dt_eng, vcov = ~ responseid),
-    "Eng: Overall" = feols(fmla("sc_overall_z"), data = dt_eng, vcov = ~ responseid)
-  )
-}
-
-chk <- "\\checkmark"
-
-format_tbl <- function(tbl) {
-  tbl <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering \\\\footnotesize", tbl)
-  # Inject Panel A: HR | Panel B: Engineer header + Coding/Overall labels per column
-  tbl <- sub(
-    "\\\\toprule",
-    paste0("\\\\toprule",
-           " & \\\\multicolumn{2}{c}{\\\\textbf{Panel A: HR}}",
-           " & \\\\multicolumn{2}{c}{\\\\textbf{Panel B: Engineer}} \\\\\\\\ ",
-           "\\\\cmidrule(lr){2-3} \\\\cmidrule(lr){4-5} ",
-           " & Coding & Overall & Coding & Overall \\\\\\\\"),
-    tbl
-  )
-  # Drop the default duplicate dep-var header row (sc_coding_z, sc_overall_z, ...)
-  tbl <- sub(
-    "\\s*&\\s*sc_coding_z\\s*&\\s*sc_overall_z\\s*&\\s*sc_coding_z\\s*&\\s*sc_overall_z\\s*\\\\\\\\",
-    "",
-    tbl
-  )
-  tbl <- gsub("\\\\begin\\{table\\}", "\\\\begin{table}\n\\\\resizebox{\\\\textwidth}{!}{", tbl)
-  tbl <- gsub("\\\\end\\{table\\}", "}\n\\\\end{table}", tbl)
-  tbl
-}
-
-label_dict <- function(proxy, proxy_label, spec = c("race_gender", "urm_tech")) {
-  spec <- match.arg(spec)
-  if (spec == "race_gender") {
-    groups <- c("White_Female"   = "White Female",
-                "Asian_Male"     = "Asian Male",
-                "Asian_Female"   = "Asian Female",
-                "Hispanic_Male"  = "Hispanic Male",
-                "Hispanic_Female"= "Hispanic Female")
-    c(setNames(groups, paste0("race_gender::", names(groups))),
-      setNames(paste0(groups, " $\\times$ ", proxy_label),
-               paste0("race_gender::", names(groups), ":", proxy)))
-  } else {
-    c("urm_tech"                          = "URM (WF, AF, HM, HF)",
-      setNames(paste0("URM $\\times$ ", proxy_label), paste0("urm_tech:", proxy)))
-  }
-}
-
-print_etable <- function(models, proxy, proxy_label, title, notes, spec = c("race_gender", "urm_tech")) {
-  spec <- match.arg(spec)
-  tbl <- etable(
-    models,
-    tex = TRUE, style.tex = style.tex("aer"),
-    placement = "H",
-    depvar = FALSE,
-    keep = if (spec == "race_gender") "%race_gender" else "%urm_tech",
-    fitstat = c("n", "ar2"),
-    drop.section = "fixef",
-    digits = 3, se.below = TRUE,
-    signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
-    dict = label_dict(proxy, proxy_label, spec),
-    extralines = list(
-      "Resume FE"     = rep(chk, 4),
-      "Respondent FE" = rep(chk, 4),
-      "Position FE"   = rep(chk, 4)
-    ),
-    title = title,
-    notes = notes
-  )
-  cat(format_tbl(tbl))
-}
-
-## Wrapper: print BOTH cuts (6-demographic race_gender, then URM-binary) for one proxy.
-print_both <- function(proxy, proxy_label, notes_base) {
-  print_etable(
-    fit_hetro(proxy, spec = "race_gender"),
-    proxy = proxy, proxy_label = proxy_label, spec = "race_gender",
-    title = sprintf("Heterogeneity by %s — 6-Group Demographic Cut", proxy_label),
-    notes = notes_base
-  )
-  cat("\n\\vspace{0.5em}\n\n")
-  print_etable(
-    fit_hetro(proxy, spec = "urm_tech"),
-    proxy = proxy, proxy_label = proxy_label, spec = "urm_tech",
-    title = sprintf("Heterogeneity by %s — URM-Tech Binary Cut", proxy_label),
-    notes = notes_base
-  )
-}
-
-## ------- Triple interaction helpers (race_gender x proxy_a x proxy_b) -------
-fit_triple <- function(proxy_a, proxy_b, spec = c("race_gender", "urm_tech")) {
-  spec <- match.arg(spec)
-  fmla <- if (spec == "race_gender") {
-    function(y) as.formula(sprintf(
-      "%s ~ i(race_gender, ref='White_Male') * %s * %s | responseid + resume_index + r_do",
-      y, proxy_a, proxy_b))
-  } else {
-    function(y) as.formula(sprintf(
-      "%s ~ urm_tech * %s * %s | responseid + resume_index + r_do",
-      y, proxy_a, proxy_b))
-  }
-  list(
-    "HR: Coding"   = feols(fmla("sc_coding_z"),  data = dt_hr,  vcov = ~ responseid),
-    "HR: Overall"  = feols(fmla("sc_overall_z"), data = dt_hr,  vcov = ~ responseid),
-    "Eng: Coding"  = feols(fmla("sc_coding_z"),  data = dt_eng, vcov = ~ responseid),
-    "Eng: Overall" = feols(fmla("sc_overall_z"), data = dt_eng, vcov = ~ responseid)
-  )
-}
-
-label_dict_triple <- function(proxy_a, proxy_b, a_lab, b_lab, spec) {
-  if (spec == "race_gender") {
-    g <- c("White_Female"="WF", "Asian_Male"="AM", "Asian_Female"="AF",
-           "Hispanic_Male"="HM", "Hispanic_Female"="HF")
-    c(setNames(g, paste0("race_gender::", names(g))),
-      setNames(paste0(g, " $\\times$ ", a_lab),
-               paste0("race_gender::", names(g), ":", proxy_a)),
-      setNames(paste0(g, " $\\times$ ", b_lab),
-               paste0("race_gender::", names(g), ":", proxy_b)),
-      setNames(paste0(g, " $\\times$ ", a_lab, " $\\times$ ", b_lab),
-               paste0("race_gender::", names(g), ":", proxy_a, ":", proxy_b)))
-  } else {
-    c("urm_tech" = "URM",
-      setNames(paste0("URM $\\times$ ", a_lab),              paste0("urm_tech:", proxy_a)),
-      setNames(paste0("URM $\\times$ ", b_lab),              paste0("urm_tech:", proxy_b)),
-      setNames(paste0("URM $\\times$ ", a_lab, " $\\times$ ", b_lab),
-               paste0("urm_tech:", proxy_a, ":", proxy_b)))
-  }
-}
-
-print_etable_triple <- function(models, proxy_a, proxy_b, a_lab, b_lab, title, notes, spec) {
-  tbl <- etable(
-    models,
-    tex = TRUE, style.tex = style.tex("aer"),
-    placement = "H",
-    depvar = FALSE,
-    keep = if (spec == "race_gender") "%race_gender" else "%urm_tech",
-    fitstat = c("n", "ar2"),
-    drop.section = "fixef",
-    digits = 3, se.below = TRUE,
-    signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
-    dict = label_dict_triple(proxy_a, proxy_b, a_lab, b_lab, spec),
-    extralines = list(
-      "Resume FE"     = rep(chk, 4),
-      "Respondent FE" = rep(chk, 4),
-      "Position FE"   = rep(chk, 4)
-    ),
-    title = title,
-    notes = notes
-  )
-  cat(format_tbl(tbl))
-}
-
-print_both_triple <- function(proxy_a, proxy_b, a_lab, b_lab, notes_base) {
-  print_etable_triple(
-    fit_triple(proxy_a, proxy_b, "race_gender"),
-    proxy_a, proxy_b, a_lab, b_lab,
-    title = sprintf("%s $\\times$ %s $\\times$ Demographic — 6-Group Cut", a_lab, b_lab),
-    notes = notes_base, spec = "race_gender"
-  )
-  cat("\n\\vspace{0.5em}\n\n")
-  print_etable_triple(
-    fit_triple(proxy_a, proxy_b, "urm_tech"),
-    proxy_a, proxy_b, a_lab, b_lab,
-    title = sprintf("%s $\\times$ %s $\\times$ URM — Binary Cut", a_lab, b_lab),
-    notes = notes_base, spec = "urm_tech"
-  )
-}
-```
-
-\newpage
-
-### Domain-Matched: Race-DEI View
-
-Heterogeneity proxy: z-score of `s5_view_dei_race` (higher = more pro race-DEI). Each group's main-effect row shows the premium over White Male at the proxy mean; the interaction row shows how that premium shifts per 1 SD increase in pro race-DEI view.
-
-```{r dei_new_race, eval = TRUE, echo = FALSE, results = 'asis'}
-print_etable(
-  fit_hetro("pro_dei_race_z"),
-  proxy = "pro_dei_race_z",
-  proxy_label = "Pro Race-DEI",
-  title = "Heterogeneity by Race-DEI View (Ref: White Male, Non-blind)",
-  notes = "Standard errors clustered by respondent."
-)
-```
-
-\newpage
-
-### Domain-Matched: Gender-DEI View
-
-Heterogeneity proxy: z-score of `s5_view_dei_gender` (higher = more pro gender-DEI).
-
-```{r dei_new_gender, eval = TRUE, echo = FALSE, results = 'asis'}
-print_etable(
-  fit_hetro("pro_dei_gender_z"),
-  proxy = "pro_dei_gender_z",
-  proxy_label = "Pro Gender-DEI",
-  title = "Heterogeneity by Gender-DEI View (Ref: White Male, Non-blind)",
-  notes = "Standard errors clustered by respondent."
-)
-```
-
-\newpage
-
-### Combined Normative Index (Race-DEI + Gender-DEI)
-
-Heterogeneity proxy: row-mean of `pro_dei_race_z` and `pro_dei_gender_z`, re-standardized within sample. Excludes both `pro_diverse_z` and `pro_hiring_dei_z`.
-
-```{r dei_new_combined, eval = TRUE, echo = FALSE, results = 'asis'}
-print_etable(
-  fit_hetro("pro_dei_norm_z"),
-  proxy = "pro_dei_norm_z",
-  proxy_label = "Pro DEI (Race+Gender)",
-  title = "Heterogeneity by Composite Race+Gender DEI Index (Ref: White Male, Non-blind)",
-  notes = "Standard errors clustered by respondent."
-)
-```
-
-\newpage
-
-### Combined Index Including Diversity Preference
-
-Heterogeneity proxy: row-mean of `pro_dei_race_z`, `pro_dei_gender_z`, and `pro_diverse_z`, re-standardized within sample. Adds the personal diversity-workplace preference to the normative index.
-
-```{r dei_new_combined_diverse, eval = TRUE, echo = FALSE, results = 'asis'}
-print_etable(
-  fit_hetro("pro_dei_full_z"),
-  proxy = "pro_dei_full_z",
-  proxy_label = "Pro DEI (R+G+Div)",
-  title = "Heterogeneity by Composite Race+Gender+Diverse Index (Ref: White Male, Non-blind)",
-  notes = "Standard errors clustered by respondent."
-)
-```
-
-\newpage
-
-### Standalone: Diversity Preference
-
-Heterogeneity proxy: z-score of `s5_view_diverse` alone (higher = stronger personal preference for working in a diverse environment).
-
-```{r dei_new_diverse_only, eval = TRUE, echo = FALSE, results = 'asis'}
-print_etable(
-  fit_hetro("pro_diverse_z"),
-  proxy = "pro_diverse_z",
-  proxy_label = "Pro Diverse",
-  title = "Heterogeneity by Diversity Preference Standalone (Ref: White Male, Non-blind)",
-  notes = "Standard errors clustered by respondent."
-)
-```
-
-```{r dei_new_cleanup, eval = TRUE, echo = FALSE, include = FALSE}
-## Intentionally NOT removing helpers (fit_hetro, print_etable, etc.) here —
-## the following "By DEI (Alternative Proxies)" section reuses them.
-rm(zstd, build_idx)
-```
-
-\clearpage
-## By DEI (Alternative Proxies)
-
-The proxies below swap in revealed-behavior or firm-level measures for the stated normative items used above. Same model, same sample (non-blind), same reference applicant (White Male).
-
-```{r dei_alt_setup, eval = TRUE, echo = FALSE, include = FALSE}
-## Reuse helpers defined in the "By DEI (New)" setup chunk, but rebuild the
-## per-role data.tables since dt_hr / dt_eng were also reused from there.
-```
-
-\newpage
-### Priority of "Diversity and Representation" in Hiring Goals (`s4_goals_5`)
-
-Revealed priority from the Section 4 forced-choice ranking of 7 hiring goals (asked *before* the DEI attitude block). Proxy: z-score of the inverted rank (higher = diversity ranked more highly relative to six competing goals including Technical Ability, Communication, etc.).
-
-```{r dei_alt_div_priority, eval = TRUE, echo = FALSE, results = 'asis'}
-print_both(
-  "div_priority_z", "Div Priority",
-  "Proxy: z-score of (8 - s4_goals_5), where s4_goals_5 is the rank (1=top, 7=bottom) assigned to \"Diversity and Representation.\" Sample: non-blind."
-)
-```
-
-\newpage
-### Firm DEI Policy Count (`s5_policy_dei`)
-
-Count of firm DEI policies (0–6) the respondent reports their firm has, from the checklist of six concrete policies (non-discrimination, URM representation, DEI training, DEI staff, salary transparency, affinity groups). Firm-behavioral: firm had to actually adopt each. Proxy: z-scored count.
-
-```{r dei_alt_policy_count, eval = TRUE, echo = FALSE, results = 'asis'}
-print_both(
-  "dei_policy_count_z", "Policy Count",
-  "Proxy: z-score of the count of six dei_policy_* indicators (s5_policy_dei). Sample: non-blind."
-)
-```
-
-\newpage
-### Firm Uses Blind Hiring (`s5_bh`)
-
-Binary indicator: firm blinds any information at any stage of hiring. Narrowly on-topic (firm has itself adopted the practice being studied). Proxy: `bh_yes` (0/1).
-
-```{r dei_alt_bh, eval = TRUE, echo = FALSE, results = 'asis'}
-print_both(
-  "bh_yes", "Firm Blinds",
-  "Proxy: bh_yes = 1 if firm blinds any info at any stage of hiring. Sample: non-blind."
-)
-```
-
-\newpage
-### Firm Targets URM/Female Groups (`s5_policy_diversity`)
-
-Binary indicator: firm is actively interested in advancing Black, Hispanic, or Female representation in technical roles (multi-select; any of the three counts). Firm-behavioral intent. Proxy: `firm_targets_any_urm` (0/1).
-
-```{r dei_alt_targets, eval = TRUE, echo = FALSE, results = 'asis'}
-print_both(
-  "firm_targets_any_urm", "Firm Targets URM",
-  "Proxy: 1 if firm targets any of {Black, Hispanic, Female} for representation (s5_policy_diversity). Sample: non-blind."
-)
-```
-
-\newpage
-### Firm Attention to Race DEI (`s5_view_dei_race_f`)
-
-Respondent's perception of how much their firm currently pays attention to increasing racial DEI (1=Very low … 5=Very high). Middle-ground: perceived firm behavior, not personal view on whether DEI is good. Proxy: z-score.
-
-```{r dei_alt_attention_race, eval = TRUE, echo = FALSE, results = 'asis'}
-print_both(
-  "firm_attention_race_z", "Firm Race-DEI Attention",
-  "Proxy: z-score of s5_view_dei_race_f (respondent's perception of firm's current race-DEI effort). Sample: non-blind."
-)
-```
-
-\newpage
-### Firm Attention to Gender DEI (`s5_view_dei_gender_f`)
-
-Same construction as above but for gender DEI attention. Proxy: z-score of `s5_view_dei_gender_f`.
-
-```{r dei_alt_attention_gender, eval = TRUE, echo = FALSE, results = 'asis'}
-print_both(
-  "firm_attention_gender_z", "Firm Gender-DEI Attention",
-  "Proxy: z-score of s5_view_dei_gender_f (respondent's perception of firm's current gender-DEI effort). Sample: non-blind."
-)
-```
-
-\newpage
-### Triple Interaction: Personal Priority $\times$ Firm Attention (Backlash Test)
-
-The race-attention single interaction above showed a negative coefficient on Hispanic Male $\times$ firm race-DEI attention (HR Overall $\approx -0.27^{***}$). One reading is **backlash**: respondents at firms with high perceived race-DEI attention — but whose *personal* diversity priority is low — feel the firm is over-weighting DEI and downgrade URM candidates in response. That hypothesis predicts a *positive* triple interaction: higher personal priority flips the firm-attention effect from negative to positive. Below we test this with `div_priority_z` $\times$ firm-attention, separately for race and gender attention.
-
-```{r dei_alt_triple_race, eval = TRUE, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
-print_both_triple(
-  "div_priority_z", "firm_attention_race_z",
-  "Div Prio", "Race Attn",
-  "div_priority_z = z-score of personal diversity priority (s4_goals_5); firm_attention_race_z = z-score of perceived firm race-DEI attention (s5_view_dei_race_f). Sample: non-blind."
-)
-```
-
-\newpage
-```{r dei_alt_triple_gender, eval = TRUE, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
-print_both_triple(
-  "div_priority_z", "firm_attention_gender_z",
-  "Div Prio", "Gender Attn",
-  "div_priority_z = z-score of personal diversity priority (s4_goals_5); firm_attention_gender_z = z-score of perceived firm gender-DEI attention (s5_view_dei_gender_f). Sample: non-blind."
-)
-```
-
-```{r dei_alt_cleanup, eval = TRUE, echo = FALSE, include = FALSE}
-rm(dt_hr, dt_eng, fit_hetro, fit_triple, chk, format_tbl,
-   label_dict, label_dict_triple, print_etable, print_etable_triple,
-   print_both, print_both_triple)
-```
-
-\clearpage
-## By DEI (Storyline)
-
-### What we tested
-
-A natural story would be: respondents with stronger pro-DEI views should exhibit larger premia toward under-represented applicants. We test that across **11 heterogeneity proxies** — five stated preferences (the four DEI-view items plus their composites), four firm-level behaviors (policy count, blind-hiring use, URM targeting, perceived attention), and one forced-choice revealed priority (`s4_goals` rank of Diversity) — interacted with applicant demographics two ways (6-group and URM-binary).
-
-### What we found (one line)
-
-**Stated and single revealed-preference proxies do not meaningfully shift demographic premia.** Across 132 interaction tests (11 proxies × 4 outcomes × 3 interaction terms on average), significance counts are close to chance. The URM-binary cut is especially striking: **0 of 44 interactions reach p < 0.10**. No single DEI proxy — by itself — explains who gives URM candidates a premium.
-
-### The one signal, and what it looks like
-
-Exception: the **triple interaction** of personal diversity priority with firm-perceived DEI attention is consistently negative for HR (p < 0.05 on both coding and overall outcomes, for both race- and gender-attention). Reading the HR-Overall regression for Hispanic Male candidates at $\pm 1$ SD of each covariate gives:
-
-```{r dei_story_table, eval = TRUE, echo = FALSE, warning = FALSE, message = FALSE, results = 'asis'}
-dt_hr_nb <- firm_long_dt[treat == "nonblind" & role == "HR"]
-m <- feols(
-  sc_overall_z ~ i(race_gender, ref = "White_Male") * div_priority_z * firm_attention_race_z
-  | responseid + resume_index + r_do,
-  data = dt_hr_nb, vcov = ~ responseid
-)
-
-b <- coef(m)
-b_hm     <- b["race_gender::Hispanic_Male"]
-b_hm_div <- b["div_priority_z:race_gender::Hispanic_Male"]
-b_hm_atn <- b["firm_attention_race_z:race_gender::Hispanic_Male"]
-b_hm_tri <- b["div_priority_z:firm_attention_race_z:race_gender::Hispanic_Male"]
-
-q <- function(div, atn) b_hm + b_hm_div*div + b_hm_atn*atn + b_hm_tri*div*atn
-
-tab <- data.frame(
-  Personal_Priority = c("Low (personal, $-1\\sigma$)", "High (personal, $+1\\sigma$)"),
-  Low_Firm   = sprintf("%+.2f", c(q(-1,-1), q(+1,-1))),
-  High_Firm  = sprintf("%+.2f", c(q(-1,+1), q(+1,+1)))
-)
-
-knitr::kable(
-  tab, format = "latex", booktabs = TRUE, escape = FALSE,
-  col.names = c(" ", "Low Firm Race Attn", "High Firm Race Attn"),
-  caption = "Predicted Hispanic Male premium (vs. White Male) on HR Overall rating, by quadrant of respondent's personal Diversity priority (s4\\_goals\\_5) and perceived firm race-DEI attention (s5\\_view\\_dei\\_race\\_f). Non-blind arm, $N=1{,}188$."
-) |>
-  kableExtra::kable_styling(latex_options = "HOLD_position") |>
-  kableExtra::add_header_above(c(" " = 1, "Firm Race-DEI Attention" = 2))
-
-rm(dt_hr_nb, m, b, b_hm, b_hm_div, b_hm_atn, b_hm_tri, q, tab)
-```
-
-### Interpretation: substitution, not backlash
-
-A "backlash" reading of the single interaction on firm race-attention (negative coefficient on HM $\times$ firm attention) would predict a **positive** triple interaction: anti-DEI respondents at pro-DEI firms should be the ones penalizing URM candidates. The data does the opposite.
-
-What the quadrant table actually shows:
-
-1. The **largest HM premium** ($+0.74\sigma$) appears in HR respondents who **personally prioritize diversity** *and* work at firms that **don't**. These are compensators — filling a gap they see their firm as leaving open.
-2. Once the firm **is** emphasizing race-DEI, personal priority stops mattering. HR respondents at high-attention firms give roughly no HM premium regardless of their own views.
-3. The backlash cell — anti-DEI personal, pro-DEI firm — is not a large negative. It is modestly negative, not meaningfully different from the other high-firm-attention cell.
-
-The pattern fits a **substitution** mechanism: personal DEI effort and institutional DEI effort appear to be substitutes in the HR evaluator's behavior, not complements. The "do the work when the firm isn't, and ease off when the firm is" description is consistent with the Hispanic Female triple (similar signs for HR Coding and Overall) and with the parallel result when firm *gender*-attention is swapped in for race-attention.
-
-### Caveats
-
-- The result is **HR-specific**: engineers' triple interactions are null across the board.
-- The triple interaction involves two simultaneously-scaled proxies; the quadrant numbers are linear-projection extrapolations, not sample averages. The corner cells contain relatively thin subsamples.
-- This is one sample, and with 11 primary proxies tested before we arrived at the triple, the "storyline" bears some selection. It would be strongest as a *replication target* rather than a confirmed result.
-
-### Implications for the paper
-
-If we choose to report a DEI-heterogeneity story, the defensible framing is:
-
-> *"Neither stated DEI attitudes nor observable firm DEI behaviors, taken singly, explain variation in demographic premia. However, the combination of strong personal diversity priority and a firm that does not visibly act on it is associated with a substantially larger Hispanic-Male premium among HR evaluators — a pattern consistent with individual-level substitution for perceived firm inattention, rather than backlash against firm over-emphasis."*
-
-This is a cleaner claim than "pro-DEI → more URM premium," which the data doesn't support.
-
-\clearpage
-### Non-linear Demographic Biases for Low vs High Quality Candidates (GPA & Coding Score)
+## Non-linear Demographic Biases for Low vs High Quality Candidates (GPA & Coding Score)
 
 ```{r nonlinear_preferences, echo = FALSE, include = FALSE}
 
@@ -3695,7 +3262,7 @@ rm(eng_horse_race, tbl)
 
 
 \clearpage
-### Heterogeneity by Firm Size
+## Heterogeneity by Firm Size
 ```{r stage_pref_heterogeneity_by_firmsize, eval = TRUE, echo = FALSE, out.width="100%", fig.width=14, fig.height=4.5, fig.align='center', results='asis'}
 
 ## Regressions: Heterogeneity by Firm Size
