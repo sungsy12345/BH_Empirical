@@ -275,6 +275,44 @@ firm_dt[!is.na(fl_193_do), c(paste0("r", 1:18, "_DO")) := lapply(tstrsplit(fl_19
                                           sd(s5_view_dei_gender_f, na.rm = TRUE),
           by = .(role, treat)]
 
+  #### Firm Racial / Gender Composition (self-reported; each block sums to 100)
+  # Raw shares (s2_firm_racecomp_1..5 and s2_firm_gendercomp_1..3) come from the
+  # survey and are used directly where needed. Here we derive own-group shares
+  # and two data-quality flags that apply to all respondents (blind + non-blind).
+
+  # Own-group share (the share of the respondent's own race / gender at their firm)
+  firm_dt[, own_race_share := fcase(
+    resp_race == "White",    s2_firm_racecomp_1,
+    resp_race == "Black",    s2_firm_racecomp_2,
+    resp_race == "Hispanic", s2_firm_racecomp_3,
+    resp_race == "Asian",    s2_firm_racecomp_4,
+    default = s2_firm_racecomp_5
+  )]
+  firm_dt[, own_gender_share := fcase(
+    resp_gender == "Male",   s2_firm_gendercomp_1,
+    resp_gender == "Female", s2_firm_gendercomp_2,
+    default = s2_firm_gendercomp_3
+  )]
+
+  # Data-quality flags on self-reported composition (two consolidated flags).
+  # Computed on firm_dt (which holds all respondents, blind + non-blind), so
+  # the same flags apply across arms when later specs pool blind and non-blind.
+  # - flag_extreme_composition : 100% reported in the residual "Other"-race
+  #   category OR 100% in the "Non-binary/Other" gender category. These are
+  #   implausible self-reports at any firm size (Other/NB are catch-all
+  #   residuals that cannot account for 100% of a real workforce).
+  # - flag_own_zero            : respondent reports 0% of their own race OR
+  #   0% of their own gender at their firm (internal inconsistency). NA-safe:
+  #   if a respondent lacks a self-reported race or gender, that side of the
+  #   comparison is treated as non-flagging.
+  firm_dt[, flag_extreme_composition := as.integer(
+    s2_firm_racecomp_5 == 100 | s2_firm_gendercomp_3 == 100
+  )]
+  firm_dt[, flag_own_zero := as.integer(
+    (!is.na(own_race_share)   & own_race_share   == 0) |
+    (!is.na(own_gender_share) & own_gender_share == 0)
+  )]
+
   #### IRR: (Firm) Currently Hiring
   firm_dt[, `:=`(
     currentlyhiring_yes = fifelse(s1_irr_firm == 1, 1L, 0L, na = 0L))
@@ -322,6 +360,8 @@ firm_dt[!is.na(fl_193_do), c(paste0("r", 1:18, "_DO")) := lapply(tstrsplit(fl_19
                       "firm_targets_asian", "firm_targets_male", "firm_targets_female",
                       "firm_targets_race_urm", "firm_targets_any_urm",
                       "firm_attention_race_z", "firm_attention_gender_z",
+                      "own_race_share", "own_gender_share",
+                      "flag_extreme_composition", "flag_own_zero",
                       "firm_id", "s2_firm_size", "firm_size", "firm_size_small", "firm_size_mid", "firm_size_large",
                       "IRR_1", "IRR_2", "IRR_ever", "s3_outside_res",
                       "s4_recruiting_in_years", "s4_recruiting_in_years_centered")
@@ -356,6 +396,8 @@ firm_dt[!is.na(fl_193_do), c(paste0("r", 1:18, "_DO")) := lapply(tstrsplit(fl_19
                 "firm_targets_asian", "firm_targets_male", "firm_targets_female",
                 "firm_targets_race_urm", "firm_targets_any_urm",
                 "firm_attention_race_z", "firm_attention_gender_z",
+                "own_race_share", "own_gender_share",
+                "flag_extreme_composition", "flag_own_zero",
                 "firm_id", "s2_firm_size", "firm_size", "firm_size_small", "firm_size_mid", "firm_size_large",
                 "IRR_1", "IRR_2", "IRR_ever", "s3_outside_res",
                 "s4_recruiting_in_years", "s4_recruiting_in_years_centered"),
