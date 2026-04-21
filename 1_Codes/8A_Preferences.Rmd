@@ -18,9 +18,79 @@ knitr::opts_chunk$set(echo = TRUE)
 
 <!-- ##### ##### ##### ##### ##### Demographic Preferences ##### ##### ##### ##### ##### -->
 
-# Demographic Preferences
+# Preferences (All Dimensions)
 
-<!-- ## Preferences on Overall Score -->
+\textcolor{blue}{\textbf{Takeaway}}: On average, HR shows little demographic preference, while Engineers display a stronger preference for non-White groups over White Males.
+
+
+```{r stage_pref_alldimensions, echo = FALSE, results = 'asis'}
+
+## Run All Regressions
+suppressMessages(suppressWarnings({
+  #### HR Models
+  reg_hr_cod <- feols(sc_coding_z ~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
+  reg_hr_fit <- feols(sc_fit_z    ~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
+  reg_hr_sta <- feols(sc_stay_z   ~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
+  reg_hr_ovr <- feols(sc_overall_z~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
+  reg_hr_adv <- feols(sc_advance  ~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
+
+  #### Engineer Models
+  reg_eng_cod <- feols(sc_coding_z ~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
+  reg_eng_fit <- feols(sc_fit_z    ~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
+  reg_eng_sta <- feols(sc_stay_z   ~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
+  reg_eng_ovr <- feols(sc_overall_z~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
+}))
+
+## Setup Labels
+rg_labels <- c("White Female", "Asian Male", "Asian Female", "Hispanic Male", "Hispanic Female")
+rg_raw <- grep("^race_gender", names(coef(reg_hr_cod)), value = TRUE)
+
+dict_dims <- c(
+  setNames(rg_labels, rg_raw),
+  "resume_index" = "Resume (Content) FE",
+  "responseid"   = "Respondent FE",
+  "r_do"         = "Display Position FE"
+)
+
+## Generate Side-by-Side Table (9 columns)
+tbl <- fixest::etable(
+  list(
+    # HR Panel (5 cols)
+    "Coding" = reg_hr_cod, "Fit" = reg_hr_fit, "Stay" = reg_hr_sta, "Overall" = reg_hr_ovr, "Advance" = reg_hr_adv,
+    # Eng Panel (4 cols)
+    "Coding " = reg_eng_cod, "Fit " = reg_eng_fit, "Stay " = reg_eng_sta, "Overall " = reg_eng_ovr
+  ),
+  tex = TRUE, style.tex = style.tex("aer"),
+  placement = "H",
+  keep = "%^race_gender",
+  drop = "%^(Intercept)$",
+  dict = dict_dims,
+  fitstat = c("n", "r2"),
+  digits = 3,
+  se.below = TRUE,
+  notes = c("Standard errors clustered by respondent.", "Significance levels: * p<0.1, ** p<0.05, *** p<0.01")
+)
+
+## Final Layout Modifications 
+
+  #### Header spanning: HR occupies cols 2-6 (5 cols), Eng occupies cols 7-10 (4 cols)
+  tbl <- sub(
+    "\\\\toprule",
+    paste0("\\\\toprule & \\\\multicolumn{5}{c}{Panel A: HR (Non-blind, N = ", nobs(reg_hr_cod)/18, ")} & \\\\multicolumn{4}{c}{Panel B: Engineer (Non-blind, N = ", nobs(reg_eng_cod)/18, ")} \\\\\\\\ \\\\cmidrule(lr){2-6} \\\\cmidrule(lr){7-10}"),
+    tbl
+  )
+  
+  #### Clean up formatting
+  tbl <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering", tbl)
+
+## Print
+cat(tbl)
+
+rm(reg_hr_cod, reg_hr_fit, reg_hr_sta, reg_hr_ovr, reg_hr_adv, 
+   reg_eng_cod, reg_eng_fit, reg_eng_sta, reg_eng_ovr,
+   rg_labels, rg_raw, dict_dims, tbl)
+```
+
 ```{r stage_pref_overall, echo = FALSE, eval = FALSE, results = 'asis'}
 
 ## Regression: Overall Scores
@@ -212,75 +282,12 @@ rm(panelA, panelB, tbl, rg_raw, rg_labels, dict_rg, dict_all,
 ```
 
 
-## Preferences on All Dimensions
-```{r stage_pref_alldimensions, echo = FALSE, results = 'asis'}
+\newpage
+# Heterogeneity in Preferences (By Respondent Demographics)
 
-## Run All Regressions
-suppressMessages(suppressWarnings({
-  #### HR Models
-  reg_hr_cod <- feols(sc_coding_z ~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
-  reg_hr_fit <- feols(sc_fit_z    ~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
-  reg_hr_sta <- feols(sc_stay_z   ~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
-  reg_hr_ovr <- feols(sc_overall_z~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
-  reg_hr_adv <- feols(sc_advance  ~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
+\textcolor{blue}{\textbf{Takeaway}}: HR does not display preference based on demographic concordance. Engineers assign a slight premium (0.56--0.86\% of a SD) to non-concordant groups, driven primarily by White Male Engineers --- the majority group among Engineers --- whose positive preference favors non-White demographic groups.
 
-  #### Engineer Models
-  reg_eng_cod <- feols(sc_coding_z ~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
-  reg_eng_fit <- feols(sc_fit_z    ~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
-  reg_eng_sta <- feols(sc_stay_z   ~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
-  reg_eng_ovr <- feols(sc_overall_z~ i(race_gender) | resume_index + responseid + r_do, firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
-}))
-
-## Setup Labels
-rg_labels <- c("White Female", "Asian Male", "Asian Female", "Hispanic Male", "Hispanic Female")
-rg_raw <- grep("^race_gender", names(coef(reg_hr_cod)), value = TRUE)
-
-dict_dims <- c(
-  setNames(rg_labels, rg_raw),
-  "resume_index" = "Resume (Content) FE",
-  "responseid"   = "Respondent FE",
-  "r_do"         = "Display Position FE"
-)
-
-## Generate Side-by-Side Table (9 columns)
-tbl <- fixest::etable(
-  list(
-    # HR Panel (5 cols)
-    "Coding" = reg_hr_cod, "Fit" = reg_hr_fit, "Stay" = reg_hr_sta, "Overall" = reg_hr_ovr, "Advance" = reg_hr_adv,
-    # Eng Panel (4 cols)
-    "Coding " = reg_eng_cod, "Fit " = reg_eng_fit, "Stay " = reg_eng_sta, "Overall " = reg_eng_ovr
-  ),
-  tex = TRUE, style.tex = style.tex("aer"),
-  placement = "H",
-  keep = "%^race_gender",
-  drop = "%^(Intercept)$",
-  dict = dict_dims,
-  fitstat = c("n", "r2"),
-  digits = 3,
-  se.below = TRUE,
-  notes = c("Standard errors clustered by respondent.", "Significance levels: * p<0.1, ** p<0.05, *** p<0.01")
-)
-
-## Final Layout Modifications 
-
-  #### Header spanning: HR occupies cols 2-6 (5 cols), Eng occupies cols 7-10 (4 cols)
-  tbl <- sub(
-    "\\\\toprule",
-    paste0("\\\\toprule & \\\\multicolumn{5}{c}{Panel A: HR (Non-blind, N = ", nobs(reg_hr_cod)/18, ")} & \\\\multicolumn{4}{c}{Panel B: Engineer (Non-blind, N = ", nobs(reg_eng_cod)/18, ")} \\\\\\\\ \\\\cmidrule(lr){2-6} \\\\cmidrule(lr){7-10}"),
-    tbl
-  )
-  
-  #### Clean up formatting
-  tbl <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering", tbl)
-
-## Print
-cat(tbl)
-
-rm(reg_hr_cod, reg_hr_fit, reg_hr_sta, reg_hr_ovr, reg_hr_adv, 
-   reg_eng_cod, reg_eng_fit, reg_eng_sta, reg_eng_ovr,
-   rg_labels, rg_raw, dict_dims, tbl)
-```
-
+\textcolor{blue}{\textbf{Takeaway (2)}}: In the U.S. IT setting, the traditional concordance bias (homophily) and animus (discrimination against minorities) story can be rejected. 
 
 
 <!-- ## Functions for Concordance and Heterogeneity  -->
@@ -1509,9 +1516,7 @@ plot_simple_concordance <- function(model_hr, model_eng = NULL, title) {
 
 ```
 
-
-\newpage
-### By Concordant Race (Detailed Asian Categorization)
+## By Concordant Race (using detailed Asian categorization)
 
 ```{r concordant_race, echo = FALSE, results = 'asis'}
 models_hr_concordance_race  <- suppressMessages(suppressWarnings(
@@ -1568,7 +1573,7 @@ rm(models_hr_concordance_race, models_eng_concordance_race,
 ```
 
 
-### By Concordant Gender (Male / Female Only)
+## By Concordant Gender (includes Male / Female respondents only)
 
 ```{r concordant_gender, echo = FALSE, results = 'asis'}
 
@@ -1685,7 +1690,7 @@ rm(models_hr_concordance_racegender, models_eng_concordance_racegender,
 
 ```
 
-### By Concordant Race and Gender (Detailed Asian Categorization)
+## By Concordant Race and Gender (using detailed Asian categorization)
 
 ```{r concordant_racegender_detailed, echo = FALSE, results = 'asis'}
 
@@ -1744,7 +1749,7 @@ rm(models_hr_concordance_detailed, models_eng_concordance_detailed,
 ```
 
 
-#### Who drives Engineers' Bias Against Concordant Race Gender Groups
+### Who drives Engineers' Bias Against Concordant Race Gender Groups
 
 \vspace{0.25cm}
 Below graph centers the concordant group.
@@ -1848,12 +1853,13 @@ rm(models_hr_hetero_detailed, models_eng_hetero_detailed,
 
 ```
 
+
 \clearpage
-## By DEI
+# Heterogeneity in Preferences (By Respondent DEI / Diversity Preferencs)
 
 \textcolor{blue}{\textbf{Takeaway}}: No individual DEI / diversity preference measure --- stated, revealed, or firm-level --- explains variation in demographic discrimination.
 
-### Individual DEI / Diversity Proxies
+## (2-way Interaction Models) By Individual DEI / Diversity Variables
 
 ```{r dei_final_overall, eval = TRUE, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
 
@@ -2018,7 +2024,7 @@ proxy_hdr <- paste(col_labels, collapse = " & ")
 tbl <- sub(
   "\\\\toprule",
   paste0(
-    "\\\\multicolumn{9}{c}{\\\\textbf{URM-Tech Binary Cut (1 = WF/AF/HM/HF; 0 = WM/AM)}} \\\\\\\\ ",
+    "\\\\multicolumn{9}{c}{\\\\textbf{Outcome Var: Assigned Overall Score (Z)}} \\\\\\\\ ",
     "\\\\toprule",
     " & \\\\multicolumn{4}{c}{\\\\textbf{Panel A: HR}}",
     " & \\\\multicolumn{4}{c}{\\\\textbf{Panel B: Engineer}} \\\\\\\\",
@@ -2043,9 +2049,9 @@ rm(dt_hr_nb, dt_eng_nb, zstd, proxies, col_labels, fit_urm,
 ```
 
 \newpage
-### Firm Targets $\times$ Same Applicant Demographic
+## (2-way Interaction Models) By Whether the Firm Targets the Same Applicant Demographic
 
-\textcolor{blue}{\textbf{Takeaway}}: When a firm states it targets a demographic, its individual evaluators rate applicants of that group \textit{lower}, not higher --- more strongly among engineers than HR. This mirrors the substitution pattern documented in Section \ref{sec:triple}: where institutional DEI effort is high, individual evaluators somehow seem to ease off from the institutional push.
+\textcolor{blue}{\textbf{Takeaway}}: When a firm states it targets a demographic, its individual evaluators rate applicants of that group \textit{lower}, not higher --- more strongly among engineers than among HR. This mirrors the substitution pattern documented in Section \ref{sec:triple}: where institutional DEI effort is high, individual evaluators appear to ease off from the institutional push.
 
 ```{r dei_final_targets, eval = TRUE, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
 
@@ -2199,17 +2205,19 @@ rm(dt_hr_nb, dt_eng_nb, prep, fit_match_joint, m_hr_t, m_eng_t, dict_t, tbl_t,
 
 \scriptsize F = Female, H = Hispanic, B = Black. "Targets F or H" $\Rightarrow$ `firm_targets_female = 1` OR `firm_targets_hispanic = 1`; "Targets F, H, or B" additionally includes `firm_targets_black = 1` (robustness check; note that Black applicants are not in the study). URM $=$ \{WF, AF, HM, HF\}. \normalsize
 
+
+
 \newpage
-### Triple Interaction: Personal Priority $\times$ Firm Attention
+## (Triple Interaction Models) By Respondent's Priority for DEI $\times$ Firm Attention on DEI
 \label{sec:triple}
 
-\textcolor{blue}{\textbf{Takeaway}}: **Hypothesis: Substitution vs. Backlash Effect.**
+\textcolor{blue}{\textbf{Takeaway}}: The negative triple interactions for HR (with both race-DEI and gender-DEI firm-attention proxies) support the **substitution** hypothesis, not backlash.
+
+\textcolor{blue}{\textbf{Hypothesis}}: **Substitution vs. Backlash Effect.**
 
 - **Substitution**: When a firm already prioritizes DEI, individuals who *also* personally prioritize DEI reduce (rather than amplify) the URM premium --- they treat the firm's push as sufficient and ease off. *Expect a negative sign on the triple interaction term.*
 
 - **Backlash**: When a firm prioritizes DEI, individuals who do *not* personally prioritize DEI react by rating URM applicants lower. *Expect a positive sign on the triple interaction term.*
-
-The negative triple interactions for HR (with both race-DEI and gender-DEI firm-attention proxies) support the **substitution** hypothesis, not backlash.
 
 ```{r dei_final_triple, eval = TRUE, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
 
@@ -2231,6 +2239,21 @@ m_hr_r  <- fit_triple_urm(dt_hr_nb,  "firm_attention_race_z")
 m_eng_r <- fit_triple_urm(dt_eng_nb, "firm_attention_race_z")
 m_hr_g  <- fit_triple_urm(dt_hr_nb,  "firm_attention_gender_z")
 m_eng_g <- fit_triple_urm(dt_eng_nb, "firm_attention_gender_z")
+
+# Effective respondent counts per model (respondents with non-missing proxy)
+n_used <- c(
+  dt_hr_nb[!is.na(firm_attention_race_z),    uniqueN(responseid)],
+  dt_eng_nb[!is.na(firm_attention_race_z),   uniqueN(responseid)],
+  dt_hr_nb[!is.na(firm_attention_gender_z),  uniqueN(responseid)],
+  dt_eng_nb[!is.na(firm_attention_gender_z), uniqueN(responseid)]
+)
+n_full <- c(
+  dt_hr_nb[,  uniqueN(responseid)],
+  dt_eng_nb[, uniqueN(responseid)],
+  dt_hr_nb[,  uniqueN(responseid)],
+  dt_eng_nb[, uniqueN(responseid)]
+)
+n_drop <- n_full - n_used
 
 models_trp <- list("HR (Race)" = m_hr_r, "Eng (Race)" = m_eng_r,
                    "HR (Gender)" = m_hr_g, "Eng (Gender)" = m_eng_g)
@@ -2255,9 +2278,11 @@ tbl_trp <- etable(
   signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
   dict = dict_trp,
   extralines = list(
-    "Resume FE"     = rep(chk, 4),
-    "Respondent FE" = rep(chk, 4),
-    "Position FE"   = rep(chk, 4)
+    "Resume FE"          = rep(chk, 4),
+    "Respondent FE"      = rep(chk, 4),
+    "Position FE"        = rep(chk, 4),
+    "Respondents (used)" = as.character(n_used),
+    "Dropped (NA proxy)" = as.character(n_drop)
   )
 )
 
@@ -2284,722 +2309,15 @@ tbl_trp <- sub("\\\\end\\{tabular\\}", "\\\\end{tabular}}", tbl_trp)
 cat(tbl_trp)
 
 rm(dt_hr_nb, dt_eng_nb, chk, fit_triple_urm, m_hr_r, m_eng_r, m_hr_g, m_eng_g,
-   models_trp, dict_trp, tbl_trp)
+   models_trp, dict_trp, tbl_trp, n_used, n_full, n_drop)
 ```
 
-\scriptsize `div_priority_z` = z-score of (8 $-$ `s4_goals_5`), the revealed priority of "Diversity and Representation" in the respondent's ranking of seven hiring goals. `firm_attention_race_z` / `firm_attention_gender_z` = z-scores of `s5_view_dei_race_f` / `s5_view_dei_gender_f`, the respondent's perception of their firm's current DEI attention level. Standard errors clustered by respondent. Sample: non-blind arm. \normalsize
-
-\vspace{1em}
-
-Reading the HR Overall regression at $\pm 1\sigma$ of each covariate (for Hispanic Male applicants, vs White Male), the four quadrants give the most direct picture of the substitution mechanism:
-
-```{r dei_final_quadrant, eval = TRUE, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
-dt_hr_q <- firm_long_dt[treat == "nonblind" & role == "HR"]
-m_q <- feols(
-  sc_overall_z ~ i(race_gender, ref = "White_Male") * div_priority_z * firm_attention_race_z
-  | responseid + resume_index + r_do,
-  data = dt_hr_q, vcov = ~ responseid
-)
-b <- coef(m_q)
-b_hm     <- b["race_gender::Hispanic_Male"]
-b_hm_div <- b["div_priority_z:race_gender::Hispanic_Male"]
-b_hm_atn <- b["firm_attention_race_z:race_gender::Hispanic_Male"]
-b_hm_tri <- b["div_priority_z:firm_attention_race_z:race_gender::Hispanic_Male"]
-q <- function(div, atn) b_hm + b_hm_div*div + b_hm_atn*atn + b_hm_tri*div*atn
-
-tab <- data.frame(
-  Personal = c("Low personal priority ($-1\\sigma$)", "High personal priority ($+1\\sigma$)"),
-  Low  = sprintf("%+.2f", c(q(-1,-1), q(+1,-1))),
-  High = sprintf("%+.2f", c(q(-1,+1), q(+1,+1)))
-)
-knitr::kable(
-  tab, format = "latex", booktabs = TRUE, escape = FALSE,
-  col.names = c(" ", "Low Firm Race Attn", "High Firm Race Attn"),
-  caption = "Predicted Hispanic Male premium (vs. White Male) on HR Overall rating, at quadrants of (personal diversity priority $\\times$ firm race-DEI attention)."
-) |>
-  kableExtra::kable_styling(latex_options = "HOLD_position", font_size = 9) |>
-  kableExtra::add_header_above(c(" " = 1, "Firm Race-DEI Attention" = 2))
-rm(dt_hr_q, m_q, b, b_hm, b_hm_div, b_hm_atn, b_hm_tri, q, tab)
-```
-
-The largest HM premium ($+0.74\sigma$) sits in the (high personal priority, low firm attention) cell --- the "individual compensates for firm inattention" case. At firms already emphasizing race-DEI (right column), HM premia collapse regardless of personal priority. The backlash quadrant (low personal priority, high firm attention) is modestly negative, not extreme.
+\scriptsize `div_priority_z` = z-score of (8 $-$ `s4_goals_5`), the revealed priority of "Diversity and Representation" in the respondent's ranking of seven hiring goals. `firm_attention_race_z` / `firm_attention_gender_z` = z-scores of `s5_view_dei_race_f` / `s5_view_dei_gender_f`, the respondent's perception of their firm's current DEI attention level. Standard errors clustered by respondent. Sample: non-blind arm; respondents with a missing firm-DEI-attention response are dropped by \texttt{feols} (see the ``Respondents (used)'' and ``Dropped (NA proxy)'' rows). \normalsize
 
 \vspace{0.5em}
 
-> *Implication*: Neither stated DEI attitudes nor observable firm DEI behaviors, taken singly, explain variation in demographic premia. However, the combination of strong personal diversity priority and a firm that does not visibly act on it is associated with a substantially larger Hispanic-Male premium among HR evaluators --- a pattern consistent with individual-level substitution for perceived firm inattention, rather than backlash against firm over-emphasis.
+> *Note on interpretation*: On the full non-blind Engineer sample (all 74 respondents), a two-way model `sc_overall_z ~ urm_tech | responseid + resume_index + r_do_bythree` reports a statistically significant $\hat\beta_{\text{URM}} = +0.060$ ($p = .041$). It attenuates to statistically insignificant $\hat\beta \approx +0.040$ in the triple-model subsample for two reasons: (a) $\approx 18\%$ of Engineers are dropped due to answering ``Do Not Know'' in the question that elicits how much firm pays attentions to DEI, and (b) these dropped respondents happen to rate URM applicants more favorably than respondents who did characterize their firm's DEI posture.
 
-<!--
-\clearpage
-## By DEI (Original)
-
-The DEI Index used in this section is constructed as the row-wise mean of z-scored responses to four survey items capturing views on race-based DEI (`s5_view_dei_race`), gender-based DEI (`s5_view_dei_gender`), workplace diversity (`s5_view_diverse`), and DEI in hiring (`s5_view_hiring_dei`), and is then re-standardized within role $\times$ treatment cells. See "By DEI (New)" below for an alternative construction that drops `s5_view_hiring_dei` and matches the proxy to the demographic dimension being tested.
-
-```{r dei_continuous, eval = FALSE, echo = FALSE, fig.width=9, fig.height=6, fig.align='center', warning=FALSE, message=FALSE, results='asis'}
-
-# ==============================================================================
-# HELPER FUNCTION (reused from before, generalized for any xvar)
-# ==============================================================================
-urm_premium_curve <- function(model, data, role_label,
-                              xvar, urm = "urm_tech",
-                              grid_n = 100, grid_q = c(0.05, 0.95)) {
-  b <- coef(model)
-  V <- vcov(model)
-  int_name <- paste0(urm, ":", xvar)
-  stopifnot(urm %in% names(b), int_name %in% names(b))
-  x_lo <- quantile(data[[xvar]], probs = grid_q[1], na.rm = TRUE)
-  x_hi <- quantile(data[[xvar]], probs = grid_q[2], na.rm = TRUE)
-  x_grid <- seq(x_lo, x_hi, length.out = grid_n)
-  beta  <- b[urm];       gamma  <- b[int_name]
-  var_b <- V[urm, urm];  var_g  <- V[int_name, int_name];  cov_bg <- V[urm, int_name]
-  delta_hat <- beta + gamma * x_grid
-  se_hat    <- sqrt(pmax(0, var_b + x_grid^2 * var_g + 2 * x_grid * cov_bg))
-  out <- data.table(role = role_label, x = x_grid, delta = delta_hat, se = se_hat)
-  out[, `:=`(lo = delta - 1.96 * se, hi = delta + 1.96 * se)]
-  out[]
-}
-
-dt_hr  <- firm_long_dt[treat == "nonblind" & role == "HR"]
-dt_eng <- firm_long_dt[treat == "nonblind" & role == "Eng"]
-
-# ==============================================================================
-# TABLE: Side-by-side comparison of both indices
-# ==============================================================================
-m_hr_single_coding   <- feols(sc_coding_z  ~ urm_tech * pro_hiring_dei_z | responseid + resume_index + r_do, data = dt_hr,  vcov = ~responseid)
-m_hr_single_overall  <- feols(sc_overall_z ~ urm_tech * pro_hiring_dei_z | responseid + resume_index + r_do, data = dt_hr,  vcov = ~responseid)
-m_eng_single_coding  <- feols(sc_coding_z  ~ urm_tech * pro_hiring_dei_z | responseid + resume_index + r_do, data = dt_eng, vcov = ~responseid)
-m_eng_single_overall <- feols(sc_overall_z ~ urm_tech * pro_hiring_dei_z | responseid + resume_index + r_do, data = dt_eng, vcov = ~responseid)
-
-m_hr_index_coding    <- feols(sc_coding_z  ~ urm_tech * pro_dei_index_z  | responseid + resume_index + r_do, data = dt_hr,  vcov = ~responseid)
-m_hr_index_overall   <- feols(sc_overall_z ~ urm_tech * pro_dei_index_z  | responseid + resume_index + r_do, data = dt_hr,  vcov = ~responseid)
-m_eng_index_coding   <- feols(sc_coding_z  ~ urm_tech * pro_dei_index_z  | responseid + resume_index + r_do, data = dt_eng, vcov = ~responseid)
-m_eng_index_overall  <- feols(sc_overall_z ~ urm_tech * pro_dei_index_z  | responseid + resume_index + r_do, data = dt_eng, vcov = ~responseid)
-
-chk <- "\\checkmark"
-
-tbl <- etable(
-  list(m_hr_index_coding,  m_hr_index_overall,
-       m_hr_single_coding, m_hr_single_overall,
-       m_eng_index_coding,  m_eng_index_overall,
-       m_eng_single_coding, m_eng_single_overall),
-  tex = TRUE, style.tex = style.tex("aer"),
-  keep = c("%urm_tech$", "%:"),
-  fitstat = c("n", "ar2"),
-  drop.section = "fixef",
-  digits = 3, se.below = TRUE,
-  dict = c("urm_tech"           = "URM",
-           "pro_hiring_dei_z"   = "Single Item (Z)",
-           "pro_dei_index_z"    = "DEI Index (Z)"),
-  signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
-  extralines = list(
-    "Resume FE"      = rep(chk, 8),
-    "Respondent FE"  = rep(chk, 8),
-    "Position FE"    = rep(chk, 8)
-  ),
-  title = "URM Premium by Pro-DEI Attitude: Composite Index and Single Item",
-  notes = "Standard errors clustered by respondent. Odd columns = Coding Score (Z); Even columns = Overall Score (Z)."
-)
-
-# Inject spanning headers: 2 panels x 2 measures x 2 index versions = 8 cols
-tbl <- sub(
-  "\\\\toprule",
-  paste0("\\\\toprule",
-         " & \\\\multicolumn{4}{c}{\\\\textbf{Panel A: HR}} ",
-         " & \\\\multicolumn{4}{c}{\\\\textbf{Panel B: Engineer}} \\\\\\\\ ",
-         "\\\\cmidrule(lr){2-5} \\\\cmidrule(lr){6-9}",
-         " & \\\\multicolumn{2}{c}{DEI Index} & \\\\multicolumn{2}{c}{Single Item}",
-         " & \\\\multicolumn{2}{c}{DEI Index} & \\\\multicolumn{2}{c}{Single Item} \\\\\\\\ ",
-         "\\\\cmidrule(lr){2-3}\\\\cmidrule(lr){4-5}\\\\cmidrule(lr){6-7}\\\\cmidrule(lr){8-9}"),
-  tbl
-)
-tbl <- gsub("\\s*&\\s*\\\\multicolumn\\{8\\}\\{c\\}\\{.*?\\}\\\\\\\\", "", tbl)
-tbl <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering \\\\footnotesize", tbl)
-tbl <- gsub("\\\\begin\\{table\\}", "\\\\begin{table}\n\\\\resizebox{\\\\textwidth}{!}{", tbl)
-tbl <- gsub("\\\\end\\{table\\}", "}\n\\\\end{table}", tbl)
-
-cat(tbl)
-
-# ==============================================================================
-# PLOTS: Single item (top row) vs DEI Index (bottom row)
-# ==============================================================================
-make_curve_panel <- function(curves, title_label) {
-  ggplot(curves, aes(x = x, y = delta)) +
-    geom_ribbon(aes(ymin = lo, ymax = hi), alpha = 0.20) +
-    geom_line(linewidth = 1) +
-    geom_hline(yintercept = 0, linetype = "dashed", linewidth = 0.4) +
-    coord_cartesian(ylim = c(-0.5, 0.7)) +
-    facet_wrap(~ role, nrow = 1) +
-    labs(title = title_label, x = NULL, y = "Predicted URM premium") +
-    theme_bw() +
-    theme(plot.title = element_text(face = "bold", size = 9),
-          axis.title = element_text(size = 8),
-          axis.text  = element_text(size = 8),
-          strip.text = element_text(size = 8))
-}
-
-# Row 1: Single item, Coding
-curves_single_coding <- rbindlist(list(
-  urm_premium_curve(m_hr_single_coding,  dt_hr,  "HR",       xvar = "pro_hiring_dei_z"),
-  urm_premium_curve(m_eng_single_coding, dt_eng, "Engineer", xvar = "pro_hiring_dei_z")
-))[, role := factor(role, levels = c("HR", "Engineer"))]
-
-# Row 1: Single item, Overall
-curves_single_overall <- rbindlist(list(
-  urm_premium_curve(m_hr_single_overall,  dt_hr,  "HR",       xvar = "pro_hiring_dei_z"),
-  urm_premium_curve(m_eng_single_overall, dt_eng, "Engineer", xvar = "pro_hiring_dei_z")
-))[, role := factor(role, levels = c("HR", "Engineer"))]
-
-# Row 2: DEI Index, Coding
-curves_index_coding <- rbindlist(list(
-  urm_premium_curve(m_hr_index_coding,  dt_hr,  "HR",       xvar = "pro_dei_index_z"),
-  urm_premium_curve(m_eng_index_coding, dt_eng, "Engineer", xvar = "pro_dei_index_z")
-))[, role := factor(role, levels = c("HR", "Engineer"))]
-
-# Row 2: DEI Index, Overall
-curves_index_overall <- rbindlist(list(
-  urm_premium_curve(m_hr_index_overall,  dt_hr,  "HR",       xvar = "pro_dei_index_z"),
-  urm_premium_curve(m_eng_index_overall, dt_eng, "Engineer", xvar = "pro_dei_index_z")
-))[, role := factor(role, levels = c("HR", "Engineer"))]
-
-p1 <- make_curve_panel(curves_single_coding,  "Coding Score - Whether DEI Improves Quality of Hiring")
-p2 <- make_curve_panel(curves_single_overall, "Overall Score - Whether DEI Improves Quality of Hiring")
-p3 <- make_curve_panel(curves_index_coding,   "Coding Score - DEI Index")
-p4 <- make_curve_panel(curves_index_overall,  "Overall Score - DEI Index")
-
-# Add shared x-axis label only to bottom row
-x_label <- "Pro-DEI attitude (Z-score)"
-p1 <- p1 + labs(x = x_label)
-p2 <- p2 + labs(x = x_label)
-
-(p4 + p3) / (p2 + p1) +
-  plot_annotation(
-    title   = "URM Premium by Pro-DEI Attitude",
-    subtitle = "Top row: composite DEI index  |  Bottom row: single-item measure",
-    theme = theme(plot.title    = element_text(face = "bold", size = 11),
-                  plot.subtitle = element_text(size = 9, color = "gray40"))
-  )
-
-Plot_Heterogeniety_DEI_Index <- p4
-
-rm(dt_hr, dt_eng, urm_premium_curve, make_curve_panel,
-   m_hr_single_coding, m_hr_single_overall, m_eng_single_coding, m_eng_single_overall,
-   m_hr_index_coding,  m_hr_index_overall,  m_eng_index_coding,  m_eng_index_overall,
-   curves_single_coding, curves_single_overall, curves_index_coding, curves_index_overall,
-   p1, p2, p3, p4, chk, tbl, x_label)
-```
-
-\newpage
-```{r dei_discrete, eval=FALSE, echo=FALSE, fig.width=9, fig.height=6, fig.align='center', warning=FALSE, message=FALSE, results='asis'}
-
-dt_hr  <- firm_long_dt[treat == "nonblind" & role == "HR"]
-dt_eng <- firm_long_dt[treat == "nonblind" & role == "Eng"]
-
-# ==============================================================================
-# MODELS: urm_tech * 3-tier DEI (Anti-DEI is reference)
-# ==============================================================================
-m_hr_coding   <- feols(sc_coding_z  ~ urm_tech * pro_dei_index_3tiers | responseid + resume_index + r_do, data = dt_hr,  vcov = ~responseid)
-m_hr_overall  <- feols(sc_overall_z ~ urm_tech * pro_dei_index_3tiers | responseid + resume_index + r_do, data = dt_hr,  vcov = ~responseid)
-m_eng_coding  <- feols(sc_coding_z  ~ urm_tech * pro_dei_index_3tiers | responseid + resume_index + r_do, data = dt_eng, vcov = ~responseid)
-m_eng_overall <- feols(sc_overall_z ~ urm_tech * pro_dei_index_3tiers | responseid + resume_index + r_do, data = dt_eng, vcov = ~responseid)
-
-chk <- "\\checkmark"
-
-tbl <- etable(
-  list(m_hr_coding, m_hr_overall, m_eng_coding, m_eng_overall),
-  tex = TRUE, style.tex = style.tex("aer"),
-  keep = c("%urm_tech$", "%:"),
-  fitstat = c("n", "ar2"),
-  drop.section = "fixef",
-  digits = 3, se.below = TRUE,
-  dict = c("urm_tech"                                      = "URM",
-           "pro_dei_index_3tiers::Mid-DEI"                 = "Mid-DEI",
-           "pro_dei_index_3tiers::Pro-DEI"                 = "Pro-DEI",
-           "urm_tech:pro_dei_index_3tiers::Mid-DEI"        = "URM $\\times$ Mid-DEI",
-           "urm_tech:pro_dei_index_3tiers::Pro-DEI"        = "URM $\\times$ Pro-DEI"),
-  signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
-  extralines = list(
-    "Resume FE"     = rep(chk, 4),
-    "Respondent FE" = rep(chk, 4),
-    "Position FE"   = rep(chk, 4)
-  ),
-  title = "URM Premium by DEI Attitude Tier (Base: Anti-DEI)",
-  notes = "Standard errors clustered by respondent. Base group: Anti-DEI (bottom tercile). Odd columns = Coding Score (Z); Even columns = Overall Score (Z)."
-)
-
-tbl <- sub(
-  "\\\\toprule",
-  paste0("\\\\toprule",
-         " & \\\\multicolumn{2}{c}{\\\\textbf{Panel A: HR}}",
-         " & \\\\multicolumn{2}{c}{\\\\textbf{Panel B: Engineer}} \\\\\\\\ ",
-         "\\\\cmidrule(lr){2-3} \\\\cmidrule(lr){4-5}"),
-  tbl
-)
-tbl <- gsub("\\s*&\\s*\\\\multicolumn\\{4\\}\\{c\\}\\{.*?\\}\\\\\\\\", "", tbl)
-tbl <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering \\\\footnotesize", tbl)
-tbl <- gsub("\\\\begin\\{table\\}", "\\\\begin{table}\n\\\\resizebox{\\\\textwidth}{!}{", tbl)
-tbl <- gsub("\\\\end\\{table\\}", "}\n\\\\end{table}", tbl)
-
-cat(tbl)
-
-# ==============================================================================
-# PLOT: Marginal URM premium by DEI tier (equivalent to curve plots)
-# ==============================================================================
-make_tier_plot <- function(model, role_label, outcome_label) {
-  b <- coef(model)
-  V <- vcov(model)
-  
-  # Find the exact coefficient names as stored by fixest
-  int_mid <- names(b)[grepl("urm_tech.*Mid", names(b))]
-  int_pro <- names(b)[grepl("urm_tech.*Pro", names(b))]
-  
-  tiers <- c("Anti-DEI", "Mid-DEI", "Pro-DEI")
-  
-  # Anti-DEI: just urm_tech main effect
-  est_anti <- b["urm_tech"]
-  se_anti  <- sqrt(V["urm_tech", "urm_tech"])
-  
-  # Mid-DEI: urm_tech + interaction
-  est_mid <- b["urm_tech"] + b[int_mid]
-  se_mid  <- sqrt(V["urm_tech","urm_tech"] + V[int_mid,int_mid] + 2*V["urm_tech",int_mid])
-  
-  # Pro-DEI: urm_tech + interaction
-  est_pro <- b["urm_tech"] + b[int_pro]
-  se_pro  <- sqrt(V["urm_tech","urm_tech"] + V[int_pro,int_pro] + 2*V["urm_tech",int_pro])
-  
-  data.table(
-    tier    = factor(tiers, levels = tiers),
-    delta   = c(est_anti, est_mid, est_pro),
-    se      = c(se_anti,  se_mid,  se_pro),
-    role    = role_label,
-    outcome = outcome_label
-  )[, `:=`(lo = delta - 1.96*se, hi = delta + 1.96*se)]
-}
-
-plot_df <- rbindlist(list(
-  make_tier_plot(m_hr_coding,   "HR",       "Coding Score (Z)"),
-  make_tier_plot(m_hr_overall,  "HR",       "Overall Score (Z)"),
-  make_tier_plot(m_eng_coding,  "Engineer", "Coding Score (Z)"),
-  make_tier_plot(m_eng_overall, "Engineer", "Overall Score (Z)")
-))
-plot_df[, role    := factor(role,    levels = c("HR", "Engineer"))]
-plot_df[, outcome := factor(outcome, levels = c("Coding Score (Z)", "Overall Score (Z)"))]
-
-ggplot(plot_df, aes(x = tier, y = delta, color = tier, shape = tier)) +
-  geom_hline(yintercept = 0, linetype = "dashed", linewidth = 0.4) +
-  geom_pointrange(aes(ymin = lo, ymax = hi), size = 0.6) +
-  scale_color_manual(values = c("Anti-DEI" = "black", "Mid-DEI" = "steelblue", "Pro-DEI" = "indianred1")) +
-  scale_shape_manual(values = c("Anti-DEI" = 16, "Mid-DEI" = 15, "Pro-DEI" = 17)) +
-  coord_cartesian(ylim = c(-0.5, 0.7)) +
-  facet_grid(outcome ~ role) +
-  labs(title    = "URM Premium by Pro-DEI Attitude Tier",
-       subtitle = "Base group: Anti-DEI. Points show marginal URM premium within each tier.",
-       x = "DEI Attitude Tier", y = "Predicted URM Premium (Z-Score)",
-       color = NULL, shape = NULL) +
-  theme_bw() +
-  theme(legend.position  = "top",
-        plot.title       = element_text(face = "bold", size = 11),
-        plot.subtitle    = element_text(size = 9, color = "gray40"),
-        axis.text.x      = element_text(size = 8),
-        strip.text       = element_text(size = 8))
-
-rm(dt_hr, dt_eng,
-   m_hr_coding, m_hr_overall, m_eng_coding, m_eng_overall,
-   make_tier_plot, plot_df, chk, tbl)
-```
-
-
-
-```{r urm_positive_imp, eval = FALSE, echo = FALSE}
-## URM Tech (urm_tech) on Positive Impact of DEI Policy
-feols(c(sc_coding_z, sc_overall_z) ~ 
-            urm_tech * pro_hiring_dei_z
-          | responseid + resume_index + r_do,
-          data = firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
-
-# feols(c(sc_coding_z, sc_overall_z) ~ 
-#             urm_tech * pro_hiring_dei_z * resp_age_centered
-#           | responseid + resume_index + r_do,
-#           data = firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
-
-feols(c(sc_coding_z, sc_overall_z) ~ 
-            urm_tech * pro_hiring_dei_z
-          | responseid + resume_index + r_do,
-          data = firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
-
-# feols(c(sc_coding_z, sc_overall_z) ~ 
-#             urm_tech * pro_hiring_dei_z * resp_age_centered
-#           | responseid + resume_index + r_do,
-#           data = firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
-```
-
-
-\newpage
-
-```{r heterogeneity_pro_dei, eval = FALSE, echo = FALSE, eval = FALSE, include = FALSE}
-## URM Tech (urm_tech) on Pro DEI Index
-feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
-            urm_tech * pro_dei_index_z
-          | responseid + resume_index + r_do,
-          data = firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
-
-feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
-            urm_tech * pro_dei_index_z * resp_age_centered
-          | responseid + resume_index + r_do,
-          data = firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
-
-feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
-            urm_tech * pro_dei_index_z
-          | responseid + resume_index + r_do,
-          data = firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
-
-feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
-            urm_tech * pro_dei_index_z * resp_age_centered
-          | responseid + resume_index + r_do,
-          data = firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
-
-## URM Gender (urm_gender) on Pro Gender DEI Index
-feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
-            urm_gender * pro_dei_gender_z
-          | responseid + resume_index + r_do,
-          data = firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
-
-feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
-            urm_gender * pro_dei_gender_z * resp_age_centered
-          | responseid + resume_index + r_do,
-          data = firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
-
-feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
-            urm_gender * pro_dei_gender_z
-          | responseid + resume_index + r_do,
-          data = firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
-
-feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
-            urm_gender * pro_dei_gender_z * resp_age_centered
-          | responseid + resume_index + r_do,
-          data = firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
-
-## URM Race (urm_race) on Pro Race DEI Index
-feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
-            urm_race * pro_dei_race_z
-          | responseid + resume_index + r_do,
-          data = firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
-
-feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
-            urm_race * pro_dei_race_z * resp_age_centered
-          | responseid + resume_index + r_do,
-          data = firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
-
-feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
-            urm_race * pro_dei_race_z
-          | responseid + resume_index + r_do,
-          data = firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
-
-feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
-            urm_race * pro_dei_race_z * resp_age_centered
-          | responseid + resume_index + r_do,
-          data = firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
-```
-
-
-
-```{r stage_pref_heterogeneity_dei, eval = FALSE, echo = FALSE, eval = FALSE, out.width="100%", fig.width=14, fig.height=11, fig.align='center', results='asis'}
-
-## Regressions: Heterogeneity by DEI Views
-
-## ========== BINARY DEI (Pro vs Anti/Neutral) ==========
-
-  #### HR (Race View - Binary) - WITH SC_ADVANCE
-  models_hr_dei_race_binary <- suppressMessages(suppressWarnings(
-    feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
-            i(race_gender, ref = "White_Male") + 
-            i(race_gender, factor(resp_pro_dei_race), ref2 = "0") +
-            resp_age + I(resp_age^2) + I(resp_age^3)
-          | resume_index + r_do_bythree + resp_gender + resp_race + s2_educ + s2_income,
-          data = firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
-  ))
-  names(models_hr_dei_race_binary) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z", "sc_advance")
-
-  #### Engineer (Race View - Binary) - NO SC_ADVANCE
-  models_eng_dei_race_binary <- suppressMessages(suppressWarnings(
-    feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
-            i(race_gender, ref = "White_Male") + 
-            i(race_gender, factor(resp_pro_dei_race), ref2 = "0") +
-            resp_age + I(resp_age^2) + I(resp_age^3)
-          | resume_index + r_do_bythree + resp_gender + resp_race + s2_educ + s2_income,
-          data = firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
-  ))
-  names(models_eng_dei_race_binary) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z")
-
-  #### HR (Gender View - Binary) - WITH SC_ADVANCE
-  models_hr_dei_gender_binary <- suppressMessages(suppressWarnings(
-    feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
-            i(race_gender, ref = "White_Male") + 
-            i(race_gender, factor(resp_pro_dei_gender), ref2 = "0") +
-            resp_age + I(resp_age^2) + I(resp_age^3)
-          | resume_index + r_do_bythree + resp_gender + resp_race + s2_educ + s2_income,
-          data = firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
-  ))
-  names(models_hr_dei_gender_binary) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z", "sc_advance")
-
-  #### Engineer (Gender View - Binary) - NO SC_ADVANCE
-  models_eng_dei_gender_binary <- suppressMessages(suppressWarnings(
-    feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
-            i(race_gender, ref = "White_Male") + 
-            i(race_gender, factor(resp_pro_dei_gender), ref2 = "0") +
-            resp_age + I(resp_age^2) + I(resp_age^3)
-          | resume_index + r_do_bythree + resp_gender + resp_race + s2_educ + s2_income,
-          data = firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
-  ))
-  names(models_eng_dei_gender_binary) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z")
-
-## ========== CONTINUOUS DEI (1-5 Scale) ==========
-
-  #### HR (Race View - Continuous) - WITH SC_ADVANCE
-  models_hr_dei_race_continuous <- suppressMessages(suppressWarnings(
-    feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
-            i(race_gender, ref = "White_Male") + 
-            i(race_gender, s5_view_dei_race, ref = "White_Male") +
-            resp_age + I(resp_age^2) + I(resp_age^3)
-          | resume_index + r_do_bythree + resp_gender + resp_race + s2_educ + s2_income,
-          data = firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
-  ))
-  names(models_hr_dei_race_continuous) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z", "sc_advance")
-
-  #### Engineer (Race View - Continuous) - NO SC_ADVANCE
-  models_eng_dei_race_continuous <- suppressMessages(suppressWarnings(
-    feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
-            i(race_gender, ref = "White_Male") + 
-            i(race_gender, s5_view_dei_race, ref = "White_Male") +
-            resp_age + I(resp_age^2) + I(resp_age^3)
-          | resume_index + r_do_bythree + resp_gender + resp_race + s2_educ + s2_income,
-          data = firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
-  ))
-  names(models_eng_dei_race_continuous) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z")
-
-  #### HR (Gender View - Continuous) - WITH SC_ADVANCE
-  models_hr_dei_gender_continuous <- suppressMessages(suppressWarnings(
-    feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~ 
-            i(race_gender, ref = "White_Male") + 
-            i(race_gender, s5_view_dei_gender, ref = "White_Male") +
-            resp_age + I(resp_age^2) + I(resp_age^3)
-          | resume_index + r_do_bythree + resp_gender + resp_race + s2_educ + s2_income,
-          data = firm_long_dt[treat == "nonblind" & role == "HR"], vcov = ~ responseid)
-  ))
-  names(models_hr_dei_gender_continuous) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z", "sc_advance")
-
-  #### Engineer (Gender View - Continuous) - NO SC_ADVANCE
-  models_eng_dei_gender_continuous <- suppressMessages(suppressWarnings(
-    feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~ 
-            i(race_gender, ref = "White_Male") + 
-            i(race_gender, s5_view_dei_gender, ref = "White_Male") +
-            resp_age + I(resp_age^2) + I(resp_age^3)
-          | resume_index + r_do_bythree + resp_gender + resp_race + s2_educ + s2_income,
-          data = firm_long_dt[treat == "nonblind" & role == "Eng"], vcov = ~ responseid)
-  ))
-  names(models_eng_dei_gender_continuous) <- c("sc_coding_z", "sc_fit_z", "sc_stay_z", "sc_overall_z")
-
-## Coefficient maps
-coef_map_race_binary <- c(
-  "race_gender::White_Female" = "WF",
-  "race_gender::Asian_Male" = "AM",
-  "race_gender::Asian_Female" = "AF",
-  "race_gender::Hispanic_Male" = "HM",
-  "race_gender::Hispanic_Female" = "HF",
-  "race_gender::White_Male:factor(resp_pro_dei_race)::1" = "WM × Pro-DEI (Race)",
-  "race_gender::White_Female:factor(resp_pro_dei_race)::1" = "WF × Pro-DEI (Race)",
-  "race_gender::Asian_Male:factor(resp_pro_dei_race)::1" = "AM × Pro-DEI (Race)",
-  "race_gender::Asian_Female:factor(resp_pro_dei_race)::1" = "AF × Pro-DEI (Race)",
-  "race_gender::Hispanic_Male:factor(resp_pro_dei_race)::1" = "HM × Pro-DEI (Race)",
-  "race_gender::Hispanic_Female:factor(resp_pro_dei_race)::1" = "HF × Pro-DEI (Race)"
-)
-
-coef_map_race_continuous <- c(
-  "race_gender::White_Female" = "WF",
-  "race_gender::Asian_Male" = "AM",
-  "race_gender::Asian_Female" = "AF",
-  "race_gender::Hispanic_Male" = "HM",
-  "race_gender::Hispanic_Female" = "HF",
-  "race_gender::White_Male:s5_view_dei_race" = "WM × Pro DEI Scale (Race)",
-  "race_gender::White_Female:s5_view_dei_race" = "WF × Pro DEI Scale (Race)",
-  "race_gender::Asian_Male:s5_view_dei_race" = "AM × Pro DEI Scale (Race)",
-  "race_gender::Asian_Female:s5_view_dei_race" = "AF × Pro DEI Scale (Race)",
-  "race_gender::Hispanic_Male:s5_view_dei_race" = "HM × Pro DEI Scale (Race)",
-  "race_gender::Hispanic_Female:s5_view_dei_race" = "HF × Pro DEI Scale (Race)"
-)
-
-coef_map_gender_binary <- c(
-  "race_gender::White_Female" = "WF",
-  "race_gender::Asian_Male" = "AM",
-  "race_gender::Asian_Female" = "AF",
-  "race_gender::Hispanic_Male" = "HM",
-  "race_gender::Hispanic_Female" = "HF",
-  "race_gender::White_Male:factor(resp_pro_dei_gender)::1" = "WM × Pro-DEI (Gender)",
-  "race_gender::White_Female:factor(resp_pro_dei_gender)::1" = "WF × Pro-DEI (Gender)",
-  "race_gender::Asian_Male:factor(resp_pro_dei_gender)::1" = "AM × Pro-DEI (Gender)",
-  "race_gender::Asian_Female:factor(resp_pro_dei_gender)::1" = "AF × Pro-DEI (Gender)",
-  "race_gender::Hispanic_Male:factor(resp_pro_dei_gender)::1" = "HM × Pro-DEI (Gender)",
-  "race_gender::Hispanic_Female:factor(resp_pro_dei_gender)::1" = "HF × Pro-DEI (Gender)"
-)
-
-coef_map_gender_continuous <- c(
-  "race_gender::White_Female" = "WF",
-  "race_gender::Asian_Male" = "AM",
-  "race_gender::Asian_Female" = "AF",
-  "race_gender::Hispanic_Male" = "HM",
-  "race_gender::Hispanic_Female" = "HF",
-  "race_gender::White_Male:s5_view_dei_gender" = "WM × Pro DEI Scale (Gender)",
-  "race_gender::White_Female:s5_view_dei_gender" = "WF × Pro DEI Scale (Gender)",
-  "race_gender::Asian_Male:s5_view_dei_gender" = "AM × Pro DEI Scale (Gender)",
-  "race_gender::Asian_Female:s5_view_dei_gender" = "AF × Pro DEI Scale (Gender)",
-  "race_gender::Hispanic_Male:s5_view_dei_gender" = "HM × Pro DEI Scale (Gender)",
-  "race_gender::Hispanic_Female:s5_view_dei_gender" = "HF × Pro DEI Scale (Gender)"
-)
-
-## ========== PAGE 1: RACE DEI HETEROGENEITY - 2x2 LAYOUT ==========
-cat("\\subsection*{Heterogeneity by Race DEI View}\n\n")
-cat("Reference group: White Male. Respondent fixed effects are NOT included to allow identification of all DEI interaction terms. Respondent characteristics (age, age$^2$, age$^3$, gender, race, education, income) are included as controls.\n\n")
-
-cat("\\begin{table}[H]\n")
-cat("\\centering\n")
-cat("\\begin{minipage}[t]{0.48\\textwidth}\n")
-cat("\\centering\n")
-cat("\\textbf{HR - Binary Race DEI}\n\n")
-modelsummary(
-  models_hr_dei_race_binary,
-  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
-  coef_map = coef_map_race_binary,
-  gof_map = c("nobs", "r.squared"),
-  output = "kableExtra",
-  table.attr = "style='width:100%;'"
-) %>%
-  kable_styling(font_size = 7, latex_options = "HOLD_position")
-cat("\\end{minipage}\n")
-cat("\\hfill\n")
-cat("\\begin{minipage}[t]{0.48\\textwidth}\n")
-cat("\\centering\n")
-cat("\\textbf{Engineer - Binary Race DEI}\n\n")
-modelsummary(
-  models_eng_dei_race_binary,
-  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
-  coef_map = coef_map_race_binary,
-  gof_map = c("nobs", "r.squared"),
-  output = "kableExtra",
-  table.attr = "style='width:100%;'"
-) %>%
-  kable_styling(font_size = 7, latex_options = "HOLD_position")
-cat("\\end{minipage}\n")
-cat("\\end{table}\n\n")
-
-cat("\\vspace{0.5cm}\n\n")
-
-cat("\\begin{table}[H]\n")
-cat("\\centering\n")
-cat("\\begin{minipage}[t]{0.48\\textwidth}\n")
-cat("\\centering\n")
-cat("\\textbf{HR - Continuous Race DEI}\n\n")
-modelsummary(
-  models_hr_dei_race_continuous,
-  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
-  coef_map = coef_map_race_continuous,
-  gof_map = c("nobs", "r.squared"),
-  output = "kableExtra",
-  table.attr = "style='width:100%;'"
-) %>%
-  kable_styling(font_size = 7, latex_options = "HOLD_position")
-cat("\\end{minipage}\n")
-cat("\\hfill\n")
-cat("\\begin{minipage}[t]{0.48\\textwidth}\n")
-cat("\\centering\n")
-cat("\\textbf{Engineer - Continuous Race DEI}\n\n")
-modelsummary(
-  models_eng_dei_race_continuous,
-  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
-  coef_map = coef_map_race_continuous,
-  gof_map = c("nobs", "r.squared"),
-  output = "kableExtra",
-  table.attr = "style='width:100%;'"
-) %>%
-  kable_styling(font_size = 7, latex_options = "HOLD_position")
-cat("\\end{minipage}\n")
-cat("\\end{table}\n\n")
-
-cat("\\newpage\n")
-
-## ========== PAGE 2: GENDER DEI HETEROGENEITY - 2x2 LAYOUT ==========
-cat("\\subsection*{Heterogeneity by Gender DEI View}\n\n")
-cat("Reference group: White Male. Respondent fixed effects are NOT included to allow identification of all DEI interaction terms. Respondent characteristics (age, age$^2$, age$^3$, gender, race, education, income) are included as controls.\n\n")
-
-cat("\\begin{table}[H]\n")
-cat("\\centering\n")
-cat("\\begin{minipage}[t]{0.48\\textwidth}\n")
-cat("\\centering\n")
-cat("\\textbf{HR - Binary Gender DEI}\n\n")
-modelsummary(
-  models_hr_dei_gender_binary,
-  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
-  coef_map = coef_map_gender_binary,
-  gof_map = c("nobs", "r.squared"),
-  output = "kableExtra",
-  table.attr = "style='width:100%;'"
-) %>%
-  kable_styling(font_size = 7, latex_options = "HOLD_position")
-cat("\\end{minipage}\n")
-cat("\\hfill\n")
-cat("\\begin{minipage}[t]{0.48\\textwidth}\n")
-cat("\\centering\n")
-cat("\\textbf{Engineer - Binary Gender DEI}\n\n")
-modelsummary(
-  models_eng_dei_gender_binary,
-  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
-  coef_map = coef_map_gender_binary,
-  gof_map = c("nobs", "r.squared"),
-  output = "kableExtra",
-  table.attr = "style='width:100%;'"
-) %>%
-  kable_styling(font_size = 7, latex_options = "HOLD_position")
-cat("\\end{minipage}\n")
-cat("\\end{table}\n\n")
-
-cat("\\vspace{0.5cm}\n\n")
-
-cat("\\begin{table}[H]\n")
-cat("\\centering\n")
-cat("\\begin{minipage}[t]{0.48\\textwidth}\n")
-cat("\\centering\n")
-cat("\\textbf{HR - Continuous Gender DEI}\n\n")
-modelsummary(
-  models_hr_dei_gender_continuous,
-  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
-  coef_map = coef_map_gender_continuous,
-  gof_map = c("nobs", "r.squared"),
-  output = "kableExtra",
-  table.attr = "style='width:100%;'"
-) %>%
-  kable_styling(font_size = 7, latex_options = "HOLD_position")
-cat("\\end{minipage}\n")
-cat("\\hfill\n")
-cat("\\begin{minipage}[t]{0.48\\textwidth}\n")
-cat("\\centering\n")
-cat("\\textbf{Engineer - Continuous Gender DEI}\n\n")
-modelsummary(
-  models_eng_dei_gender_continuous,
-  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
-  coef_map = coef_map_gender_continuous,
-  gof_map = c("nobs", "r.squared"),
-  output = "kableExtra",
-  table.attr = "style='width:100%;'"
-) %>%
-  kable_styling(font_size = 7, latex_options = "HOLD_position")
-cat("\\end{minipage}\n")
-cat("\\end{table}\n\n")
-
-## Clean up
-rm(models_hr_dei_race_binary, models_eng_dei_race_binary,
-   models_hr_dei_gender_binary, models_eng_dei_gender_binary,
-   models_hr_dei_race_continuous, models_eng_dei_race_continuous,
-   models_hr_dei_gender_continuous, models_eng_dei_gender_continuous,
-   coef_map_race_binary, coef_map_race_continuous,
-   coef_map_gender_binary, coef_map_gender_continuous)
-```
 
 -->
 \clearpage

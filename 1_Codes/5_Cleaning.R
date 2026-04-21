@@ -290,7 +290,7 @@ firm_dt[!is.na(fl_193_do), c(paste0("r", 1:18, "_DO")) := lapply(tstrsplit(fl_19
   #### Display Order (Lumped by Three)
   cols_in  <- paste0("r", 1:18, "_DO")
   cols_out <- paste0(cols_in, "_bythree")
-  firm_dt[, (cols_out) := lapply(.SD, function(x) floor(x/3)), .SDcols = cols_in]
+  firm_dt[, (cols_out) := lapply(.SD, function(x) ceiling(x/3)), .SDcols = cols_in]
   rm(cols_in, cols_out)
     
   #### Employer's Coding Languages
