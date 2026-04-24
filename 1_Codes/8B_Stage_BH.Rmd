@@ -1,0 +1,503 @@
+---
+title: "Stage-by-Stage Impact of Blind Hiring"
+output:
+  pdf_document:
+    number_sections: true
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{threeparttable}  
+  - \usepackage{float}  
+geometry: margin=0.5in, landscape
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+<!-- +++++ ++++++ ++++++ Part 5-2: Analysis (Stage-by-Stage Impact of Blind Hiring) +++++ ++++++ ++++++ -->
+
+
+# Impact of Blind Hiring on Evaluations
+
+## On All Dimensions (Z)
+
+\textcolor{blue}{\textbf{Takeaway}}: Our experiment demonstrates that withholding demographic information \emph{reshuffles} candidates' relative evaluations across stages. In the HR resume-screening stage, Hispanic Male candidates are the largest losers: under blinding, their overall evaluation scores fall by 11.8\% of a standard deviation relative to when their identity is revealed (significant at the 5\% level). In the Engineer technical evaluation stage, the largest gainers are White Male candidates, whose scores rise by 8.5\% of a SD under blinding (significant at the 1\% level), while most other demographic groups lose ground. A standard caveat applies: because hiring is often an ordinal ranking problem --- where one candidate's gain necessarily corresponds to another candidate's lost opportunity --- the absence of statistical significance on a given row does not mean the corresponding group is unaffected by blinding.
+
+```{r blind_hiring_treatment_effects_demo, echo = FALSE, results = 'asis'}
+## Treatment Effects of Blind Hiring
+## Reference: Blind resumes (baseline)
+## Shows effect of revealing each demographic vs. keeping it blind
+
+## HR Models (with sc_advance) - WITH RESPONDENT CHARACTERISTICS
+models_hr_blind <- suppressMessages(suppressWarnings(
+  feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~
+          i(race_gender, ref = "Blind") +
+          resp_age + I(resp_age^2) + I(resp_age^3)
+        | resume_index + r_do_bythree + resp_gender + resp_race + s2_educ + s2_income,
+        data = firm_long_dt[role == "HR"], vcov = ~ responseid)
+))
+names(models_hr_blind) <- c("Coding (Z)", "Fit (Z)", "Stay (Z)", "Overall (Z)", "Advance (0/1)")
+
+## Engineer Models (no sc_advance) - WITH RESPONDENT CHARACTERISTICS
+models_eng_blind <- suppressMessages(suppressWarnings(
+  feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~
+          i(race_gender, ref = "Blind") +
+          resp_age + I(resp_age^2) + I(resp_age^3)
+        | resume_index + r_do_bythree + resp_gender + resp_race + s2_educ + s2_income,
+        data = firm_long_dt[role == "Eng"], vcov = ~ responseid)
+))
+names(models_eng_blind) <- c("Coding (Z)", "Fit (Z)", "Stay (Z)", "Overall (Z)")
+
+## Flip coefficient signs so a positive coefficient = effect of blinding.
+flip_coef_signs <- function(model) {
+  model$coefficients <- -1 * model$coefficients
+  return(model)
+}
+models_hr_blind  <- lapply(models_hr_blind,  flip_coef_signs)
+models_eng_blind <- lapply(models_eng_blind, flip_coef_signs)
+
+## Coefficient map - ONLY show demographic coefficients
+coef_map_blind <- c(
+  "race_gender::White_Male"      = "White Male",
+  "race_gender::White_Female"    = "White Female",
+  "race_gender::Asian_Male"      = "Asian Male",
+  "race_gender::Asian_Female"    = "Asian Female",
+  "race_gender::Hispanic_Male"   = "Hispanic Male",
+  "race_gender::Hispanic_Female" = "Hispanic Female"
+)
+
+## Custom gof_map
+gof_custom_blind <- tribble(
+  ~raw,        ~clean,          ~fmt,
+  "nobs",      "Observations",   0,
+  "r.squared", "R2",             3
+)
+
+## FE / controls footer rows (displayed inside the table). Respondent FE and
+## Respondent Characteristics are placed adjacent to make the contrast visible:
+## we do NOT soak up respondent heterogeneity with a fixed effect, but we DO
+## include respondent demographic controls as absorbing FEs + age polynomial.
+chk <- "\\checkmark"
+nox <- "$\\times$"
+fe_rows_hr <- data.frame(
+  c("Resume (Content) FE", "Display Position FE", "Respondent FE", "Respondent Characteristics"),
+  c(chk, chk, nox, chk), c(chk, chk, nox, chk), c(chk, chk, nox, chk),
+  c(chk, chk, nox, chk), c(chk, chk, nox, chk),
+  stringsAsFactors = FALSE
+)
+names(fe_rows_hr) <- c("term", "Coding (Z)", "Fit (Z)", "Stay (Z)", "Overall (Z)", "Advance (0/1)")
+
+fe_rows_eng <- data.frame(
+  c("Resume (Content) FE", "Display Position FE", "Respondent FE", "Respondent Characteristics"),
+  c(chk, chk, nox, chk), c(chk, chk, nox, chk), c(chk, chk, nox, chk),
+  c(chk, chk, nox, chk),
+  stringsAsFactors = FALSE
+)
+names(fe_rows_eng) <- c("term", "Coding (Z)", "Fit (Z)", "Stay (Z)", "Overall (Z)")
+
+cat("\\begin{table}[H]\n")
+cat("\\centering\n")
+cat("\\begin{minipage}[t]{0.48\\textwidth}\n")
+cat("\\centering\n")
+cat("\\textbf{Panel A: HR}\n\n")
+
+modelsummary(
+  models_hr_blind,
+  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  coef_map = coef_map_blind,
+  gof_map = gof_custom_blind,
+  add_rows = fe_rows_hr,
+  escape = FALSE,
+  output = "kableExtra",
+  table.attr = "style='width:100%;'"
+) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 7)
+
+cat("\\end{minipage}\n")
+cat("\\hfill\n")
+cat("\\begin{minipage}[t]{0.48\\textwidth}\n")
+cat("\\centering\n")
+cat("\\textbf{Panel B: Engineer}\n\n")
+
+modelsummary(
+  models_eng_blind,
+  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  coef_map = coef_map_blind,
+  gof_map = gof_custom_blind,
+  add_rows = fe_rows_eng,
+  escape = FALSE,
+  output = "kableExtra",
+  table.attr = "style='width:100%;'"
+) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 7)
+
+cat("\\end{minipage}\n")
+cat("\\end{table}\n\n")
+
+cat("\\vspace{-0.2cm}\n\n")
+cat("\\scriptsize\n\n")
+cat("\\textit{Standard errors clustered by respondent.}\n\n")
+cat("\\textit{Note on Interpreting Coefficients:} The underlying regression uses Blind resumes as the reference category, so raw coefficients capture (nonblind $-$ blind) or the effect of being blinded for each demographic on relative overall evaluation scores. We then multiply by $-1$ to report (blind $-$ nonblind), aligning the sign convention with the standard \"effect of blinding\" framing: positive $\\Rightarrow$ blinding raises the relative score for that demographic. \"Respondent Characteristics\" comprises age (with polynomial), gender, race, education, and income.\n\n")
+cat("\\normalsize\n\n")
+
+## Clean up
+rm(models_hr_blind, models_eng_blind, coef_map_blind, gof_custom_blind, flip_coef_signs,
+   chk, nox, fe_rows_hr, fe_rows_eng)
+```
+
+
+## Does Blinding Lead to More Accurate Coding Evaluations?
+
+\textcolor{blue}{\textbf{Takeaway}}: Evaluators do extract signal about candidates' actual coding ability --- Engineers much more strongly than HR, consistent with Engineers seeing the code while HR sees only the resume. Blinding, however, does \emph{not} meaningfully change this signal-extraction ability in either role: the $\texttt{true\_coding\_z} \times \texttt{blind}$ interaction is small, negative, and statistically insignificant for both HR and Engineers. If blinding --- which in our experiment amounts to removing random, uninformative demographic noise --- improved signal-extraction ability, we would expect a positive and statistically significant interaction term. In short, blinding \emph{reshuffles} who receives high scores (Section 1.1) but does not change \emph{how well} those scores track actual coding skill.
+
+\textcolor{blue}{\textbf{Specification}}: For each role, we fit
+$$
+\text{Hiring Evaluation Score (Z)} \sim \text{True Coding Ability (Z)} \times \mathbb{1}[\text{Blind}] \mid \text{Respondent FE} + \text{Display Position FE}.
+$$
+The main slope on True Coding Ability (Z) is the evaluator's signal sensitivity in the non-blind arm; the interaction is the shift in sensitivity under blinding. Resume-content FE is deliberately absent, because True Coding Ability (Z) is constant within a resume (one lab-measured score per resume) and a resume FE would absorb the RHS entirely.
+
+```{r blind_hiring_signal_extraction, echo = FALSE, results = 'asis'}
+## Pooled z-score of the lab coding score (constant within resume_index)
+firm_long_dt[, true_coding_z := (overall_score - mean(overall_score, na.rm = TRUE)) /
+                                  sd(overall_score, na.rm = TRUE)]
+
+## HR and Engineer, same spec
+## Note: respondent-level controls (age polynomial, gender, race, educ, income)
+## are all perfectly collinear with responseid FE, so they are absorbed rather
+## than separately identified. We drop them from the formula to keep the
+## reported FE footer honest.
+m_hr_sig <- suppressMessages(suppressWarnings(
+  feols(sc_coding_z ~ true_coding_z * i(treat, ref = "nonblind")
+        | responseid + r_do_bythree,
+        data = firm_long_dt[role == "HR"], vcov = ~ responseid)
+))
+
+m_eng_sig <- suppressMessages(suppressWarnings(
+  feols(sc_coding_z ~ true_coding_z * i(treat, ref = "nonblind")
+        | responseid + r_do_bythree,
+        data = firm_long_dt[role == "Eng"], vcov = ~ responseid)
+))
+
+models_sig <- list("HR" = m_hr_sig, "Engineer" = m_eng_sig)
+
+coef_map_sig <- c(
+  "true_coding_z"              = "True Coding Score (Z)",
+  "true_coding_z:treat::blind" = "True Coding Score (Z) $\\times$ Blind"
+)
+
+gof_custom_sig <- tribble(
+  ~raw,        ~clean,          ~fmt,
+  "nobs",      "Observations",   0,
+  "r.squared", "R2",             3
+)
+
+chk <- "\\checkmark"
+nox <- "$\\times$"
+fe_rows_sig <- data.frame(
+  c("Resume (Content) FE", "Display Position FE", "Respondent FE", "Respondent Characteristics"),
+  c(nox, chk, chk, nox),
+  c(nox, chk, chk, nox),
+  stringsAsFactors = FALSE
+)
+names(fe_rows_sig) <- c("term", "HR", "Engineer")
+
+cat("\\begin{table}[H]\n")
+cat("\\centering\n")
+
+modelsummary(
+  models_sig,
+  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  coef_map = coef_map_sig,
+  gof_map = gof_custom_sig,
+  add_rows = fe_rows_sig,
+  escape = FALSE,
+  output = "kableExtra",
+  table.attr = "style='width:70%;'"
+) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 8)
+
+cat("\\end{table}\n\n")
+
+cat("\\vspace{-0.2cm}\n\n")
+cat("\\scriptsize\n\n")
+cat("\\textit{Standard errors clustered by respondent.}\n\n")
+cat("\\textit{Note on Interpreting Coefficients:} The main slope on \"True Coding Score (Z)\" is the evaluator's signal sensitivity in the non-blind arm --- a 1 SD increase in actual coding ability maps into a $\\hat\\beta$ SD increase in the assigned coding rating. The interaction row is the shift in that sensitivity under blinding: positive $\\Rightarrow$ blinding sharpens rating-to-truth tracking, negative $\\Rightarrow$ blinding dulls it. The \"Resume (Content) FE\" row is marked as not included because $\\texttt{overall\\_score}$ is a resume-level property (one lab score per resume), so a resume-content FE would absorb the RHS and leave the main slope unidentified. \"Respondent Characteristics\" is marked as not included because respondent-level variables (age, gender, race, education, income) are all perfectly collinear with the respondent FE and therefore absorbed by it.\n\n")
+cat("\\normalsize\n\n")
+
+rm(m_hr_sig, m_eng_sig, models_sig, coef_map_sig, gof_custom_sig,
+   chk, nox, fe_rows_sig)
+```
+
+
+\newpage
+# Stage-by-Stage Impact of Blind Hiring on Coding Outcomes
+
+```{r blind_hiring_coding_quality, echo=FALSE, results='asis', warning=FALSE, message=FALSE, fig.width=10, fig.height=5}
+
+# ==============================================================================
+# HELPER: Dynamic standardization relative to nonblind group at each k
+# ==============================================================================
+get_avg_coding_score <- function(role_filter, treat_filter, k, 
+                                  pass_var_prefix, data) {
+  col <- paste0(pass_var_prefix, k)
+  d   <- data[role == role_filter & treat == treat_filter & get(col) == 1]
+  if (nrow(d) == 0) return(NA_real_)
+  mean(d$overall_score, na.rm = TRUE)
+}
+
+# ==============================================================================
+# COMPUTE TREATMENT EFFECT AT EACH K
+# ==============================================================================
+results_list <- list()
+
+for (k in 1:18) {
+
+  # --- HR ---
+  hr_col  <- paste0("hr_pass", k)
+  hr_data <- firm_long_dt[role == "HR" & get(hr_col) == 1]
+
+  # Dynamic standardization: relative to nonblind mean/sd at this k
+  ctrl_mean_hr <- hr_data[treat == "nonblind", mean(overall_score, na.rm = TRUE)]
+  ctrl_sd_hr   <- hr_data[treat == "nonblind", sd(overall_score,   na.rm = TRUE)]
+
+  if (!is.na(ctrl_sd_hr) && ctrl_sd_hr > 0) {
+    hr_data[, overall_score_std := (overall_score - ctrl_mean_hr) / ctrl_sd_hr]
+
+    tryCatch({
+      m_hr <- suppressMessages(suppressWarnings(
+        feols(overall_score_std ~ i(treat, ref = "nonblind") + resp_age |
+                r_do_bythree + q_version + resp_gender + resp_race + s2_educ + s2_income,
+              data = hr_data, vcov = ~ responseid)
+      ))
+      ct <- coeftable(m_hr)
+      if ("treat::blind" %in% rownames(ct)) {
+        est   <- ct["treat::blind", "Estimate"]
+        se    <- ct["treat::blind", "Std. Error"]
+        p_val <- ct["treat::blind", 4]
+        results_list[[length(results_list) + 1]] <- data.table(
+          Stage = "HR Stage", k = k,
+          estimate = est,
+          ci_low   = est - 1.96 * se,
+          ci_high  = est + 1.96 * se,
+          p_val    = p_val
+        )
+      }
+    }, error = function(e) {})
+  }
+
+  # --- Engineer ---
+  eng_col  <- paste0("eng_top", k)
+  eng_data <- firm_long_dt[role == "Eng" & get(eng_col) == 1]
+
+  ctrl_mean_eng <- eng_data[treat == "nonblind", mean(overall_score, na.rm = TRUE)]
+  ctrl_sd_eng   <- eng_data[treat == "nonblind", sd(overall_score,   na.rm = TRUE)]
+
+  if (!is.na(ctrl_sd_eng) && ctrl_sd_eng > 0) {
+    eng_data[, overall_score_std := (overall_score - ctrl_mean_eng) / ctrl_sd_eng]
+
+    tryCatch({
+      m_eng <- suppressMessages(suppressWarnings(
+        feols(overall_score_std ~ i(treat, ref = "nonblind") + resp_age |
+                r_do_bythree + q_version + resp_gender + resp_race + s2_educ + s2_income +
+                resp_python + resp_java,
+              data = eng_data, vcov = ~ responseid)
+      ))
+      ct <- coeftable(m_eng)
+      if ("treat::blind" %in% rownames(ct)) {
+        est   <- ct["treat::blind", "Estimate"]
+        se    <- ct["treat::blind", "Std. Error"]
+        p_val <- ct["treat::blind", 4]
+        results_list[[length(results_list) + 1]] <- data.table(
+          Stage = "Engineer Stage", k = k,
+          estimate = est,
+          ci_low   = est - 1.96 * se,
+          ci_high  = est + 1.96 * se,
+          p_val    = p_val
+        )
+      }
+    }, error = function(e) {})
+  }
+}
+
+dt_plot <- rbindlist(results_list)
+dt_plot[, Stage := factor(Stage, levels = c("HR Stage", "Engineer Stage"))]
+dt_plot[, sig_stars := fcase(
+  p_val < 0.01, "***",
+  p_val < 0.05, "**",
+  p_val < 0.10, "*",
+  default = ""
+)]
+
+# ==============================================================================
+# PLOT
+# ==============================================================================
+ggplot(dt_plot, aes(x = k, y = estimate, color = Stage)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.8) +
+  geom_pointrange(aes(ymin = ci_low, ymax = ci_high),
+                  linewidth = 0.8, size = 0.6, fatten = 3) +
+  geom_text(aes(y = ci_high, label = sig_stars),
+            vjust = -0.5, size = 5, color = "black", show.legend = FALSE) +
+  facet_wrap(~ Stage, ncol = 2) +
+  scale_color_manual(values = c("HR Stage" = "#C44E52", "Engineer Stage" = "#4C72B0")) +
+  scale_x_continuous(breaks = 1:18, name = "Number of Candidates Selected (k)") +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+  labs(
+    title    = "Does Blind Hiring Select Better Coders?",
+    subtitle = paste("Effect of blinding on actual coding quality of selected candidates.",
+                     "Standardized relative to nonblind group at each k."),
+    y       = "Effect on Actual Coding Score (SD, relative to nonblind)",
+    caption = "Positive = blind hiring selects candidates with higher actual coding scores.\nSignificance: * p<0.10, ** p<0.05, *** p<0.01"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position    = "none",
+    plot.title         = element_text(face = "bold", size = 13),
+    plot.subtitle      = element_text(size = 10, color = "gray30"),
+    strip.text         = element_text(face = "bold", size = 12),
+    panel.grid.minor.x = element_blank(),
+    axis.title.x       = element_text(margin = margin(t = 10)),
+    axis.title.y       = element_text(margin = margin(r = 10)),
+    plot.caption       = element_text(size = 8, hjust = 0)
+  )
+
+rm(results_list, dt_plot, k,
+   hr_col, hr_data, ctrl_mean_hr, ctrl_sd_hr, m_hr, ct,
+   eng_col, eng_data, ctrl_mean_eng, ctrl_sd_eng, m_eng,
+   est, se, p_val)
+```
+
+```{r blind_hiring_demographic_selection, eval = FALSE, echo=FALSE, fig.width=12, fig.height=10}
+
+# ==============================================================================
+# COMPUTE TREATMENT EFFECT AT EACH K
+# LHS: hr_passk / eng_topk (0/1 selected)
+# RHS: race_gender with "Blind" as reference, then flip signs
+# ==============================================================================
+results_all <- list()
+
+demo_labels <- c("White_Male", "White_Female", "Asian_Male",
+                 "Asian_Female", "Hispanic_Male", "Hispanic_Female")
+
+for (k in 1:18) {
+
+  hr_col  <- paste0("hr_pass", k)
+  eng_col <- paste0("eng_top", k)
+
+  # --- HR ---
+  tryCatch({
+    m_hr <- suppressMessages(suppressWarnings(
+      feols(as.formula(paste0(hr_col,
+        " ~ i(race_gender, ref = 'Blind') |
+          r_do + q_version + resp_gender + resp_race + s2_educ + s2_income")),
+        data = firm_long_dt[role == "HR"],
+        vcov = ~ responseid)
+    ))
+    ct <- coeftable(m_hr)
+    for (dg in demo_labels) {
+      coef_nm <- paste0("race_gender::", dg)
+      if (coef_nm %in% rownames(ct)) {
+        est   <- -ct[coef_nm, "Estimate"]      # flip sign
+        se    <-  ct[coef_nm, "Std. Error"]
+        p_val <-  ct[coef_nm, 4]
+        results_all[[length(results_all) + 1]] <- data.table(
+          demo  = gsub("_", " ", dg),
+          Stage = "HR Stage", k = k,
+          estimate = est,
+          ci_low   = est - 1.96 * se,
+          ci_high  = est + 1.96 * se,
+          p_val    = p_val
+        )
+      }
+    }
+  }, error = function(e) {})
+
+  # --- Engineer ---
+  tryCatch({
+    m_eng <- suppressMessages(suppressWarnings(
+      feols(as.formula(paste0(eng_col,
+        " ~ i(race_gender, ref = 'Blind') + resp_age |
+          r_do_bythree + q_version + resp_gender + resp_race + s2_educ + s2_income +
+          resp_python + resp_java")),
+        data = firm_long_dt[role == "Eng"],
+        vcov = ~ responseid)
+    ))
+    ct <- coeftable(m_eng)
+    for (dg in demo_labels) {
+      coef_nm <- paste0("race_gender::", dg)
+      if (coef_nm %in% rownames(ct)) {
+        est   <- -ct[coef_nm, "Estimate"]      # flip sign
+        se    <-  ct[coef_nm, "Std. Error"]
+        p_val <-  ct[coef_nm, 4]
+        results_all[[length(results_all) + 1]] <- data.table(
+          demo  = gsub("_", " ", dg),
+          Stage = "Engineer Stage", k = k,
+          estimate = est,
+          ci_low   = est - 1.96 * se,
+          ci_high  = est + 1.96 * se,
+          p_val    = p_val
+        )
+      }
+    }
+  }, error = function(e) {})
+}
+
+# ==============================================================================
+# ASSEMBLE AND PLOT
+# ==============================================================================
+dt_plot <- rbindlist(results_all)
+dt_plot[, Stage := factor(Stage, levels = c("HR Stage", "Engineer Stage"))]
+dt_plot[, demo  := factor(demo,  levels = c("White Male",    "White Female",
+                                             "Asian Male",    "Asian Female",
+                                             "Hispanic Male", "Hispanic Female"))]
+dt_plot[, sig_stars := fcase(
+  p_val < 0.01, "***",
+  p_val < 0.05, "**",
+  p_val < 0.10, "*",
+  default = ""
+)]
+dt_plot[, star_y := ifelse(estimate >= 0,
+                            ci_high + 0.005,
+                            ci_low  - 0.005)]
+
+ggplot(dt_plot, aes(x = k, y = estimate, color = Stage)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.6) +
+  geom_pointrange(aes(ymin = ci_low, ymax = ci_high),
+                  linewidth = 0.6, size = 0.4, fatten = 3) +
+  geom_text(aes(y = star_y, label = sig_stars),
+            vjust = ifelse(dt_plot$estimate >= 0, 0, 1),
+            size = 3, color = "black", show.legend = FALSE) +
+  facet_grid(demo ~ Stage) +
+  scale_color_manual(values = c("HR Stage" = "#C44E52", "Engineer Stage" = "#4C72B0")) +
+  scale_x_continuous(breaks = seq(1, 18, by = 3),
+                     name   = "Number of Candidates Selected (k)") +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.20))) +
+  labs(
+    title    = "Effect of Blind Hiring on Selection Probability by Demographic Group",
+    subtitle = paste("Blinding effect = -(effect of revealing identity vs blind).",
+                     "Positive = more likely selected under blinding."),
+    y        = "Blinding Effect on Selection Probability",
+    color    = "Evaluator Role",
+    caption  = "Significance: * p<0.10, ** p<0.05, *** p<0.01. Base group: Blind resumes."
+  ) +
+  theme_bw() +
+  theme(
+    legend.position    = "bottom",
+    legend.title       = element_text(face = "bold", size = 10),
+    legend.text        = element_text(size = 9),
+    plot.title         = element_text(face = "bold", size = 13),
+    plot.subtitle      = element_text(size = 10, color = "gray30"),
+    strip.text         = element_text(face = "bold", size = 10),
+    strip.text.y       = element_text(angle = 0),
+    panel.grid.minor.x = element_blank(),
+    axis.title.x       = element_text(margin = margin(t = 10)),
+    axis.title.y       = element_text(margin = margin(r = 10)),
+    plot.caption       = element_text(size = 8, hjust = 0),
+    panel.spacing      = unit(0.4, "lines")
+  )
+
+rm(results_all, dt_plot, demo_labels, dg, k,
+   hr_col, eng_col, m_hr, m_eng, ct,
+   est, se, p_val, coef_nm)
+```
+
