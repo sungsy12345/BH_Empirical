@@ -532,51 +532,80 @@ firm_dt[!is.na(fl_193_do), c(paste0("r", 1:18, "_DO")) := lapply(tstrsplit(fl_19
     race_gender %in% c("Blind"), NA_integer_)]
   
   #### Create Demographic Concordance
-  firm_long_dt[treat == "nonblind" & 
-                 (resp_gender == "Male" | resp_gender == "Female"), 
+  ##
+  ## Convention: in nonblind, respondents whose race or gender is not
+  ## represented in the applicant pool (e.g., Black, Other-race; Non-binary,
+  ## Other-gender; Korean / Japanese / other-Asian whose detailed
+  ## sub-ethnicity is not Chinese or Indian) are coded as always-discordant.
+  ## Those respondents can never be concordant in our experimental design,
+  ## but their nonblind ratings are informative for the discordant cell.
+
+  ## --- Gender concordance ---
+  firm_long_dt[treat == "nonblind" &
+                 (resp_gender == "Male" | resp_gender == "Female"),
                concordance_gender := fifelse(as.character(gender) == as.character(resp_gender), 1, 0)]
-  firm_long_dt[treat == "nonblind" & 
-                 resp_race == "White" | resp_race == "Asian" | resp_race == "Hispanic", 
+  ## Non-binary / other-gender respondents in nonblind: always-discordant.
+  firm_long_dt[treat == "nonblind" &
+                 !is.na(resp_gender) &
+                 !(resp_gender %in% c("Male", "Female")),
+               concordance_gender := 0L]
+
+  ## --- Broad race concordance ---
+  firm_long_dt[treat == "nonblind" &
+                 (resp_race == "White" | resp_race == "Asian" | resp_race == "Hispanic"),
                concordance_race := fifelse(as.character(race) == as.character(resp_race), 1, 0)]
-  firm_long_dt[treat == "nonblind" & 
-                 resp_race == "White" | resp_race == "Hispanic", 
+  ## Black / other-race respondents in nonblind: always-discordant.
+  firm_long_dt[treat == "nonblind" &
+                 !is.na(resp_race) &
+                 !(resp_race %in% c("White", "Asian", "Hispanic")),
+               concordance_race := 0L]
+
+  ## --- Detailed race concordance (Asian split into Chinese / Indian) ---
+  firm_long_dt[treat == "nonblind" &
+                 (resp_race == "White" | resp_race == "Hispanic"),
                concordance_race_detailed := fifelse(as.character(race) == as.character(resp_race), 1, 0)]
-  firm_long_dt[treat == "nonblind" & 
-                 resp_race == "Asian" & resp_race_gender_detailed %in% c("Chinese_Male", "Chinese_Female"), 
-               concordance_race_detailed := fifelse(chinese == 1, 1, 0)]  
+  firm_long_dt[treat == "nonblind" &
+                 resp_race == "Asian" & resp_race_gender_detailed %in% c("Chinese_Male", "Chinese_Female"),
+               concordance_race_detailed := fifelse(chinese == 1, 1, 0)]
   firm_long_dt[treat == "nonblind" &
                  resp_race == "Asian" & resp_race_gender_detailed %in% c("Indian_Male", "Indian_Female"),
                concordance_race_detailed := fifelse(indian == 1, 1, 0)]
   ## Asian respondents whose detailed sub-ethnicity is not Chinese or Indian
-  ## (e.g., Korean, Japanese) are coded as always-discordant in nonblind:
-  ## the Asian applicant names in our resumes are exclusively Chinese or
-  ## Indian, so these respondents can never be concordant.
+  ## (Korean, Japanese, etc.) AND any non-W/A/H respondents (Black, Other):
+  ## always-discordant in nonblind.
   firm_long_dt[treat == "nonblind" &
-                 resp_race == "Asian" &
-                 !(resp_race_gender_detailed %in% c("Chinese_Male", "Chinese_Female",
-                                                    "Indian_Male",  "Indian_Female")) &
+                 !is.na(resp_race) &
                  is.na(concordance_race_detailed),
                concordance_race_detailed := 0L]
+
+  ## --- Broad race-gender concordance ---
   firm_long_dt[treat == "nonblind" &
-                 (resp_race_gender == "White_Male" | resp_race_gender == "White_Female" | 
-                    resp_race_gender == "Asian_Male" | resp_race_gender == "Asian_Female" | 
-                    resp_race_gender == "Hispanic_Male" | resp_race_gender == "Hispanic_Female"), 
+                 (resp_race_gender == "White_Male" | resp_race_gender == "White_Female" |
+                    resp_race_gender == "Asian_Male" | resp_race_gender == "Asian_Female" |
+                    resp_race_gender == "Hispanic_Male" | resp_race_gender == "Hispanic_Female"),
                concordance_race_gender := fifelse(as.character(race_gender) == as.character(resp_race_gender), 1, 0)]
-  firm_long_dt[treat == "nonblind" & 
-                 (resp_race_gender_detailed == "White_Male" | resp_race_gender_detailed == "White_Female" | 
-                    resp_race_gender_detailed == "Chinese_Male" | resp_race_gender_detailed == "Chinese_Female" | 
-                    resp_race_gender_detailed == "Indian_Male" | resp_race_gender_detailed == "Indian_Female" | 
+  ## Any other race-gender combination in nonblind (Black-Male, Black-Female,
+  ## White-Nonbinary, etc.): always-discordant.
+  firm_long_dt[treat == "nonblind" &
+                 !is.na(resp_race) & !is.na(resp_gender) &
+                 is.na(concordance_race_gender),
+               concordance_race_gender := 0L]
+
+  ## --- Detailed race-gender concordance ---
+  firm_long_dt[treat == "nonblind" &
+                 (resp_race_gender_detailed == "White_Male" | resp_race_gender_detailed == "White_Female" |
+                    resp_race_gender_detailed == "Chinese_Male" | resp_race_gender_detailed == "Chinese_Female" |
+                    resp_race_gender_detailed == "Indian_Male" | resp_race_gender_detailed == "Indian_Female" |
                     resp_race_gender_detailed == "Hispanic_Male" | resp_race_gender_detailed == "Hispanic_Female"),
                concordance_race_gender_detailed := fifelse(as.character(race_gender_detailed) == as.character(resp_race_gender_detailed), 1, 0)]
   firm_long_dt[, concordance_race_gender_detailed_blind := fcase(
     concordance_race_gender_detailed == 1, "Concordant_Group",
     concordance_race_gender_detailed == 0, "Discordant_Group",
-    ## Asian respondents whose detailed sub-ethnicity is not represented in
-    ## the applicant pool (e.g., Korean, Japanese) are coded as always-
-    ## discordant in nonblind: the Asian applicant names are exclusively
-    ## Chinese or Indian, so these respondents can never be concordant.
+    ## Any nonblind respondent whose detailed race-gender is not represented
+    ## in the applicant pool: always-discordant. Covers Korean/Japanese Asians,
+    ## Black, Other, Non-binary, etc.
     is.na(concordance_race_gender_detailed) & treat == "nonblind" &
-      resp_race == "Asian", "Discordant_Group",
+      !is.na(resp_race) & !is.na(resp_gender), "Discordant_Group",
     is.na(concordance_race_gender_detailed) & treat == "blind", "Blind"
   )]
   firm_long_dt[, concordance_race_gender_detailed_blind := factor(concordance_race_gender_detailed_blind,

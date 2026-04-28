@@ -332,7 +332,7 @@ models_hr_bh_conc_race <- suppressMessages(suppressWarnings(
           i(blind_concordance_race, ref = "Blind") +
           resp_age + I(resp_age^2) + I(resp_age^3)
         | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income,
-        data = firm_long_dt[role == "HR" & resp_race %in% c("White", "Asian", "Hispanic")],
+        data = firm_long_dt[role == "HR"],
         vcov = ~ responseid)
 ))
 names(models_hr_bh_conc_race) <- c("Coding (Z)", "Fit (Z)", "Stay (Z)", "Overall (Z)", "Advance (0/1)")
@@ -342,7 +342,7 @@ models_eng_bh_conc_race <- suppressMessages(suppressWarnings(
           i(blind_concordance_race, ref = "Blind") +
           resp_age + I(resp_age^2) + I(resp_age^3)
         | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income,
-        data = firm_long_dt[role == "Eng" & resp_race %in% c("White", "Asian", "Hispanic")],
+        data = firm_long_dt[role == "Eng"],
         vcov = ~ responseid)
 ))
 names(models_eng_bh_conc_race) <- c("Coding (Z)", "Fit (Z)", "Stay (Z)", "Overall (Z)")
@@ -362,9 +362,10 @@ coef_map_conc <- c(
 )
 
 gof_custom_conc <- tribble(
-  ~raw,        ~clean,          ~fmt,
-  "nobs",      "Observations",   0,
-  "r.squared", "R2",             3
+  ~raw,            ~clean,          ~fmt,
+  "nobs",          "Observations",   0,
+  "r.squared",     "R$^2$",          3,
+  "adj.r.squared", "Adj. R$^2$",     3
 )
 
 chk <- "\\checkmark"
@@ -380,14 +381,11 @@ fe_rows <- data.frame(
   stringsAsFactors = FALSE
 )
 
-n_hr_wah  <- uniqueN(firm_long_dt[role == "HR"  & resp_race %in% c("White","Asian","Hispanic"), responseid])
-n_eng_wah <- uniqueN(firm_long_dt[role == "Eng" & resp_race %in% c("White","Asian","Hispanic"), responseid])
+n_hr_wah  <- uniqueN(firm_long_dt[role == "HR"  & !is.na(blind_concordance_race), responseid])
+n_eng_wah <- uniqueN(firm_long_dt[role == "Eng" & !is.na(blind_concordance_race), responseid])
 
 panel_a_lbl <- paste0("Panel A: HR (N = ", n_hr_wah, ")")
 panel_b_lbl <- paste0("Panel B: Engineer (N = ", n_eng_wah, ")")
-
-cat("\\begin{table}[H]\n")
-cat("\\centering\n")
 
 modelsummary(
   all_models,
@@ -398,13 +396,16 @@ modelsummary(
   escape   = FALSE,
   output   = "kableExtra"
 ) %>%
-  kable_styling(latex_options = "HOLD_position", font_size = 7) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 6) %>%
   add_header_above(setNames(c(1, 5, 4), c(" ", panel_a_lbl, panel_b_lbl))) %>%
-  footnote(general = "Standard errors clustered by respondent. \\\\textit{Note:} Sample restricted to White / Asian / Hispanic respondents. Concordance is defined at the detailed race level: Asian respondents are matched at the sub-ethnicity level (Chinese / Indian). Asian respondents whose sub-ethnicity is not represented in the applicant pool (e.g., Korean, Japanese) are treated as always-discordant in nonblind, since the Asian applicant names are exclusively Chinese or Indian. Coefficients are flipped so positive $\\\\Rightarrow$ blinding raises the score for that concordance group relative to the nonblind outcome. ``Respondent Characteristics'' comprises age (with polynomial); gender, race, education, and income are absorbed as FE.",
+  row_spec(7, extra_latex_after = "\\midrule") %>%
+  footnote(general = c(
+             "Standard errors clustered by respondent.",
+             "\\\\textit{Note:} Concordance is defined at the detailed race level: Asian respondents are matched at the sub-ethnicity level (Chinese / Indian). Respondents whose race is not represented in the applicant pool (e.g., Black, Other; Korean / Japanese / other-Asian whose sub-ethnicity is not Chinese or Indian) are treated as always-discordant in nonblind.",
+             "Coefficients are flipped so positive $\\\\Rightarrow$ blinding raises the score for that concordance group relative to the nonblind outcome."
+           ),
            general_title = "", threeparttable = TRUE,
-           footnote_as_chunk = TRUE, escape = FALSE)
-
-cat("\\end{table}\n\n")
+           footnote_as_chunk = FALSE, escape = FALSE)
 
 rm(models_hr_bh_conc_race, models_eng_bh_conc_race, all_models,
    coef_map_conc, gof_custom_conc, flip_coef_signs, chk, nox, fe_rows,
@@ -429,7 +430,7 @@ models_hr_bh_conc_gender <- suppressMessages(suppressWarnings(
           i(blind_concordance_gender, ref = "Blind") +
           resp_age + I(resp_age^2) + I(resp_age^3)
         | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income,
-        data = firm_long_dt[role == "HR" & resp_gender %in% c("Male", "Female")],
+        data = firm_long_dt[role == "HR"],
         vcov = ~ responseid)
 ))
 names(models_hr_bh_conc_gender) <- c("Coding (Z)", "Fit (Z)", "Stay (Z)", "Overall (Z)", "Advance (0/1)")
@@ -439,7 +440,7 @@ models_eng_bh_conc_gender <- suppressMessages(suppressWarnings(
           i(blind_concordance_gender, ref = "Blind") +
           resp_age + I(resp_age^2) + I(resp_age^3)
         | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income,
-        data = firm_long_dt[role == "Eng" & resp_gender %in% c("Male", "Female")],
+        data = firm_long_dt[role == "Eng"],
         vcov = ~ responseid)
 ))
 names(models_eng_bh_conc_gender) <- c("Coding (Z)", "Fit (Z)", "Stay (Z)", "Overall (Z)")
@@ -459,9 +460,10 @@ coef_map_conc <- c(
 )
 
 gof_custom_conc <- tribble(
-  ~raw,        ~clean,          ~fmt,
-  "nobs",      "Observations",   0,
-  "r.squared", "R2",             3
+  ~raw,            ~clean,          ~fmt,
+  "nobs",          "Observations",   0,
+  "r.squared",     "R$^2$",          3,
+  "adj.r.squared", "Adj. R$^2$",     3
 )
 
 chk <- "\\checkmark"
@@ -477,14 +479,11 @@ fe_rows <- data.frame(
   stringsAsFactors = FALSE
 )
 
-n_hr_mf  <- uniqueN(firm_long_dt[role == "HR"  & resp_gender %in% c("Male","Female"), responseid])
-n_eng_mf <- uniqueN(firm_long_dt[role == "Eng" & resp_gender %in% c("Male","Female"), responseid])
+n_hr_mf  <- uniqueN(firm_long_dt[role == "HR"  & !is.na(blind_concordance_gender), responseid])
+n_eng_mf <- uniqueN(firm_long_dt[role == "Eng" & !is.na(blind_concordance_gender), responseid])
 
 panel_a_lbl <- paste0("Panel A: HR (N = ", n_hr_mf, ")")
 panel_b_lbl <- paste0("Panel B: Engineer (N = ", n_eng_mf, ")")
-
-cat("\\begin{table}[H]\n")
-cat("\\centering\n")
 
 modelsummary(
   all_models,
@@ -495,13 +494,16 @@ modelsummary(
   escape   = FALSE,
   output   = "kableExtra"
 ) %>%
-  kable_styling(latex_options = "HOLD_position", font_size = 7) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 6) %>%
   add_header_above(setNames(c(1, 5, 4), c(" ", panel_a_lbl, panel_b_lbl))) %>%
-  footnote(general = "Standard errors clustered by respondent. \\\\textit{Note:} Sample restricted to Male / Female respondents. Coefficients are flipped so positive $\\\\Rightarrow$ blinding raises the score for that concordance group relative to the nonblind outcome. ``Respondent Characteristics'' comprises age (with polynomial); gender, race, education, and income are absorbed as FE.",
+  row_spec(7, extra_latex_after = "\\midrule") %>%
+  footnote(general = c(
+             "Standard errors clustered by respondent.",
+             "\\\\textit{Note:} Respondents whose gender is not represented in the applicant pool (e.g., Non-binary, Other) are treated as always-discordant in nonblind, since the applicant names are exclusively Male or Female.",
+             "Coefficients are flipped so positive $\\\\Rightarrow$ blinding raises the score for that concordance group relative to the nonblind outcome."
+           ),
            general_title = "", threeparttable = TRUE,
-           footnote_as_chunk = TRUE, escape = FALSE)
-
-cat("\\end{table}\n\n")
+           footnote_as_chunk = FALSE, escape = FALSE)
 
 rm(models_hr_bh_conc_gender, models_eng_bh_conc_gender, all_models,
    coef_map_conc, gof_custom_conc, flip_coef_signs, chk, nox, fe_rows,
@@ -509,6 +511,7 @@ rm(models_hr_bh_conc_gender, models_eng_bh_conc_gender, all_models,
 ```
 
 
+\clearpage
 ## By Concordant Race and Gender
 
 ```{r bh_heterogeneity_concordance_broad, echo = FALSE, results = 'asis'}
@@ -531,7 +534,7 @@ models_hr_bh_conc_rg <- suppressMessages(suppressWarnings(
           i(blind_concordance_race_gender, ref = "Blind") +
           resp_age + I(resp_age^2) + I(resp_age^3)
         | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income,
-        data = firm_long_dt[role == "HR" & resp_race %in% c("White", "Asian", "Hispanic")],
+        data = firm_long_dt[role == "HR"],
         vcov = ~ responseid)
 ))
 names(models_hr_bh_conc_rg) <- c("Coding (Z)", "Fit (Z)", "Stay (Z)", "Overall (Z)", "Advance (0/1)")
@@ -541,7 +544,7 @@ models_eng_bh_conc_rg <- suppressMessages(suppressWarnings(
           i(blind_concordance_race_gender, ref = "Blind") +
           resp_age + I(resp_age^2) + I(resp_age^3)
         | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income,
-        data = firm_long_dt[role == "Eng" & resp_race %in% c("White", "Asian", "Hispanic")],
+        data = firm_long_dt[role == "Eng"],
         vcov = ~ responseid)
 ))
 names(models_eng_bh_conc_rg) <- c("Coding (Z)", "Fit (Z)", "Stay (Z)", "Overall (Z)")
@@ -560,9 +563,10 @@ coef_map_conc <- c(
 )
 
 gof_custom_conc <- tribble(
-  ~raw,        ~clean,          ~fmt,
-  "nobs",      "Observations",   0,
-  "r.squared", "R2",             3
+  ~raw,            ~clean,          ~fmt,
+  "nobs",          "Observations",   0,
+  "r.squared",     "R$^2$",          3,
+  "adj.r.squared", "Adj. R$^2$",     3
 )
 
 chk <- "\\checkmark"
@@ -578,14 +582,11 @@ fe_rows <- data.frame(
   stringsAsFactors = FALSE
 )
 
-n_hr_wah  <- uniqueN(firm_long_dt[role == "HR"  & resp_race %in% c("White","Asian","Hispanic"), responseid])
-n_eng_wah <- uniqueN(firm_long_dt[role == "Eng" & resp_race %in% c("White","Asian","Hispanic"), responseid])
+n_hr_wah  <- uniqueN(firm_long_dt[role == "HR"  & !is.na(blind_concordance_race_gender), responseid])
+n_eng_wah <- uniqueN(firm_long_dt[role == "Eng" & !is.na(blind_concordance_race_gender), responseid])
 
 panel_a_lbl <- paste0("Panel A: HR (N = ", n_hr_wah, ")")
 panel_b_lbl <- paste0("Panel B: Engineer (N = ", n_eng_wah, ")")
-
-cat("\\begin{table}[H]\n")
-cat("\\centering\n")
 
 modelsummary(
   all_models,
@@ -596,13 +597,16 @@ modelsummary(
   escape   = FALSE,
   output   = "kableExtra"
 ) %>%
-  kable_styling(latex_options = "HOLD_position", font_size = 7) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 6) %>%
   add_header_above(setNames(c(1, 5, 4), c(" ", panel_a_lbl, panel_b_lbl))) %>%
-  footnote(general = "Standard errors clustered by respondent. \\\\textit{Note:} Weaker concordance definition. Sample restricted to White / Asian / Hispanic respondents (no detailed Asian filter; Korean and Japanese respondents are kept as Asian and matched against Asian applicants). Concordance is defined as race-gender match at the broad level. Coefficients are flipped so positive $\\\\Rightarrow$ blinding raises the score for that concordance group relative to the nonblind outcome. ``Respondent Characteristics'' comprises age (with polynomial); gender, race, education, and income are absorbed as FE.",
+  row_spec(7, extra_latex_after = "\\midrule") %>%
+  footnote(general = c(
+             "Standard errors clustered by respondent.",
+             "\\\\textit{Note:} Concordance is defined as race-gender match at the broad level (Asian respondents are matched at the broad Asian level rather than by detailed sub-ethnicity). Respondents whose race or gender is not represented in the applicant pool (e.g., Black, Other; Non-binary, Other-gender) are treated as always-discordant in nonblind.",
+             "Coefficients are flipped so positive $\\\\Rightarrow$ blinding raises the score for that concordance group relative to the nonblind outcome."
+           ),
            general_title = "", threeparttable = TRUE,
-           footnote_as_chunk = TRUE, escape = FALSE)
-
-cat("\\end{table}\n\n")
+           footnote_as_chunk = FALSE, escape = FALSE)
 
 rm(models_hr_bh_conc_rg, models_eng_bh_conc_rg, all_models,
    coef_map_conc, gof_custom_conc, flip_coef_signs, chk, nox, fe_rows,
@@ -610,7 +614,7 @@ rm(models_hr_bh_conc_rg, models_eng_bh_conc_rg, all_models,
 ```
 
 
-## By Concordant Race and Gender (using detailed Asian categorization)
+## By Concordant Race and Gender (matched on detailed Asian Ethnicity)
 
 ```{r bh_heterogeneity_concordance_detailed, echo = FALSE, results = 'asis'}
 ## Uses the pre-built `concordance_race_gender_detailed_blind` factor from
@@ -654,9 +658,10 @@ coef_map_conc <- c(
 )
 
 gof_custom_conc <- tribble(
-  ~raw,        ~clean,          ~fmt,
-  "nobs",      "Observations",   0,
-  "r.squared", "R2",             3
+  ~raw,            ~clean,          ~fmt,
+  "nobs",          "Observations",   0,
+  "r.squared",     "R$^2$",          3,
+  "adj.r.squared", "Adj. R$^2$",     3
 )
 
 chk <- "\\checkmark"
@@ -678,9 +683,6 @@ n_eng_det <- uniqueN(firm_long_dt[role == "Eng" & !is.na(concordance_race_gender
 panel_a_lbl <- paste0("Panel A: HR (N = ", n_hr_det, ")")
 panel_b_lbl <- paste0("Panel B: Engineer (N = ", n_eng_det, ")")
 
-cat("\\begin{table}[H]\n")
-cat("\\centering\n")
-
 modelsummary(
   all_models,
   stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
@@ -690,13 +692,16 @@ modelsummary(
   escape   = FALSE,
   output   = "kableExtra"
 ) %>%
-  kable_styling(latex_options = "HOLD_position", font_size = 7) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 6) %>%
   add_header_above(setNames(c(1, 5, 4), c(" ", panel_a_lbl, panel_b_lbl))) %>%
-  footnote(general = "Standard errors clustered by respondent. \\\\textit{Note:} Concordance is defined at the detailed race-gender level: applicants are Chinese, Indian, White, or Hispanic (by gender). Asian respondents whose detailed sub-ethnicity is not represented in the applicant pool (e.g., Korean, Japanese) are treated as always-discordant in nonblind, since the Asian applicant names are exclusively Chinese or Indian. Coefficients are flipped so positive $\\\\Rightarrow$ blinding raises the score for that concordance group relative to the nonblind outcome. ``Respondent Characteristics'' comprises age (with polynomial); gender, race, education, and income are absorbed as FE.",
+  row_spec(7, extra_latex_after = "\\midrule") %>%
+  footnote(general = c(
+             "Standard errors clustered by respondent.",
+             "\\\\textit{Note:} Concordance is defined at the detailed race-gender level: applicants are Chinese, Indian, White, or Hispanic (by gender). Respondents whose detailed race-gender is not represented in the applicant pool (e.g., Korean / Japanese / other-Asian sub-ethnicities; Black, Other-race; Non-binary, Other-gender) are treated as always-discordant in nonblind.",
+             "Coefficients are flipped so positive $\\\\Rightarrow$ blinding raises the score for that concordance group relative to the nonblind outcome."
+           ),
            general_title = "", threeparttable = TRUE,
-           footnote_as_chunk = TRUE, escape = FALSE)
-
-cat("\\end{table}\n\n")
+           footnote_as_chunk = FALSE, escape = FALSE)
 
 rm(models_hr_bh_conc_det, models_eng_bh_conc_det, all_models,
    coef_map_conc, gof_custom_conc, flip_coef_signs, chk, nox, fe_rows,
