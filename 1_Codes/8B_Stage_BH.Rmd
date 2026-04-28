@@ -5,8 +5,10 @@ output:
     number_sections: true
 header-includes:
   - \usepackage{booktabs}
-  - \usepackage{threeparttable}  
-  - \usepackage{float}  
+  - \usepackage{threeparttable}
+  - \usepackage{float}
+  - \usepackage{bbm}
+  - \usepackage{array}
 geometry: margin=0.5in, landscape
 ---
 
@@ -18,11 +20,11 @@ knitr::opts_chunk$set(echo = TRUE)
 <!-- +++++ ++++++ ++++++ Part 5-2: Analysis (Stage-by-Stage Impact of Blind Hiring) +++++ ++++++ ++++++ -->
 
 
-# Impact of Blind Hiring on Evaluations
+# Treatment Effect on Evaluations
 
 ## On All Dimensions (Z)
 
-\textcolor{blue}{\textbf{Takeaway}}: Our experiment demonstrates that withholding demographic information \emph{reshuffles} candidates' relative evaluations across stages. In the HR resume-screening stage, Hispanic Male candidates are the largest losers: under blinding, their overall evaluation scores fall by 11.8\% of a standard deviation relative to when their identity is revealed (significant at the 5\% level). In the Engineer technical evaluation stage, the largest gainers are White Male candidates, whose scores rise by 8.5\% of a SD under blinding (significant at the 1\% level), while most other demographic groups lose ground. A standard caveat applies: because hiring is often an ordinal ranking problem --- where one candidate's gain necessarily corresponds to another candidate's lost opportunity --- the absence of statistical significance on a given row does not mean the corresponding group is unaffected by blinding.
+\textcolor{blue}{\textbf{Takeaway}}: Blinding demographic information \emph{reshuffles} candidates' relative evaluations. In the HR resume screening stage, Hispanic Male candidates are the largest losers: under blinding, their overall evaluation scores fall by \textcolor{blue}{11.5\%} of a standard deviation relative to when their identity is revealed. In the Engineer technical evaluation stage, the largest gainers are White Male candidates, whose scores rise by \textcolor{blue}{8.5\%} of a SD under blinding, while Hispanic Females' scores lose by \textcolor{blue}{6.9\%} of a SD. However, because hiring is often an ordinal ranking problem --- where one candidate's gain necessarily corresponds to another candidate's lost opportunity --- the absence of statistical significance on a given row does not mean the corresponding group is unaffected by blind hiring.
 
 ```{r blind_hiring_treatment_effects_demo, echo = FALSE, results = 'asis'}
 ## Treatment Effects of Blind Hiring
@@ -34,7 +36,7 @@ models_hr_blind <- suppressMessages(suppressWarnings(
   feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~
           i(race_gender, ref = "Blind") +
           resp_age + I(resp_age^2) + I(resp_age^3)
-        | resume_index + r_do_bythree + resp_gender + resp_race + s2_educ + s2_income,
+        | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income,
         data = firm_long_dt[role == "HR"], vcov = ~ responseid)
 ))
 names(models_hr_blind) <- c("Coding (Z)", "Fit (Z)", "Stay (Z)", "Overall (Z)", "Advance (0/1)")
@@ -44,7 +46,7 @@ models_eng_blind <- suppressMessages(suppressWarnings(
   feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~
           i(race_gender, ref = "Blind") +
           resp_age + I(resp_age^2) + I(resp_age^3)
-        | resume_index + r_do_bythree + resp_gender + resp_race + s2_educ + s2_income,
+        | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income,
         data = firm_long_dt[role == "Eng"], vcov = ~ responseid)
 ))
 names(models_eng_blind) <- c("Coding (Z)", "Fit (Z)", "Stay (Z)", "Overall (Z)")
@@ -133,13 +135,11 @@ modelsummary(
   kable_styling(latex_options = "HOLD_position", font_size = 7)
 
 cat("\\end{minipage}\n")
+cat("\\par\\vspace{0.4em}\n")
+cat("\\noindent\\begin{minipage}{0.96\\textwidth}\\scriptsize\n")
+cat("\\textit{Standard errors clustered by respondent.} \\textit{Note on Interpreting Coefficients:} The underlying regression uses Blind resumes as the reference category, so raw coefficients capture (nonblind $-$ blind) or the effect of being blinded for each demographic on standardized overall evaluation scores. We then multiply by $-1$ to report (blind $-$ nonblind), aligning the sign convention with the standard \"effect of blinding\" framing. positive coefficient $\\Rightarrow$ blinding raises the score for that demographic.\n")
+cat("\\end{minipage}\n")
 cat("\\end{table}\n\n")
-
-cat("\\vspace{-0.2cm}\n\n")
-cat("\\scriptsize\n\n")
-cat("\\textit{Standard errors clustered by respondent.}\n\n")
-cat("\\textit{Note on Interpreting Coefficients:} The underlying regression uses Blind resumes as the reference category, so raw coefficients capture (nonblind $-$ blind) or the effect of being blinded for each demographic on relative overall evaluation scores. We then multiply by $-1$ to report (blind $-$ nonblind), aligning the sign convention with the standard \"effect of blinding\" framing: positive $\\Rightarrow$ blinding raises the relative score for that demographic. \"Respondent Characteristics\" comprises age (with polynomial), gender, race, education, and income.\n\n")
-cat("\\normalsize\n\n")
 
 ## Clean up
 rm(models_hr_blind, models_eng_blind, coef_map_blind, gof_custom_blind, flip_coef_signs,
@@ -147,46 +147,221 @@ rm(models_hr_blind, models_eng_blind, coef_map_blind, gof_custom_blind, flip_coe
 ```
 
 
+\newpage
 ## Does Blinding Lead to More Accurate Coding Evaluations?
 
 \textcolor{blue}{\textbf{Takeaway}}: Evaluators do extract signal about candidates' actual coding ability --- Engineers much more strongly than HR, consistent with Engineers seeing the code while HR sees only the resume. Blinding, however, does \emph{not} meaningfully change this signal-extraction ability in either role: the $\texttt{true\_coding\_z} \times \texttt{blind}$ interaction is small, negative, and statistically insignificant for both HR and Engineers. If blinding --- which in our experiment amounts to removing random, uninformative demographic noise --- improved signal-extraction ability, we would expect a positive and statistically significant interaction term. In short, blinding \emph{reshuffles} who receives high scores (Section 1.1) but does not change \emph{how well} those scores track actual coding skill.
 
-\textcolor{blue}{\textbf{Specification}}: For each role, we fit
+\textcolor{blue}{\textbf{Specification}}: For each role $\in \{\text{HR}, \text{Engineer}\}$, we fit
 $$
-\text{Hiring Evaluation Score (Z)} \sim \text{True Coding Ability (Z)} \times \mathbb{1}[\text{Blind}] \mid \text{Respondent FE} + \text{Display Position FE}.
+\text{Hiring Evaluation Score (Z)} \sim \text{True Coding Ability (Z)} \times \mathbbm{1}[\text{Blind arm}] \mid \text{Respondent FE} + \text{Display Position FE}.
 $$
-The main slope on True Coding Ability (Z) is the evaluator's signal sensitivity in the non-blind arm; the interaction is the shift in sensitivity under blinding. Resume-content FE is deliberately absent, because True Coding Ability (Z) is constant within a resume (one lab-measured score per resume) and a resume FE would absorb the RHS entirely.
+
+In each of the four cells we test two nulls:
+
+\begin{itemize}
+    \item $H_0\!: \beta = 0$ --- the evaluator extracts \emph{no signal} from true coding ability.
+    \item $H_0\!: \beta = 1$ --- the evaluator is \emph{perfectly calibrated}: a $1$ SD rise in true ability produces exactly a $1$ SD rise in the rating, with no shrinkage.
+\end{itemize}
+
+\noindent Running both tests separately by arm reveals whether blinding changes the evaluator's calibration, not merely whether signal is extracted at all.
 
 ```{r blind_hiring_signal_extraction, echo = FALSE, results = 'asis'}
 ## Pooled z-score of the lab coding score (constant within resume_index)
 firm_long_dt[, true_coding_z := (overall_score - mean(overall_score, na.rm = TRUE)) /
                                   sd(overall_score, na.rm = TRUE)]
 
-## HR and Engineer, same spec
-## Note: respondent-level controls (age polynomial, gender, race, educ, income)
-## are all perfectly collinear with responseid FE, so they are absorbed rather
-## than separately identified. We drop them from the formula to keep the
-## reported FE footer honest.
-m_hr_sig <- suppressMessages(suppressWarnings(
+## Two pooled interacted regressions --- one per role. Since treat is
+## between-respondent, responseid FE absorbs the main effect of treat but
+## leaves both the main slope on true_coding_z (identified from within-
+## respondent variation, by definition the nonblind arm's slope since
+## nonblind is the reference) and the interaction slope identifiable.
+m_hr  <- suppressMessages(suppressWarnings(
   feols(sc_coding_z ~ true_coding_z * i(treat, ref = "nonblind")
-        | responseid + r_do_bythree,
-        data = firm_long_dt[role == "HR"], vcov = ~ responseid)
+        | responseid + r_do,
+        data = firm_long_dt[role == "HR"],
+        vcov = ~ responseid)
+))
+m_eng <- suppressMessages(suppressWarnings(
+  feols(sc_coding_z ~ true_coding_z * i(treat, ref = "nonblind")
+        | responseid + r_do,
+        data = firm_long_dt[role == "Eng"],
+        vcov = ~ responseid)
 ))
 
-m_eng_sig <- suppressMessages(suppressWarnings(
-  feols(sc_coding_z ~ true_coding_z * i(treat, ref = "nonblind")
-        | responseid + r_do_bythree,
-        data = firm_long_dt[role == "Eng"], vcov = ~ responseid)
-))
+## Extract arm-specific slopes, SEs, and the four tests (H0: beta = 0 / 1
+## for each arm) from a single pooled model. beta_nonblind = main coef;
+## beta_blind = main + interaction; SE(beta_blind) via linear-combination
+## formula using the full vcov matrix.
+extract_stats <- function(m) {
+  ct    <- coeftable(m)
+  V     <- vcov(m)
+  main_name <- "true_coding_z"
+  int_name  <- "true_coding_z:treat::blind"
 
-models_sig <- list("HR" = m_hr_sig, "Engineer" = m_eng_sig)
+  b_main <- ct[main_name, "Estimate"]
+  s_main <- ct[main_name, "Std. Error"]
+  b_int  <- ct[int_name,  "Estimate"]
+  s_int  <- ct[int_name,  "Std. Error"]
+  cov_mi <- V[main_name, int_name]
 
-coef_map_sig <- c(
-  "true_coding_z"              = "True Coding Score (Z)",
-  "true_coding_z:treat::blind" = "True Coding Score (Z) $\\times$ Blind"
+  b_nb <- b_main
+  s_nb <- s_main
+  b_b  <- b_main + b_int
+  s_b  <- sqrt(s_main^2 + s_int^2 + 2 * cov_mi)
+
+  pval <- function(t) 2 * (1 - pnorm(abs(t)))
+  p_nb_0 <- pval(b_nb / s_nb)
+  p_nb_1 <- pval((b_nb - 1) / s_nb)
+  p_b_0  <- pval(b_b  / s_b)
+  p_b_1  <- pval((b_b  - 1) / s_b)
+  ## H0: beta_blind = beta_nonblind is the same as H0: beta_interaction = 0,
+  ## so we read its p-value directly off the interaction coefficient.
+  p_eq   <- ct[int_name, 4]
+
+  fs <- fitstat(m, c("r2", "ar2"), simplify = TRUE)
+  list(b_nb = unname(b_nb), s_nb = unname(s_nb),
+       b_b  = unname(b_b),  s_b  = unname(s_b),
+       p_nb_0 = p_nb_0, p_nb_1 = p_nb_1,
+       p_b_0  = p_b_0,  p_b_1  = p_b_1,
+       p_eq   = unname(p_eq),
+       n = m$nobs, r2 = unname(fs["r2"]), ar2 = unname(fs["ar2"]))
+}
+
+s_hr  <- extract_stats(m_hr)
+s_eng <- extract_stats(m_eng)
+
+## Formatting helpers.
+sig_stars <- function(p) {
+  if (is.na(p))        ""
+  else if (p < 0.01)   "***"
+  else if (p < 0.05)   "**"
+  else if (p < 0.10)   "*"
+  else                 ""
+}
+fmt_p <- function(p) {
+  if (is.na(p)) return("")
+  pstr <- if (p < 0.001) "$<\\!0.001$" else sprintf("%.3f", p)
+  paste0("p = ", pstr, sig_stars(p))
+}
+
+chk <- "\\checkmark"
+nox <- "$\\times$"
+
+cell_col <- function(s) c(
+  sprintf("%.3f~(%.3f)", s$b_nb, s$s_nb),
+  sprintf("%.3f~(%.3f)", s$b_b,  s$s_b),
+  fmt_p(s$p_nb_0),
+  fmt_p(s$p_nb_1),
+  fmt_p(s$p_b_0),
+  fmt_p(s$p_b_1),
+  fmt_p(s$p_eq),
+  format(s$n,   big.mark = ","),
+  sprintf("%.3f", s$r2),
+  sprintf("%.3f", s$ar2),
+  nox, chk, chk, nox
 )
 
-gof_custom_sig <- tribble(
+tbl <- data.frame(
+  lbl = c("$\\hat\\beta_{\\text{nonblind}}$ (slope, nonblind arm)",
+          "$\\hat\\beta_{\\text{blind}}$ (slope, blind arm)",
+          "$H_0\\!: \\beta_{\\text{nonblind}} = 0$",
+          "$H_0\\!: \\beta_{\\text{nonblind}} = 1$",
+          "$H_0\\!: \\beta_{\\text{blind}} = 0$",
+          "$H_0\\!: \\beta_{\\text{blind}} = 1$",
+          "$H_0\\!: \\beta_{\\text{blind}} = \\beta_{\\text{nonblind}}$",
+          "Observations",
+          "$R^2$",
+          "Adj. $R^2$",
+          "Resume (Content) FE",
+          "Display Position FE",
+          "Respondent FE",
+          "Respondent Characteristics"),
+  HR  = cell_col(s_hr),
+  Eng = cell_col(s_eng),
+  stringsAsFactors = FALSE,
+  check.names = FALSE
+)
+names(tbl) <- c(" ", "HR", "Engineer")
+
+cat("\\begin{table}[H]\n")
+cat("\\centering\n")
+
+kable(tbl, format = "latex", booktabs = TRUE, escape = FALSE,
+      align = "lcc", row.names = FALSE) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 8) %>%
+  row_spec(2, extra_latex_after = "\\midrule") %>%
+  row_spec(7, extra_latex_after = "\\midrule") %>%
+  footnote(general = "Cluster-robust standard errors (by respondent) shown in parentheses next to each $\\\\hat\\\\beta$. Stars on p-values: * $p<0.10$, ** $p<0.05$, *** $p<0.01$. \\\\textit{Note:} Both arm-specific slopes come from a single pooled interacted regression per role, \\\\texttt{sc\\\\_coding\\\\_z \\\\textasciitilde\\\\ true\\\\_coding\\\\_z * i(treat, ref = 'nonblind') | responseid + r\\\\_do}; $\\\\hat\\\\beta_{\\\\text{nonblind}}$ is read off the main coefficient, and $\\\\hat\\\\beta_{\\\\text{blind}}$ is computed as (main + interaction) with SE derived via the standard linear-combination formula using the estimated variance--covariance matrix. The ``Resume (Content) FE'' row is marked as not included because $\\\\texttt{overall\\\\_score}$ is a resume-level property (one lab score per resume), so a resume-content FE would absorb the RHS and leave the main slope unidentified. ``Respondent Characteristics'' is marked as not included because respondent-level variables (age, gender, race, education, income) are all perfectly collinear with the respondent FE and therefore absorbed by it.",
+           general_title = "", threeparttable = TRUE,
+           footnote_as_chunk = TRUE, escape = FALSE)
+
+cat("\\end{table}\n\n")
+
+rm(m_hr, m_eng, s_hr, s_eng,
+   extract_stats, sig_stars, fmt_p, cell_col,
+   chk, nox, tbl)
+```
+
+
+\clearpage
+# Treatment Effect: Heterogeneity by Demographics
+
+\textcolor{blue}{\textbf{Takeaway}}: For HR, the effect of blinding does not vary with respondent--applicant demographic concordance. For Engineers, heterogeneity in the treatment effect emerges as the concordance definition tightens. On detailed race--gender, the finest cut of own-group similarity, blinding raises concordant applicants' Overall scores while reducing the nonconcordant group's scores. Concretely: candidates with concordant race and gender profiles gain 7.1\% of a SD, and those with nonconcordant profiles lose 1.1\% of a SD, on their evaluation scores under blinding. This is consistent with the earlier finding in \texttt{8A\_Preferences.pdf} \S2 that Engineers in our sample penalize candidates who match them on race and gender --- a pattern driven mainly by White Male Engineers' assignment of a premium to non-White candidates.
+
+## By Concordant Race
+
+```{r bh_heterogeneity_concordance_race, echo = FALSE, results = 'asis'}
+## Tri-level variable: Blind / Nonblind-Concordant / Nonblind-Nonconcordant
+## Use detailed-race concordance: Asian respondents are matched at the
+## sub-ethnicity level (Chinese / Indian). Korean / Japanese / other-Asian
+## respondents in nonblind are coded as always-discordant in 5_Cleaning.R,
+## so they remain in the regression rather than being dropped.
+firm_long_dt[, blind_concordance_race := fcase(
+  treat == "blind",                                     "Blind",
+  treat == "nonblind" & concordance_race_detailed == 1, "Nonblind_Concordant",
+  treat == "nonblind" & concordance_race_detailed == 0, "Nonblind_Nonconcordant",
+  default = NA_character_
+)]
+firm_long_dt[, blind_concordance_race := factor(blind_concordance_race,
+  levels = c("Blind", "Nonblind_Concordant", "Nonblind_Nonconcordant"))]
+
+## HR and Engineer regressions — same FE skeleton as Section 1.1
+models_hr_bh_conc_race <- suppressMessages(suppressWarnings(
+  feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~
+          i(blind_concordance_race, ref = "Blind") +
+          resp_age + I(resp_age^2) + I(resp_age^3)
+        | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income,
+        data = firm_long_dt[role == "HR" & resp_race %in% c("White", "Asian", "Hispanic")],
+        vcov = ~ responseid)
+))
+names(models_hr_bh_conc_race) <- c("Coding (Z)", "Fit (Z)", "Stay (Z)", "Overall (Z)", "Advance (0/1)")
+
+models_eng_bh_conc_race <- suppressMessages(suppressWarnings(
+  feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~
+          i(blind_concordance_race, ref = "Blind") +
+          resp_age + I(resp_age^2) + I(resp_age^3)
+        | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income,
+        data = firm_long_dt[role == "Eng" & resp_race %in% c("White", "Asian", "Hispanic")],
+        vcov = ~ responseid)
+))
+names(models_eng_bh_conc_race) <- c("Coding (Z)", "Fit (Z)", "Stay (Z)", "Overall (Z)")
+
+flip_coef_signs <- function(model) { model$coefficients <- -1 * model$coefficients; return(model) }
+models_hr_bh_conc_race  <- lapply(models_hr_bh_conc_race,  flip_coef_signs)
+models_eng_bh_conc_race <- lapply(models_eng_bh_conc_race, flip_coef_signs)
+
+## Combine into one model list for a single wide table.
+all_models <- c(models_hr_bh_conc_race, models_eng_bh_conc_race)
+names(all_models) <- c("Coding", "Fit", "Stay", "Overall", "Advance",
+                       "Coding ", "Fit ", "Stay ", "Overall ")  # trailing space disambiguator
+
+coef_map_conc <- c(
+  "blind_concordance_race::Nonblind_Concordant"    = "Effect of Blinding on Concordant Applicant",
+  "blind_concordance_race::Nonblind_Nonconcordant" = "Effect of Blinding on Nonconcordant Applicant"
+)
+
+gof_custom_conc <- tribble(
   ~raw,        ~clean,          ~fmt,
   "nobs",      "Observations",   0,
   "r.squared", "R2",             3
@@ -194,44 +369,1373 @@ gof_custom_sig <- tribble(
 
 chk <- "\\checkmark"
 nox <- "$\\times$"
-fe_rows_sig <- data.frame(
-  c("Resume (Content) FE", "Display Position FE", "Respondent FE", "Respondent Characteristics"),
-  c(nox, chk, chk, nox),
-  c(nox, chk, chk, nox),
+fe_rows <- data.frame(
+  term = c("Resume (Content) FE", "Display Position FE",
+           "Respondent FE", "Respondent Characteristics"),
+  V1 = c(chk, chk, nox, chk), V2 = c(chk, chk, nox, chk),
+  V3 = c(chk, chk, nox, chk), V4 = c(chk, chk, nox, chk),
+  V5 = c(chk, chk, nox, chk), V6 = c(chk, chk, nox, chk),
+  V7 = c(chk, chk, nox, chk), V8 = c(chk, chk, nox, chk),
+  V9 = c(chk, chk, nox, chk),
   stringsAsFactors = FALSE
 )
-names(fe_rows_sig) <- c("term", "HR", "Engineer")
+
+n_hr_wah  <- uniqueN(firm_long_dt[role == "HR"  & resp_race %in% c("White","Asian","Hispanic"), responseid])
+n_eng_wah <- uniqueN(firm_long_dt[role == "Eng" & resp_race %in% c("White","Asian","Hispanic"), responseid])
+
+panel_a_lbl <- paste0("Panel A: HR (N = ", n_hr_wah, ")")
+panel_b_lbl <- paste0("Panel B: Engineer (N = ", n_eng_wah, ")")
 
 cat("\\begin{table}[H]\n")
 cat("\\centering\n")
 
 modelsummary(
-  models_sig,
+  all_models,
   stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
-  coef_map = coef_map_sig,
-  gof_map = gof_custom_sig,
-  add_rows = fe_rows_sig,
-  escape = FALSE,
-  output = "kableExtra",
-  table.attr = "style='width:70%;'"
+  coef_map = coef_map_conc,
+  gof_map  = gof_custom_conc,
+  add_rows = fe_rows,
+  escape   = FALSE,
+  output   = "kableExtra"
 ) %>%
-  kable_styling(latex_options = "HOLD_position", font_size = 8)
+  kable_styling(latex_options = "HOLD_position", font_size = 7) %>%
+  add_header_above(setNames(c(1, 5, 4), c(" ", panel_a_lbl, panel_b_lbl))) %>%
+  footnote(general = "Standard errors clustered by respondent. \\\\textit{Note:} Sample restricted to White / Asian / Hispanic respondents. Concordance is defined at the detailed race level: Asian respondents are matched at the sub-ethnicity level (Chinese / Indian). Asian respondents whose sub-ethnicity is not represented in the applicant pool (e.g., Korean, Japanese) are treated as always-discordant in nonblind, since the Asian applicant names are exclusively Chinese or Indian. Coefficients are flipped so positive $\\\\Rightarrow$ blinding raises the score for that concordance group relative to the nonblind outcome. ``Respondent Characteristics'' comprises age (with polynomial); gender, race, education, and income are absorbed as FE.",
+           general_title = "", threeparttable = TRUE,
+           footnote_as_chunk = TRUE, escape = FALSE)
 
 cat("\\end{table}\n\n")
 
-cat("\\vspace{-0.2cm}\n\n")
-cat("\\scriptsize\n\n")
-cat("\\textit{Standard errors clustered by respondent.}\n\n")
-cat("\\textit{Note on Interpreting Coefficients:} The main slope on \"True Coding Score (Z)\" is the evaluator's signal sensitivity in the non-blind arm --- a 1 SD increase in actual coding ability maps into a $\\hat\\beta$ SD increase in the assigned coding rating. The interaction row is the shift in that sensitivity under blinding: positive $\\Rightarrow$ blinding sharpens rating-to-truth tracking, negative $\\Rightarrow$ blinding dulls it. The \"Resume (Content) FE\" row is marked as not included because $\\texttt{overall\\_score}$ is a resume-level property (one lab score per resume), so a resume-content FE would absorb the RHS and leave the main slope unidentified. \"Respondent Characteristics\" is marked as not included because respondent-level variables (age, gender, race, education, income) are all perfectly collinear with the respondent FE and therefore absorbed by it.\n\n")
-cat("\\normalsize\n\n")
+rm(models_hr_bh_conc_race, models_eng_bh_conc_race, all_models,
+   coef_map_conc, gof_custom_conc, flip_coef_signs, chk, nox, fe_rows,
+   n_hr_wah, n_eng_wah, panel_a_lbl, panel_b_lbl)
+```
 
-rm(m_hr_sig, m_eng_sig, models_sig, coef_map_sig, gof_custom_sig,
-   chk, nox, fe_rows_sig)
+
+## By Concordant Gender
+
+```{r bh_heterogeneity_concordance_gender, echo = FALSE, results = 'asis'}
+firm_long_dt[, blind_concordance_gender := fcase(
+  treat == "blind",                              "Blind",
+  treat == "nonblind" & concordance_gender == 1, "Nonblind_Concordant",
+  treat == "nonblind" & concordance_gender == 0, "Nonblind_Nonconcordant",
+  default = NA_character_
+)]
+firm_long_dt[, blind_concordance_gender := factor(blind_concordance_gender,
+  levels = c("Blind", "Nonblind_Concordant", "Nonblind_Nonconcordant"))]
+
+models_hr_bh_conc_gender <- suppressMessages(suppressWarnings(
+  feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~
+          i(blind_concordance_gender, ref = "Blind") +
+          resp_age + I(resp_age^2) + I(resp_age^3)
+        | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income,
+        data = firm_long_dt[role == "HR" & resp_gender %in% c("Male", "Female")],
+        vcov = ~ responseid)
+))
+names(models_hr_bh_conc_gender) <- c("Coding (Z)", "Fit (Z)", "Stay (Z)", "Overall (Z)", "Advance (0/1)")
+
+models_eng_bh_conc_gender <- suppressMessages(suppressWarnings(
+  feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~
+          i(blind_concordance_gender, ref = "Blind") +
+          resp_age + I(resp_age^2) + I(resp_age^3)
+        | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income,
+        data = firm_long_dt[role == "Eng" & resp_gender %in% c("Male", "Female")],
+        vcov = ~ responseid)
+))
+names(models_eng_bh_conc_gender) <- c("Coding (Z)", "Fit (Z)", "Stay (Z)", "Overall (Z)")
+
+flip_coef_signs <- function(model) { model$coefficients <- -1 * model$coefficients; return(model) }
+models_hr_bh_conc_gender  <- lapply(models_hr_bh_conc_gender,  flip_coef_signs)
+models_eng_bh_conc_gender <- lapply(models_eng_bh_conc_gender, flip_coef_signs)
+
+## Combine into one model list for a single wide table.
+all_models <- c(models_hr_bh_conc_gender, models_eng_bh_conc_gender)
+names(all_models) <- c("Coding", "Fit", "Stay", "Overall", "Advance",
+                       "Coding ", "Fit ", "Stay ", "Overall ")
+
+coef_map_conc <- c(
+  "blind_concordance_gender::Nonblind_Concordant"    = "Effect of Blinding on Concordant Applicant",
+  "blind_concordance_gender::Nonblind_Nonconcordant" = "Effect of Blinding on Nonconcordant Applicant"
+)
+
+gof_custom_conc <- tribble(
+  ~raw,        ~clean,          ~fmt,
+  "nobs",      "Observations",   0,
+  "r.squared", "R2",             3
+)
+
+chk <- "\\checkmark"
+nox <- "$\\times$"
+fe_rows <- data.frame(
+  term = c("Resume (Content) FE", "Display Position FE",
+           "Respondent FE", "Respondent Characteristics"),
+  V1 = c(chk, chk, nox, chk), V2 = c(chk, chk, nox, chk),
+  V3 = c(chk, chk, nox, chk), V4 = c(chk, chk, nox, chk),
+  V5 = c(chk, chk, nox, chk), V6 = c(chk, chk, nox, chk),
+  V7 = c(chk, chk, nox, chk), V8 = c(chk, chk, nox, chk),
+  V9 = c(chk, chk, nox, chk),
+  stringsAsFactors = FALSE
+)
+
+n_hr_mf  <- uniqueN(firm_long_dt[role == "HR"  & resp_gender %in% c("Male","Female"), responseid])
+n_eng_mf <- uniqueN(firm_long_dt[role == "Eng" & resp_gender %in% c("Male","Female"), responseid])
+
+panel_a_lbl <- paste0("Panel A: HR (N = ", n_hr_mf, ")")
+panel_b_lbl <- paste0("Panel B: Engineer (N = ", n_eng_mf, ")")
+
+cat("\\begin{table}[H]\n")
+cat("\\centering\n")
+
+modelsummary(
+  all_models,
+  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  coef_map = coef_map_conc,
+  gof_map  = gof_custom_conc,
+  add_rows = fe_rows,
+  escape   = FALSE,
+  output   = "kableExtra"
+) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 7) %>%
+  add_header_above(setNames(c(1, 5, 4), c(" ", panel_a_lbl, panel_b_lbl))) %>%
+  footnote(general = "Standard errors clustered by respondent. \\\\textit{Note:} Sample restricted to Male / Female respondents. Coefficients are flipped so positive $\\\\Rightarrow$ blinding raises the score for that concordance group relative to the nonblind outcome. ``Respondent Characteristics'' comprises age (with polynomial); gender, race, education, and income are absorbed as FE.",
+           general_title = "", threeparttable = TRUE,
+           footnote_as_chunk = TRUE, escape = FALSE)
+
+cat("\\end{table}\n\n")
+
+rm(models_hr_bh_conc_gender, models_eng_bh_conc_gender, all_models,
+   coef_map_conc, gof_custom_conc, flip_coef_signs, chk, nox, fe_rows,
+   n_hr_mf, n_eng_mf, panel_a_lbl, panel_b_lbl)
+```
+
+
+## By Concordant Race and Gender
+
+```{r bh_heterogeneity_concordance_broad, echo = FALSE, results = 'asis'}
+## Weaker-concordance robustness check: race-gender match at the broad level.
+## Asian respondents (regardless of detailed sub-group: Chinese, Indian,
+## Korean, Japanese, etc.) match Asian applicants. Uses the pre-built
+## `concordance_race_gender` (= 1 if race_gender == resp_race_gender at the
+## {White, Asian, Hispanic} x {Male, Female} level).
+firm_long_dt[, blind_concordance_race_gender := fcase(
+  treat == "blind",                                   "Blind",
+  treat == "nonblind" & concordance_race_gender == 1, "Nonblind_Concordant",
+  treat == "nonblind" & concordance_race_gender == 0, "Nonblind_Nonconcordant",
+  default = NA_character_
+)]
+firm_long_dt[, blind_concordance_race_gender := factor(blind_concordance_race_gender,
+  levels = c("Blind", "Nonblind_Concordant", "Nonblind_Nonconcordant"))]
+
+models_hr_bh_conc_rg <- suppressMessages(suppressWarnings(
+  feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~
+          i(blind_concordance_race_gender, ref = "Blind") +
+          resp_age + I(resp_age^2) + I(resp_age^3)
+        | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income,
+        data = firm_long_dt[role == "HR" & resp_race %in% c("White", "Asian", "Hispanic")],
+        vcov = ~ responseid)
+))
+names(models_hr_bh_conc_rg) <- c("Coding (Z)", "Fit (Z)", "Stay (Z)", "Overall (Z)", "Advance (0/1)")
+
+models_eng_bh_conc_rg <- suppressMessages(suppressWarnings(
+  feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~
+          i(blind_concordance_race_gender, ref = "Blind") +
+          resp_age + I(resp_age^2) + I(resp_age^3)
+        | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income,
+        data = firm_long_dt[role == "Eng" & resp_race %in% c("White", "Asian", "Hispanic")],
+        vcov = ~ responseid)
+))
+names(models_eng_bh_conc_rg) <- c("Coding (Z)", "Fit (Z)", "Stay (Z)", "Overall (Z)")
+
+flip_coef_signs <- function(model) { model$coefficients <- -1 * model$coefficients; return(model) }
+models_hr_bh_conc_rg  <- lapply(models_hr_bh_conc_rg,  flip_coef_signs)
+models_eng_bh_conc_rg <- lapply(models_eng_bh_conc_rg, flip_coef_signs)
+
+all_models <- c(models_hr_bh_conc_rg, models_eng_bh_conc_rg)
+names(all_models) <- c("Coding", "Fit", "Stay", "Overall", "Advance",
+                       "Coding ", "Fit ", "Stay ", "Overall ")
+
+coef_map_conc <- c(
+  "blind_concordance_race_gender::Nonblind_Concordant"    = "Effect of Blinding on Concordant Applicant",
+  "blind_concordance_race_gender::Nonblind_Nonconcordant" = "Effect of Blinding on Nonconcordant Applicant"
+)
+
+gof_custom_conc <- tribble(
+  ~raw,        ~clean,          ~fmt,
+  "nobs",      "Observations",   0,
+  "r.squared", "R2",             3
+)
+
+chk <- "\\checkmark"
+nox <- "$\\times$"
+fe_rows <- data.frame(
+  term = c("Resume (Content) FE", "Display Position FE",
+           "Respondent FE", "Respondent Characteristics"),
+  V1 = c(chk, chk, nox, chk), V2 = c(chk, chk, nox, chk),
+  V3 = c(chk, chk, nox, chk), V4 = c(chk, chk, nox, chk),
+  V5 = c(chk, chk, nox, chk), V6 = c(chk, chk, nox, chk),
+  V7 = c(chk, chk, nox, chk), V8 = c(chk, chk, nox, chk),
+  V9 = c(chk, chk, nox, chk),
+  stringsAsFactors = FALSE
+)
+
+n_hr_wah  <- uniqueN(firm_long_dt[role == "HR"  & resp_race %in% c("White","Asian","Hispanic"), responseid])
+n_eng_wah <- uniqueN(firm_long_dt[role == "Eng" & resp_race %in% c("White","Asian","Hispanic"), responseid])
+
+panel_a_lbl <- paste0("Panel A: HR (N = ", n_hr_wah, ")")
+panel_b_lbl <- paste0("Panel B: Engineer (N = ", n_eng_wah, ")")
+
+cat("\\begin{table}[H]\n")
+cat("\\centering\n")
+
+modelsummary(
+  all_models,
+  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  coef_map = coef_map_conc,
+  gof_map  = gof_custom_conc,
+  add_rows = fe_rows,
+  escape   = FALSE,
+  output   = "kableExtra"
+) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 7) %>%
+  add_header_above(setNames(c(1, 5, 4), c(" ", panel_a_lbl, panel_b_lbl))) %>%
+  footnote(general = "Standard errors clustered by respondent. \\\\textit{Note:} Weaker concordance definition. Sample restricted to White / Asian / Hispanic respondents (no detailed Asian filter; Korean and Japanese respondents are kept as Asian and matched against Asian applicants). Concordance is defined as race-gender match at the broad level. Coefficients are flipped so positive $\\\\Rightarrow$ blinding raises the score for that concordance group relative to the nonblind outcome. ``Respondent Characteristics'' comprises age (with polynomial); gender, race, education, and income are absorbed as FE.",
+           general_title = "", threeparttable = TRUE,
+           footnote_as_chunk = TRUE, escape = FALSE)
+
+cat("\\end{table}\n\n")
+
+rm(models_hr_bh_conc_rg, models_eng_bh_conc_rg, all_models,
+   coef_map_conc, gof_custom_conc, flip_coef_signs, chk, nox, fe_rows,
+   n_hr_wah, n_eng_wah, panel_a_lbl, panel_b_lbl)
+```
+
+
+## By Concordant Race and Gender (using detailed Asian categorization)
+
+```{r bh_heterogeneity_concordance_detailed, echo = FALSE, results = 'asis'}
+## Uses the pre-built `concordance_race_gender_detailed_blind` factor from
+## 5_Cleaning.R. Asian respondents whose detailed sub-ethnicity (e.g.,
+## Korean, Japanese) is not represented in the applicant pool are coded as
+## always-discordant in nonblind, so they are kept in the regression rather
+## than dropped.
+
+models_hr_bh_conc_det <- suppressMessages(suppressWarnings(
+  feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z, sc_advance) ~
+          i(concordance_race_gender_detailed_blind, ref = "Blind") +
+          resp_age + I(resp_age^2) + I(resp_age^3)
+        | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income,
+        data = firm_long_dt[role == "HR"],
+        vcov = ~ responseid)
+))
+names(models_hr_bh_conc_det) <- c("Coding (Z)", "Fit (Z)", "Stay (Z)", "Overall (Z)", "Advance (0/1)")
+
+models_eng_bh_conc_det <- suppressMessages(suppressWarnings(
+  feols(c(sc_coding_z, sc_fit_z, sc_stay_z, sc_overall_z) ~
+          i(concordance_race_gender_detailed_blind, ref = "Blind") +
+          resp_age + I(resp_age^2) + I(resp_age^3)
+        | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income,
+        data = firm_long_dt[role == "Eng"],
+        vcov = ~ responseid)
+))
+names(models_eng_bh_conc_det) <- c("Coding (Z)", "Fit (Z)", "Stay (Z)", "Overall (Z)")
+
+flip_coef_signs <- function(model) { model$coefficients <- -1 * model$coefficients; return(model) }
+models_hr_bh_conc_det  <- lapply(models_hr_bh_conc_det,  flip_coef_signs)
+models_eng_bh_conc_det <- lapply(models_eng_bh_conc_det, flip_coef_signs)
+
+## Combine into one model list for a single wide table.
+all_models <- c(models_hr_bh_conc_det, models_eng_bh_conc_det)
+names(all_models) <- c("Coding", "Fit", "Stay", "Overall", "Advance",
+                       "Coding ", "Fit ", "Stay ", "Overall ")
+
+coef_map_conc <- c(
+  "concordance_race_gender_detailed_blind::Concordant_Group" = "Effect of Blinding on Concordant Applicant",
+  "concordance_race_gender_detailed_blind::Discordant_Group" = "Effect of Blinding on Nonconcordant Applicant"
+)
+
+gof_custom_conc <- tribble(
+  ~raw,        ~clean,          ~fmt,
+  "nobs",      "Observations",   0,
+  "r.squared", "R2",             3
+)
+
+chk <- "\\checkmark"
+nox <- "$\\times$"
+fe_rows <- data.frame(
+  term = c("Resume (Content) FE", "Display Position FE",
+           "Respondent FE", "Respondent Characteristics"),
+  V1 = c(chk, chk, nox, chk), V2 = c(chk, chk, nox, chk),
+  V3 = c(chk, chk, nox, chk), V4 = c(chk, chk, nox, chk),
+  V5 = c(chk, chk, nox, chk), V6 = c(chk, chk, nox, chk),
+  V7 = c(chk, chk, nox, chk), V8 = c(chk, chk, nox, chk),
+  V9 = c(chk, chk, nox, chk),
+  stringsAsFactors = FALSE
+)
+
+n_hr_det  <- uniqueN(firm_long_dt[role == "HR"  & !is.na(concordance_race_gender_detailed_blind), responseid])
+n_eng_det <- uniqueN(firm_long_dt[role == "Eng" & !is.na(concordance_race_gender_detailed_blind), responseid])
+
+panel_a_lbl <- paste0("Panel A: HR (N = ", n_hr_det, ")")
+panel_b_lbl <- paste0("Panel B: Engineer (N = ", n_eng_det, ")")
+
+cat("\\begin{table}[H]\n")
+cat("\\centering\n")
+
+modelsummary(
+  all_models,
+  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  coef_map = coef_map_conc,
+  gof_map  = gof_custom_conc,
+  add_rows = fe_rows,
+  escape   = FALSE,
+  output   = "kableExtra"
+) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 7) %>%
+  add_header_above(setNames(c(1, 5, 4), c(" ", panel_a_lbl, panel_b_lbl))) %>%
+  footnote(general = "Standard errors clustered by respondent. \\\\textit{Note:} Concordance is defined at the detailed race-gender level: applicants are Chinese, Indian, White, or Hispanic (by gender). Asian respondents whose detailed sub-ethnicity is not represented in the applicant pool (e.g., Korean, Japanese) are treated as always-discordant in nonblind, since the Asian applicant names are exclusively Chinese or Indian. Coefficients are flipped so positive $\\\\Rightarrow$ blinding raises the score for that concordance group relative to the nonblind outcome. ``Respondent Characteristics'' comprises age (with polynomial); gender, race, education, and income are absorbed as FE.",
+           general_title = "", threeparttable = TRUE,
+           footnote_as_chunk = TRUE, escape = FALSE)
+
+cat("\\end{table}\n\n")
+
+rm(models_hr_bh_conc_det, models_eng_bh_conc_det, all_models,
+   coef_map_conc, gof_custom_conc, flip_coef_signs, chk, nox, fe_rows,
+   n_hr_det, n_eng_det, panel_a_lbl, panel_b_lbl)
+```
+
+
+\clearpage
+# Treatment Effect: Heterogeneity by DEI / Diversity Preferences
+
+\textcolor{blue}{\textbf{Takeaway}}: [To be filled after first render. Parallel to 8A \S3, we ask whether the effect of blinding on evaluation scores varies with (a) respondent DEI / diversity preferences, (b) whether the respondent's firm targets the same demographic as the applicant, and (c) the triple interaction of respondent DEI priority with firm DEI attention.]
+
+\vspace{0.2em}
+
+\noindent \textit{Sign convention}: Throughout \S3, all displayed coefficients are \emph{flipped} so that positive $\Rightarrow$ blinding raises the relative score for that demographic (mirroring the convention in \S1.1). The underlying regressions use Blind as the reference category for \texttt{race\_gender}; multiplying by $-1$ converts (nonblind $-$ blind) into (blind $-$ nonblind), i.e.\ the effect of blinding.
+
+
+## (2-way Interaction Models) By Individual DEI / Diversity Variables
+
+\textcolor{blue}{\textbf{Takeaway}}: Mirroring 8A \S3's null on preference heterogeneity, most individual DEI / diversity proxies do not meaningfully moderate the effect of blinding on demographic groups. Two exceptions stand out. For HR, respondent-perceived firm DEI attention interacts strongly with the blinding effect on Hispanic Male applicants ($+0.188^{***}$ for Firm Race DEI Attention; $+0.133^{***}$ for Firm Gender DEI Attention) --- a firm-level substitution pattern in which HR evaluators at firms with high DEI attention penalize Hispanic Males under nonblind, and blinding mechanically recovers those penalties. For Engineers, individual-level pro-DEI proxies (Race DEI, Gender DEI, Diverse Workplace, Diversity Priority) consistently interact \emph{negatively} with the blinding effect on Hispanic Males ($-0.057$ to $-0.081$, $p < 0.05$ or tighter on each) --- an individual-level DEI-premium pattern in which pro-DEI Engineers are more generous to Hispanic Males under nonblind. The two channels operate in different places: firm-level substitution for HR; individual-level DEI premium for Engineers.
+
+```{r bh_dei_overall, eval = FALSE, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+
+dt_hr  <- firm_long_dt[role == "HR"]
+dt_eng <- firm_long_dt[role == "Eng"]
+
+proxies <- c(
+  "pro_dei_race_z",
+  "pro_dei_gender_z",
+  "pro_diverse_z",
+  "div_priority_z",
+  "firm_attention_race_z",
+  "firm_attention_gender_z"
+)
+col_labels <- c("Race DEI", "Gender DEI", "Diverse Wkpl", "Div Goal",
+                "Firm Race Attn", "Firm Gender Attn")
+
+## LHS is negated so that all coefficients flip at the regression level;
+## etable (unlike modelsummary) ignores post-hoc overrides of $coefficients,
+## so we flip via I(-sc_overall_z) instead of via a flip_coef_signs wrapper.
+fit_one <- function(d, pr) {
+  suppressMessages(suppressWarnings(feols(
+    as.formula(sprintf(
+      "I(-sc_overall_z) ~ i(race_gender, ref = 'Blind') + i(race_gender, %s, ref = 'Blind') + resp_age + I(resp_age^2) + I(resp_age^3) | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income",
+      pr)),
+    data = d, vcov = ~ responseid
+  )))
+}
+
+models_hr  <- lapply(proxies, function(p) fit_one(dt_hr,  p))
+models_eng <- lapply(proxies, function(p) fit_one(dt_eng, p))
+all_models <- c(models_hr, models_eng)
+
+groups <- c("White_Male"      = "White Male",
+            "White_Female"    = "White Female",
+            "Asian_Male"      = "Asian Male",
+            "Asian_Female"    = "Asian Female",
+            "Hispanic_Male"   = "Hispanic Male",
+            "Hispanic_Female" = "Hispanic Female")
+
+dict_main  <- setNames(unname(groups), paste0("race_gender::", names(groups)))
+dict_inter <- unlist(lapply(proxies, function(p) {
+  setNames(paste0(unname(groups), " $\\times$ Pro DEI/Diversity (Z)"),
+           paste0("race_gender::", names(groups), ":", p))
+}))
+dict_all <- c(dict_main, dict_inter)
+
+chk <- "\\checkmark"
+
+tbl <- etable(
+  all_models,
+  tex = TRUE, style.tex = style.tex("aer"),
+  placement = "H",
+  depvar = FALSE,
+  keep = "%race_gender",
+  fitstat = c("n", "ar2"),
+  drop.section = "fixef",
+  digits = 3, se.below = TRUE,
+  signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+  dict = dict_all,
+  extralines = list(
+    "Resume (Content) FE"      = rep(chk, 12),
+    "Display Position FE"      = rep(chk, 12),
+    "Respondent Demographic FE" = rep(chk, 12)
+  )
+)
+
+proxy_hdr <- paste(col_labels, collapse = " & ")
+
+tbl <- sub(
+  "\\\\toprule",
+  paste0(
+    "\\\\multicolumn{13}{c}{\\\\textbf{Outcome Var: Assigned Overall Score (Z) --- signs flipped so + $\\\\Rightarrow$ effect of blinding}} \\\\\\\\ ",
+    "\\\\toprule",
+    " & \\\\multicolumn{6}{c}{\\\\textbf{Panel A: HR}}",
+    " & \\\\multicolumn{6}{c}{\\\\textbf{Panel B: Engineer}} \\\\\\\\",
+    " \\\\cmidrule(lr){2-7} \\\\cmidrule(lr){8-13}",
+    " & ", proxy_hdr, " & ", proxy_hdr, " \\\\\\\\ \\\\addlinespace[2pt]"
+  ),
+  tbl
+)
+
+tbl <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering \\\\footnotesize", tbl)
+tbl <- sub(
+  "\\\\begin\\{tabular\\}",
+  "{\\\\scriptsize\\\\setlength{\\\\tabcolsep}{2pt}\\\\renewcommand{\\\\arraystretch}{0.82}\\\\begin{tabular}",
+  tbl
+)
+tbl <- sub("\\\\end\\{tabular\\}", "\\\\end{tabular}}", tbl)
+
+cat(tbl)
+
+rm(dt_hr, dt_eng, proxies, col_labels, fit_one,
+   models_hr, models_eng, all_models, groups, dict_main, dict_inter, dict_all,
+   chk, tbl, proxy_hdr)
 ```
 
 
 \newpage
-# Stage-by-Stage Impact of Blind Hiring on Coding Outcomes
+\noindent \textbf{Reproduction with three DEI / Diversity Index Options.} The same regression as above, replacing the six individual DEI proxies with three composite indices: \textit{Index A: Stated} --- the four-item average of stated DEI views; \textit{Index B: Stated + Revealed} --- equal-weight composite of Index A and the revealed-priority ranking of ``Diversity and Representation'' from the goals question; \textit{Index C: PC1} --- first principal component of the same five items.
+
+```{r bh_dei_indices_overall, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+
+dt_hr  <- firm_long_dt[role == "HR"]
+dt_eng <- firm_long_dt[role == "Eng"]
+
+indices    <- c("dei_index_A_z", "dei_index_B_z", "dei_index_C_z")
+idx_labels <- c("Index A", "Index B", "Index C")
+
+fit_one <- function(d, idx) {
+  suppressMessages(suppressWarnings(feols(
+    as.formula(sprintf(
+      "I(-sc_overall_z) ~ i(race_gender, ref = 'Blind') + i(race_gender, %s, ref = 'Blind') + resp_age + I(resp_age^2) + I(resp_age^3) | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income",
+      idx)),
+    data = d, vcov = ~ responseid
+  )))
+}
+
+models_hr  <- lapply(indices, function(p) fit_one(dt_hr,  p))
+models_eng <- lapply(indices, function(p) fit_one(dt_eng, p))
+all_models <- c(models_hr, models_eng)
+
+groups <- c("White_Male"     = "White Male",
+            "White_Female"   = "White Female",
+            "Asian_Male"     = "Asian Male",
+            "Asian_Female"   = "Asian Female",
+            "Hispanic_Male"  = "Hispanic Male",
+            "Hispanic_Female"= "Hispanic Female")
+
+dict_main  <- setNames(unname(groups), paste0("race_gender::", names(groups)))
+dict_inter <- unlist(lapply(indices, function(p) {
+  setNames(paste0(unname(groups), " $\\times$ DEI Index"),
+           paste0("race_gender::", names(groups), ":", p))
+}))
+dict_all <- c(dict_main, dict_inter)
+
+chk <- "\\checkmark"
+
+tbl <- etable(
+  all_models,
+  tex = TRUE, style.tex = style.tex("aer"),
+  placement = "H",
+  depvar = FALSE,
+  keep = "%race_gender",
+  fitstat = c("n", "ar2"),
+  drop.section = "fixef",
+  digits = 3, se.below = TRUE,
+  signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+  dict = dict_all,
+  notes = "Index A is the existing four-item average of stated DEI views. Index B averages Index A with the respondent's revealed-priority ranking of ``Diversity and Representation'' from the seven-goals question. Index C is the first principal component of the same five items, sign-aligned so higher = more pro-DEI. Coefficients are flipped via I(-sc\\_overall\\_z) so positive => effect of blinding. Standard errors clustered by respondent. Sample: both blind and nonblind arms.",
+  extralines = list(
+    "Resume (Content) FE"       = rep(chk, 6),
+    "Display Position FE"       = rep(chk, 6),
+    "Respondent Demographic FE" = rep(chk, 6)
+  )
+)
+
+idx_hdr <- paste(idx_labels, collapse = " & ")
+tbl <- sub(
+  "\\\\toprule",
+  paste0(
+    "\\\\multicolumn{7}{c}{\\\\textbf{Outcome Var: Assigned Overall Score (Z) --- Three DEI / Diversity Index Options, signs flipped so + $\\\\Rightarrow$ effect of blinding}} \\\\\\\\ ",
+    "\\\\toprule",
+    " & \\\\multicolumn{3}{c}{\\\\textbf{Panel A: HR}}",
+    " & \\\\multicolumn{3}{c}{\\\\textbf{Panel B: Engineer}} \\\\\\\\",
+    " \\\\cmidrule(lr){2-4} \\\\cmidrule(lr){5-7}",
+    " & ", idx_hdr, " & ", idx_hdr, " \\\\\\\\ \\\\addlinespace[2pt]"
+  ),
+  tbl
+)
+tbl <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering \\\\footnotesize", tbl)
+## Force equal-width centered data columns (the 6 model columns); the auto-width
+## `c` columns can become uneven when a multicolumn spanning header on one panel
+## is wider than the other.
+tbl <- sub("\\{lcccccc\\}",
+           "{l*{6}{>{\\\\centering\\\\arraybackslash}p{0.7in}}}",
+           tbl)
+tbl <- sub(
+  "\\\\begin\\{tabular\\}",
+  "{\\\\scriptsize\\\\setlength{\\\\tabcolsep}{2pt}\\\\renewcommand{\\\\arraystretch}{0.82}\\\\begin{tabular}",
+  tbl
+)
+tbl <- sub("\\\\end\\{tabular\\}", "\\\\end{tabular}}", tbl)
+
+cat(tbl)
+
+rm(dt_hr, dt_eng, indices, idx_labels, fit_one, models_hr, models_eng, all_models,
+   groups, dict_main, dict_inter, dict_all, chk, tbl, idx_hdr)
+```
+
+
+```{r bh_dei_urm, eval = FALSE, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+
+dt_hr  <- firm_long_dt[role == "HR"]
+dt_eng <- firm_long_dt[role == "Eng"]
+
+zstd <- function(x) (x - mean(x, na.rm = TRUE)) / sd(x, na.rm = TRUE)
+
+## Combined indices: row-mean of two z-scored measures, re-standardized within sample.
+dt_hr [, pro_dei_view_z   := zstd(rowMeans(as.matrix(.SD), na.rm = FALSE)),
+       .SDcols = c("pro_dei_race_z", "pro_dei_gender_z")]
+dt_eng[, pro_dei_view_z   := zstd(rowMeans(as.matrix(.SD), na.rm = FALSE)),
+       .SDcols = c("pro_dei_race_z", "pro_dei_gender_z")]
+dt_hr [, firm_attention_z := zstd(rowMeans(as.matrix(.SD), na.rm = FALSE)),
+       .SDcols = c("firm_attention_race_z", "firm_attention_gender_z")]
+dt_eng[, firm_attention_z := zstd(rowMeans(as.matrix(.SD), na.rm = FALSE)),
+       .SDcols = c("firm_attention_race_z", "firm_attention_gender_z")]
+
+proxies    <- c("pro_dei_view_z", "pro_diverse_z", "div_priority_z", "firm_attention_z")
+col_labels <- c("DEI Views (R \\\\& G)", "Diverse Wkpl", "Div Goal", "Firm DEI Attn (R \\\\& G)")
+
+## Here we build a URM-tech x Blind indicator by hand.
+## urm_tech_blind_factor: Blind / Nonblind-URM / Nonblind-NonURM
+dt_hr [, urm_tech_blind := fcase(
+  treat == "blind",                           "Blind",
+  treat == "nonblind" & urm_tech == 1,         "Nonblind_URM",
+  treat == "nonblind" & urm_tech == 0,         "Nonblind_NonURM",
+  default = NA_character_
+)]
+dt_eng[, urm_tech_blind := fcase(
+  treat == "blind",                           "Blind",
+  treat == "nonblind" & urm_tech == 1,         "Nonblind_URM",
+  treat == "nonblind" & urm_tech == 0,         "Nonblind_NonURM",
+  default = NA_character_
+)]
+dt_hr [, urm_tech_blind := factor(urm_tech_blind,
+  levels = c("Blind", "Nonblind_URM", "Nonblind_NonURM"))]
+dt_eng[, urm_tech_blind := factor(urm_tech_blind,
+  levels = c("Blind", "Nonblind_URM", "Nonblind_NonURM"))]
+
+## LHS negated so coefficients flip at the regression level (etable does not
+## respect post-hoc overrides of $coefficients).
+fit_urm <- function(d, pr) {
+  suppressMessages(suppressWarnings(feols(
+    as.formula(sprintf(
+      "I(-sc_overall_z) ~ i(urm_tech_blind, ref = 'Blind') + i(urm_tech_blind, %s, ref = 'Blind') + resp_age + I(resp_age^2) + I(resp_age^3) | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income",
+      pr)),
+    data = d, vcov = ~ responseid
+  )))
+}
+
+models_hr  <- lapply(proxies, function(p) fit_urm(dt_hr,  p))
+models_eng <- lapply(proxies, function(p) fit_urm(dt_eng, p))
+all_models <- c(models_hr, models_eng)
+
+dict_all <- c(
+  "urm_tech_blind::Nonblind_URM"    = "URM (WF, AF, HM, HF)",
+  "urm_tech_blind::Nonblind_NonURM" = "Non-URM",
+  setNames(rep("URM $\\times$ Pro DEI/Diversity (Z)",    length(proxies)),
+           paste0("urm_tech_blind::Nonblind_URM:",    proxies)),
+  setNames(rep("Non-URM $\\times$ Pro DEI/Diversity (Z)", length(proxies)),
+           paste0("urm_tech_blind::Nonblind_NonURM:", proxies))
+)
+
+chk <- "\\checkmark"
+
+tbl <- etable(
+  all_models,
+  tex = TRUE, style.tex = style.tex("aer"),
+  placement = "H",
+  depvar = FALSE,
+  keep = "%urm_tech_blind",
+  fitstat = c("n", "ar2"),
+  drop.section = "fixef",
+  digits = 3, se.below = TRUE,
+  signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+  dict = dict_all,
+  extralines = list(
+    "Resume (Content) FE"       = rep(chk, 8),
+    "Display Position FE"       = rep(chk, 8),
+    "Respondent Demographic FE" = rep(chk, 8)
+  )
+)
+
+proxy_hdr <- paste(col_labels, collapse = " & ")
+tbl <- sub(
+  "\\\\toprule",
+  paste0(
+    "\\\\multicolumn{9}{c}{\\\\textbf{Outcome Var: Assigned Overall Score (Z) --- signs flipped so + $\\\\Rightarrow$ effect of blinding}} \\\\\\\\ ",
+    "\\\\toprule",
+    " & \\\\multicolumn{4}{c}{\\\\textbf{Panel A: HR}}",
+    " & \\\\multicolumn{4}{c}{\\\\textbf{Panel B: Engineer}} \\\\\\\\",
+    " \\\\cmidrule(lr){2-5} \\\\cmidrule(lr){6-9}",
+    " & ", proxy_hdr, " & ", proxy_hdr, " \\\\\\\\ \\\\addlinespace[2pt]"
+  ),
+  tbl
+)
+tbl <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering \\\\footnotesize", tbl)
+tbl <- sub(
+  "\\\\begin\\{tabular\\}",
+  "{\\\\scriptsize\\\\setlength{\\\\tabcolsep}{2pt}\\\\renewcommand{\\\\arraystretch}{0.82}\\\\begin{tabular}",
+  tbl
+)
+tbl <- sub("\\\\end\\{tabular\\}", "\\\\end{tabular}}", tbl)
+
+cat(tbl)
+
+rm(dt_hr, dt_eng, zstd, proxies, col_labels, fit_urm,
+   models_hr, models_eng, all_models, dict_all, chk, tbl, proxy_hdr)
+```
+
+
+\newpage
+\noindent \textbf{Reproduction (URM cut) with three DEI / Diversity Index Options.}
+
+```{r bh_dei_indices_urm, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+
+dt_hr  <- firm_long_dt[role == "HR"]
+dt_eng <- firm_long_dt[role == "Eng"]
+
+dt_hr [, urm_tech_blind := fcase(
+  treat == "blind",                    "Blind",
+  treat == "nonblind" & urm_tech == 1, "Nonblind_URM",
+  treat == "nonblind" & urm_tech == 0, "Nonblind_NonURM",
+  default = NA_character_)]
+dt_eng[, urm_tech_blind := fcase(
+  treat == "blind",                    "Blind",
+  treat == "nonblind" & urm_tech == 1, "Nonblind_URM",
+  treat == "nonblind" & urm_tech == 0, "Nonblind_NonURM",
+  default = NA_character_)]
+dt_hr [, urm_tech_blind := factor(urm_tech_blind,
+  levels = c("Blind", "Nonblind_URM", "Nonblind_NonURM"))]
+dt_eng[, urm_tech_blind := factor(urm_tech_blind,
+  levels = c("Blind", "Nonblind_URM", "Nonblind_NonURM"))]
+
+indices    <- c("dei_index_A_z", "dei_index_B_z", "dei_index_C_z")
+idx_labels <- c("Index A", "Index B", "Index C")
+
+fit_urm <- function(d, idx) {
+  suppressMessages(suppressWarnings(feols(
+    as.formula(sprintf(
+      "I(-sc_overall_z) ~ i(urm_tech_blind, ref = 'Blind') + i(urm_tech_blind, %s, ref = 'Blind') + resp_age + I(resp_age^2) + I(resp_age^3) | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income",
+      idx)),
+    data = d, vcov = ~ responseid
+  )))
+}
+
+models_hr  <- lapply(indices, function(p) fit_urm(dt_hr,  p))
+models_eng <- lapply(indices, function(p) fit_urm(dt_eng, p))
+all_models <- c(models_hr, models_eng)
+
+dict_all <- c(
+  "urm_tech_blind::Nonblind_URM"    = "URM (WF, AF, HM, HF)",
+  "urm_tech_blind::Nonblind_NonURM" = "Non-URM",
+  setNames(rep("URM $\\times$ DEI Index",    length(indices)),
+           paste0("urm_tech_blind::Nonblind_URM:",    indices)),
+  setNames(rep("Non-URM $\\times$ DEI Index", length(indices)),
+           paste0("urm_tech_blind::Nonblind_NonURM:", indices))
+)
+
+chk <- "\\checkmark"
+
+tbl <- etable(
+  all_models,
+  tex = TRUE, style.tex = style.tex("aer"),
+  placement = "H",
+  depvar = FALSE,
+  keep = "%urm_tech_blind",
+  fitstat = c("n", "ar2"),
+  drop.section = "fixef",
+  digits = 3, se.below = TRUE,
+  signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+  dict = dict_all,
+  notes = "URM-Tech = \\{White Female, Asian Female, Hispanic Male, Hispanic Female\\}. Sample: both blind and nonblind arms. Coefficients flipped via I(-sc\\_overall\\_z) so positive => effect of blinding. Standard errors clustered by respondent.",
+  extralines = list(
+    "Resume (Content) FE"       = rep(chk, 6),
+    "Display Position FE"       = rep(chk, 6),
+    "Respondent Demographic FE" = rep(chk, 6)
+  )
+)
+
+idx_hdr <- paste(idx_labels, collapse = " & ")
+tbl <- sub(
+  "\\\\toprule",
+  paste0(
+    "\\\\multicolumn{7}{c}{\\\\textbf{Outcome Var: Assigned Overall Score (Z) --- URM Cut, Three DEI / Diversity Index Options, signs flipped so + $\\\\Rightarrow$ effect of blinding}} \\\\\\\\ ",
+    "\\\\toprule",
+    " & \\\\multicolumn{3}{c}{\\\\textbf{Panel A: HR}}",
+    " & \\\\multicolumn{3}{c}{\\\\textbf{Panel B: Engineer}} \\\\\\\\",
+    " \\\\cmidrule(lr){2-4} \\\\cmidrule(lr){5-7}",
+    " & ", idx_hdr, " & ", idx_hdr, " \\\\\\\\ \\\\addlinespace[2pt]"
+  ),
+  tbl
+)
+tbl <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering \\\\footnotesize", tbl)
+## Force equal-width centered data columns (see note in indices_overall chunk).
+tbl <- sub("\\{lcccccc\\}",
+           "{l*{6}{>{\\\\centering\\\\arraybackslash}p{0.7in}}}",
+           tbl)
+tbl <- sub(
+  "\\\\begin\\{tabular\\}",
+  "{\\\\scriptsize\\\\setlength{\\\\tabcolsep}{2pt}\\\\renewcommand{\\\\arraystretch}{0.82}\\\\begin{tabular}",
+  tbl
+)
+tbl <- sub("\\\\end\\{tabular\\}", "\\\\end{tabular}}", tbl)
+
+cat(tbl)
+
+rm(dt_hr, dt_eng, indices, idx_labels, fit_urm,
+   models_hr, models_eng, all_models, dict_all, chk, tbl, idx_hdr)
+```
+
+
+\vspace{0.6em}
+\noindent \textbf{Visual: URM--Non-URM gap under nonblind by DEI Index (Indices A, B, C).} Each row is one of the three DEI indices; columns are role. The single curve in each panel plots the URM--Non-URM premium under nonblind --- exactly the gap that blinding eliminates by random assignment. Positive values: URM rated higher than Non-URM under nonblind. Negative values: Non-URM rated higher. Shaded band is the 95\% CI; the dashed line at zero marks where blinding has no reshuffling effect.
+
+```{r bh_dei_indices_urm_plot, echo = FALSE, warning = FALSE, message = FALSE, fig.width = 9, fig.height = 8.5, fig.align = 'center'}
+
+dt_hr  <- firm_long_dt[role == "HR"]
+dt_eng <- firm_long_dt[role == "Eng"]
+
+dt_hr [, urm_tech_blind := fcase(
+  treat == "blind",                    "Blind",
+  treat == "nonblind" & urm_tech == 1, "Nonblind_URM",
+  treat == "nonblind" & urm_tech == 0, "Nonblind_NonURM",
+  default = NA_character_)]
+dt_eng[, urm_tech_blind := fcase(
+  treat == "blind",                    "Blind",
+  treat == "nonblind" & urm_tech == 1, "Nonblind_URM",
+  treat == "nonblind" & urm_tech == 0, "Nonblind_NonURM",
+  default = NA_character_)]
+dt_hr [, urm_tech_blind := factor(urm_tech_blind,
+  levels = c("Blind", "Nonblind_URM", "Nonblind_NonURM"))]
+dt_eng[, urm_tech_blind := factor(urm_tech_blind,
+  levels = c("Blind", "Nonblind_URM", "Nonblind_NonURM"))]
+
+fit_dei <- function(d, idx_var) {
+  feols(
+    as.formula(sprintf(
+      "I(-sc_overall_z) ~ i(urm_tech_blind, ref = 'Blind') + i(urm_tech_blind, %s, ref = 'Blind') + resp_age + I(resp_age^2) + I(resp_age^3) | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income",
+      idx_var)),
+    data = d, vcov = ~ responseid)
+}
+
+## Gap = URM - NonURM under nonblind, in raw scale. Model is in flipped scale;
+## gap_raw uses -1 on URM and +1 on NonURM contrast vectors.
+compute_gap_dei <- function(model, role_label, idx_var) {
+  cf <- coef(model); vc <- vcov(model)
+  c_urm    <- "urm_tech_blind::Nonblind_URM"
+  c_nurm   <- "urm_tech_blind::Nonblind_NonURM"
+  c_urm_x  <- paste0("urm_tech_blind::Nonblind_URM:",    idx_var)
+  c_nurm_x <- paste0("urm_tech_blind::Nonblind_NonURM:", idx_var)
+  idx_grid <- seq(-2, 2, by = 0.1)
+  out_list <- vector("list", length(idx_grid))
+  for (i in seq_along(idx_grid)) {
+    iv <- idx_grid[i]
+    a <- setNames(numeric(length(cf)), names(cf))
+    a[c_urm]    <- -1
+    a[c_nurm]   <-  1
+    a[c_urm_x]  <- -iv
+    a[c_nurm_x] <-  iv
+    out_list[[i]] <- data.table(
+      role    = role_label,
+      idx_val = iv,
+      gap     = sum(a * cf),
+      se      = sqrt(as.numeric(t(a) %*% vc %*% a))
+    )
+  }
+  rbindlist(out_list)
+}
+
+indices_to_plot <- c("dei_index_A_z", "dei_index_B_z", "dei_index_C_z")
+idx_labels      <- c("Index A", "Index B", "Index C")
+
+dat_all <- rbindlist(lapply(seq_along(indices_to_plot), function(k) {
+  iv  <- indices_to_plot[k]
+  lbl <- idx_labels[k]
+  m_hr  <- fit_dei(dt_hr,  iv)
+  m_eng <- fit_dei(dt_eng, iv)
+  d <- rbind(compute_gap_dei(m_hr,  "HR",       iv),
+             compute_gap_dei(m_eng, "Engineer", iv))
+  d[, idx_label := lbl]
+  d
+}))
+
+dat_all[, ci_lo := gap - 1.96 * se]
+dat_all[, ci_hi := gap + 1.96 * se]
+dat_all[, role  := factor(role, levels = c("HR", "Engineer"))]
+dat_all[, idx_label := factor(idx_label, levels = idx_labels)]
+
+p_3_1 <- ggplot(dat_all, aes(x = idx_val, y = gap)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+  geom_ribbon(aes(ymin = ci_lo, ymax = ci_hi), fill = "steelblue", alpha = 0.25) +
+  geom_line(color = "steelblue", linewidth = 1.2) +
+  facet_grid(idx_label ~ role) +
+  labs(x = "DEI Index (z-score)",
+       y = "URM − Non-URM gap under nonblind") +
+  theme_minimal(base_size = 11) +
+  theme(panel.grid.minor = element_blank(),
+        strip.text = element_text(face = "bold"))
+
+print(p_3_1)
+
+rm(dt_hr, dt_eng, fit_dei, compute_gap_dei, indices_to_plot, idx_labels,
+   dat_all, p_3_1)
+```
+
+
+\newpage
+## (2-way Interaction Models) By Whether the Firm Targets the Same Applicant Demographic
+
+\textcolor{blue}{\textbf{Takeaway}}: The substitution hypothesis is a \emph{null} at the level it can be cleanly tested. The bottom table's URM-aggregate match coefficient (URM $\times$ Firm Targets URM) is insignificant in both roles, and so is the Non-URM spillover. The top table is descriptive only: per-demographic match cells are identified off too few respondents to support inference (we restrict it to the URM-aligned dimensions Female and Hispanic and drop the rest, since White / Asian / Male match cells are either non-URM-aligned or fire on $\le 2$ unique respondents per role). The one mover --- Engineer's \texttt{applicant female $\times$ firm targets female} --- points in the substitution direction but is identified off $\approx 5$ respondents and should be read as suggestive. The cleaner Engineer signal lives in the \emph{main effects}: blinding \emph{lowers} URM applicants' Overall scores and \emph{raises} Non-URM scores (significant at the $5\%$ level), reproducing the Engineer non-concordance premium documented in \S1.1 and \S2 net of firm-targeting controls.
+
+```{r bh_dei_targets, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+
+dt_hr  <- firm_long_dt[role == "HR"]
+dt_eng <- firm_long_dt[role == "Eng"]
+
+## Applicant-match indicators (0 for Blind resumes, since demo is hidden).
+## Only Female and Hispanic match interactions are tested in the top table:
+##  - White / Asian / Male match cells are identified off too few respondents
+##    (1-2 per role for White and Asian; ~11-18 for Male) and Asian / Male are
+##    not URM-aligned target dimensions in our tech context.
+##  - Female and Hispanic are the URM-side dimensions where the substitution
+##    hypothesis has a well-defined prediction.
+prep <- function(d) {
+  d[, appl_female   := as.integer(treat == "nonblind" & gender == "Female")]
+  d[, appl_hispanic := as.integer(treat == "nonblind" & race   == "Hispanic")]
+  d[, firm_targets_fh  := as.integer(firm_targets_female == 1L | firm_targets_hispanic == 1L)]
+  d[, firm_targets_fhb := as.integer(firm_targets_female == 1L | firm_targets_hispanic == 1L | firm_targets_black == 1L)]
+  invisible(d)
+}
+prep(dt_hr); prep(dt_eng)
+
+chk <- "\\checkmark"
+
+## ---------- TOP: joint four-match regression per role ----------
+## LHS is negated so all coefficients flip at the regression level; etable
+## does not respect post-hoc $coefficients overrides.
+fit_match_joint <- function(d) {
+  suppressMessages(suppressWarnings(feols(
+    I(-sc_overall_z) ~ i(race_gender, ref = "Blind")
+                 + appl_female   : firm_targets_female
+                 + appl_hispanic : firm_targets_hispanic
+                 + resp_age + I(resp_age^2) + I(resp_age^3)
+                 | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income,
+    data = d, vcov = ~ responseid
+  )))
+}
+
+m_hr_t  <- fit_match_joint(dt_hr)
+m_eng_t <- fit_match_joint(dt_eng)
+
+dict_t <- c(
+  "race_gender::White_Male"             = "White Male",
+  "race_gender::White_Female"           = "White Female",
+  "race_gender::Asian_Male"             = "Asian Male",
+  "race_gender::Asian_Female"           = "Asian Female",
+  "race_gender::Hispanic_Male"          = "Hispanic Male",
+  "race_gender::Hispanic_Female"        = "Hispanic Female",
+  "appl_female:firm_targets_female"     = "Applicant Female $\\times$ Firm Targets Female",
+  "appl_hispanic:firm_targets_hispanic" = "Applicant Hispanic $\\times$ Firm Targets Hispanic"
+)
+
+tbl_t <- etable(
+  list("HR" = m_hr_t, "Engineer" = m_eng_t),
+  tex = TRUE, style.tex = style.tex("aer"),
+  placement = "H", depvar = FALSE,
+  keep = c("%race_gender", "%appl_"),
+  fitstat = c("n", "ar2"),
+  drop.section = "fixef",
+  digits = 3, se.below = TRUE,
+  signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+  dict = dict_t,
+  notes = "Each Applicant X x Firm Targets X is a match interaction, identified off applicant rows whose demographic equals the firm's targeting dimension. Standard errors clustered by respondent. Sample: both blind and nonblind arms.",
+  extralines = list(
+    "Resume (Content) FE"       = rep(chk, 2),
+    "Display Position FE"       = rep(chk, 2),
+    "Respondent Demographic FE" = rep(chk, 2)
+  )
+)
+
+tbl_t <- sub(
+  "\\\\toprule",
+  paste0(
+    "\\\\multicolumn{3}{c}{\\\\textbf{Firm Targets $\\\\times$ Same Applicant Demographic --- signs flipped so + $\\\\Rightarrow$ effect of blinding}} \\\\\\\\ ",
+    "\\\\toprule",
+    " & \\\\textbf{Panel A: HR} & \\\\textbf{Panel B: Engineer} \\\\\\\\ \\\\addlinespace[2pt]"
+  ),
+  tbl_t
+)
+tbl_t <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering \\\\footnotesize", tbl_t)
+tbl_t <- sub(
+  "\\\\begin\\{tabular\\}",
+  "{\\\\scriptsize\\\\setlength{\\\\tabcolsep}{3pt}\\\\renewcommand{\\\\arraystretch}{0.88}\\\\begin{tabular}",
+  tbl_t
+)
+tbl_t <- sub("\\\\end\\{tabular\\}", "\\\\end{tabular}}", tbl_t)
+
+cat(tbl_t)
+
+## ---------- BOTTOM: URM-Tech x Combined firm-target dummy ----------
+dt_hr [, urm_tech_blind := fcase(
+  treat == "blind",                    "Blind",
+  treat == "nonblind" & urm_tech == 1, "Nonblind_URM",
+  treat == "nonblind" & urm_tech == 0, "Nonblind_NonURM",
+  default = NA_character_
+)]
+dt_eng[, urm_tech_blind := fcase(
+  treat == "blind",                    "Blind",
+  treat == "nonblind" & urm_tech == 1, "Nonblind_URM",
+  treat == "nonblind" & urm_tech == 0, "Nonblind_NonURM",
+  default = NA_character_
+)]
+## Factor-level order is local to this chunk and controls the etable display
+## order: Non-URM main, URM main, then Non-URM:firm_targets_fh (spillover),
+## then URM:firm_targets_fh (match) -- matches the table's narrative arc.
+dt_hr [, urm_tech_blind := factor(urm_tech_blind,
+  levels = c("Blind", "Nonblind_NonURM", "Nonblind_URM"))]
+dt_eng[, urm_tech_blind := factor(urm_tech_blind,
+  levels = c("Blind", "Nonblind_NonURM", "Nonblind_URM"))]
+
+fit_urm_t <- function(d, target_var) {
+  suppressMessages(suppressWarnings(feols(
+    as.formula(sprintf(
+      "I(-sc_overall_z) ~ i(urm_tech_blind, ref = 'Blind') + i(urm_tech_blind, %s, ref = 'Blind') + resp_age + I(resp_age^2) + I(resp_age^3) | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income",
+      target_var)),
+    data = d, vcov = ~ responseid
+  )))
+}
+
+targets      <- c("firm_targets_fh")
+col_labels_b <- c("Targets F or H")
+
+models_hr_b  <- lapply(targets, function(t) fit_urm_t(dt_hr,  t))
+models_eng_b <- lapply(targets, function(t) fit_urm_t(dt_eng, t))
+all_models_b <- c(models_hr_b, models_eng_b)
+
+dict_b <- c(
+  "urm_tech_blind::Nonblind_URM"    = "URM (WF, AF, HM, HF)",
+  "urm_tech_blind::Nonblind_NonURM" = "Non-URM",
+  setNames(rep("URM $\\times$ Firm Targets URM",                       length(targets)),
+           paste0("urm_tech_blind::Nonblind_URM:",    targets)),
+  setNames(rep("Non-URM $\\times$ Firm Targets URM (spillover)",       length(targets)),
+           paste0("urm_tech_blind::Nonblind_NonURM:", targets))
+)
+
+tbl_b <- etable(
+  all_models_b,
+  tex = TRUE, style.tex = style.tex("aer"),
+  placement = "H", depvar = FALSE,
+  keep = "%urm_tech_blind",
+  fitstat = c("n", "ar2"),
+  drop.section = "fixef",
+  digits = 3, se.below = TRUE,
+  signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+  dict = dict_b,
+  notes = "URM = \\{WF, AF, HM, HF\\}. ``Firm Targets URM'' => firm\\_targets\\_female = 1 OR firm\\_targets\\_hispanic = 1. The URM row is the aggregate match; the Non-URM row is a spillover test (does targeting URM groups also shift the blinding effect on Non-URM applicants?). Standard errors clustered by respondent. Sample: both blind and nonblind arms.",
+  extralines = list(
+    "Resume (Content) FE"       = rep(chk, 2),
+    "Display Position FE"       = rep(chk, 2),
+    "Respondent Demographic FE" = rep(chk, 2)
+  )
+)
+
+tbl_b <- sub(
+  "\\\\toprule",
+  paste0(
+    "\\\\multicolumn{3}{c}{\\\\textbf{URM-Tech Binary Cut $\\\\times$ Firm Targets (Female OR Hispanic) --- signs flipped}} \\\\\\\\ ",
+    "\\\\toprule",
+    " & \\\\textbf{Panel A: HR} & \\\\textbf{Panel B: Engineer} \\\\\\\\ \\\\addlinespace[2pt]"
+  ),
+  tbl_b
+)
+tbl_b <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering \\\\footnotesize", tbl_b)
+tbl_b <- sub(
+  "\\\\begin\\{tabular\\}",
+  "{\\\\scriptsize\\\\setlength{\\\\tabcolsep}{2pt}\\\\renewcommand{\\\\arraystretch}{0.82}\\\\begin{tabular}",
+  tbl_b
+)
+tbl_b <- sub("\\\\end\\{tabular\\}", "\\\\end{tabular}}", tbl_b)
+
+cat(tbl_b)
+
+rm(dt_hr, dt_eng, prep, fit_match_joint, m_hr_t, m_eng_t,
+   dict_t, tbl_t, fit_urm_t, targets, col_labels_b,
+   models_hr_b, models_eng_b, all_models_b, dict_b, tbl_b, chk)
+```
+
+
+
+\newpage
+## (Triple Interaction Models) By Respondent's Priority for DEI $\times$ Firm Attention on DEI
+
+\textcolor{blue}{\textbf{Takeaway}}: For HR, the alignment of respondent's DEI priority with firm's DEI attention substitutes for blinding: at pro-DEI individuals $\times$ pro-DEI firms, blinding has near-zero effect on either URM or Non-URM applicants, while at anti-DEI $\times$ anti-DEI it flips a $\sim 0.40$ SD nonblind premium favoring Non-URM (URM $\times$ DEI Index $\times$ Firm DEI Attn $= +0.09^{***}$; Non-URM mirror $= -0.19^{***}$). Engineers show null moderation on both groups --- DEI-driven heterogeneity in treatment effects lives in HR's evaluations, not Engineers'.
+
+\textcolor{blue}{\textbf{Hypothesis}}: Same \textbf{Substitution vs.\ Backlash} structure as 8A \S3, now applied to the blinding effect on URM applicants.
+
+\begin{itemize}
+    \item \textbf{Substitution}: When the firm already prioritizes DEI, respondents who \emph{also} personally prioritize DEI absorb the firm's push and ease off their own URM premium under nonblind. Blinding therefore bites \emph{less} for them (small effect of blinding on URM), because their nonblind ratings were already closer to the demographically blind baseline. \emph{Expect a negative sign on the triple interaction term.}
+    \item \textbf{Backlash}: When the firm prioritizes DEI, respondents who do \emph{not} personally prioritize DEI react by marking URM applicants lower under nonblind. Blinding therefore bites \emph{more} for them (large positive effect of blinding on URM). \emph{Expect a positive sign on the triple interaction term.}
+\end{itemize}
+
+```{r bh_dei_triple, eval = FALSE, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+
+dt_hr  <- firm_long_dt[role == "HR"]
+dt_eng <- firm_long_dt[role == "Eng"]
+
+dt_hr [, urm_tech_blind := fcase(
+  treat == "blind",                    "Blind",
+  treat == "nonblind" & urm_tech == 1, "Nonblind_URM",
+  treat == "nonblind" & urm_tech == 0, "Nonblind_NonURM",
+  default = NA_character_
+)]
+dt_eng[, urm_tech_blind := fcase(
+  treat == "blind",                    "Blind",
+  treat == "nonblind" & urm_tech == 1, "Nonblind_URM",
+  treat == "nonblind" & urm_tech == 0, "Nonblind_NonURM",
+  default = NA_character_
+)]
+dt_hr [, urm_tech_blind := factor(urm_tech_blind,
+  levels = c("Blind", "Nonblind_URM", "Nonblind_NonURM"))]
+dt_eng[, urm_tech_blind := factor(urm_tech_blind,
+  levels = c("Blind", "Nonblind_URM", "Nonblind_NonURM"))]
+
+chk <- "\\checkmark"
+
+## LHS negated so all coefficients flip at the regression level; etable does
+## not respect post-hoc $coefficients overrides.
+fit_triple_urm <- function(d, proxy_b) {
+  suppressMessages(suppressWarnings(feols(
+    as.formula(sprintf(
+      "I(-sc_overall_z) ~ i(urm_tech_blind, ref = 'Blind') + i(urm_tech_blind, div_priority_z, ref = 'Blind') + i(urm_tech_blind, %s, ref = 'Blind') + i(urm_tech_blind, I(div_priority_z * %s), ref = 'Blind') + resp_age + I(resp_age^2) + I(resp_age^3) | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income",
+      proxy_b, proxy_b)),
+    data = d, vcov = ~ responseid
+  )))
+}
+
+m_hr_r  <- fit_triple_urm(dt_hr,  "firm_attention_race_z")
+m_eng_r <- fit_triple_urm(dt_eng, "firm_attention_race_z")
+m_hr_g  <- fit_triple_urm(dt_hr,  "firm_attention_gender_z")
+m_eng_g <- fit_triple_urm(dt_eng, "firm_attention_gender_z")
+
+n_used <- c(
+  dt_hr [!is.na(firm_attention_race_z),    uniqueN(responseid)],
+  dt_eng[!is.na(firm_attention_race_z),   uniqueN(responseid)],
+  dt_hr [!is.na(firm_attention_gender_z),  uniqueN(responseid)],
+  dt_eng[!is.na(firm_attention_gender_z), uniqueN(responseid)]
+)
+n_full <- c(
+  dt_hr [, uniqueN(responseid)],
+  dt_eng[, uniqueN(responseid)],
+  dt_hr [, uniqueN(responseid)],
+  dt_eng[, uniqueN(responseid)]
+)
+n_drop <- n_full - n_used
+
+models_trp <- list("HR (Race)" = m_hr_r, "Eng (Race)" = m_eng_r,
+                   "HR (Gender)" = m_hr_g, "Eng (Gender)" = m_eng_g)
+
+dict_trp <- c(
+  "urm_tech_blind::Nonblind_URM"                                       = "URM (WF, AF, HM, HF)",
+  "urm_tech_blind::Nonblind_URM:div_priority_z"                        = "URM $\\times$ Respondent Prioritizes Diversity",
+  "urm_tech_blind::Nonblind_URM:firm_attention_race_z"                 = "URM $\\times$ Firm DEI Attn",
+  "urm_tech_blind::Nonblind_URM:firm_attention_gender_z"               = "URM $\\times$ Firm DEI Attn",
+  "urm_tech_blind::Nonblind_URM:I(div_priority_z * firm_attention_race_z)"   = "URM $\\times$ Resp Prioritizes $\\times$ Firm DEI Attn",
+  "urm_tech_blind::Nonblind_URM:I(div_priority_z * firm_attention_gender_z)" = "URM $\\times$ Resp Prioritizes $\\times$ Firm DEI Attn"
+)
+
+tbl_trp <- etable(
+  models_trp,
+  tex = TRUE, style.tex = style.tex("aer"),
+  placement = "H", depvar = FALSE,
+  keep = "%urm_tech_blind::Nonblind_URM",
+  fitstat = c("n", "ar2"),
+  drop.section = "fixef",
+  digits = 3, se.below = TRUE,
+  signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+  dict = dict_trp,
+  extralines = list(
+    "Resume (Content) FE"       = rep(chk, 4),
+    "Display Position FE"       = rep(chk, 4),
+    "Respondent Demographic FE" = rep(chk, 4),
+    "Respondents (used)"        = as.character(n_used),
+    "Dropped (NA proxy)"        = as.character(n_drop)
+  )
+)
+
+tbl_trp <- sub(
+  "\\\\toprule",
+  paste0(
+    "\\\\multicolumn{5}{c}{\\\\textbf{Outcome Var: Assigned Overall Score (Z) --- signs flipped so + $\\\\Rightarrow$ effect of blinding}} \\\\\\\\ ",
+    "\\\\toprule",
+    " & \\\\multicolumn{2}{c}{\\\\textbf{Firm Race-DEI Attn}}",
+    " & \\\\multicolumn{2}{c}{\\\\textbf{Firm Gender-DEI Attn}} \\\\\\\\",
+    " \\\\cmidrule(lr){2-3} \\\\cmidrule(lr){4-5}",
+    " & HR & Eng & HR & Eng \\\\\\\\ \\\\addlinespace[2pt]"
+  ),
+  tbl_trp
+)
+tbl_trp <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering \\\\footnotesize", tbl_trp)
+tbl_trp <- sub(
+  "\\\\begin\\{tabular\\}",
+  "{\\\\scriptsize\\\\setlength{\\\\tabcolsep}{3pt}\\\\renewcommand{\\\\arraystretch}{0.88}\\\\begin{tabular}",
+  tbl_trp
+)
+tbl_trp <- sub("\\\\end\\{tabular\\}", "\\\\end{tabular}}", tbl_trp)
+
+cat(tbl_trp)
+
+rm(dt_hr, dt_eng, chk, fit_triple_urm, m_hr_r, m_eng_r, m_hr_g, m_eng_g,
+   models_trp, dict_trp, tbl_trp, n_used, n_full, n_drop)
+```
+
+
+\newpage
+\noindent \textbf{Reproduction with three DEI / Diversity Index Options.} The same triple-interaction structure as above, but replacing the single revealed-priority variable (\texttt{div\_priority\_z}) with each of three composite DEI indices in turn. One sub-table per index; each reports HR vs.\ Eng under the combined firm-DEI-attention-level proxy (\texttt{firm\_dei\_attention\_z}).
+
+```{r bh_dei_indices_triple, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+
+dt_hr  <- firm_long_dt[role == "HR"]
+dt_eng <- firm_long_dt[role == "Eng"]
+
+dt_hr [, urm_tech_blind := fcase(
+  treat == "blind",                    "Blind",
+  treat == "nonblind" & urm_tech == 1, "Nonblind_URM",
+  treat == "nonblind" & urm_tech == 0, "Nonblind_NonURM",
+  default = NA_character_)]
+dt_eng[, urm_tech_blind := fcase(
+  treat == "blind",                    "Blind",
+  treat == "nonblind" & urm_tech == 1, "Nonblind_URM",
+  treat == "nonblind" & urm_tech == 0, "Nonblind_NonURM",
+  default = NA_character_)]
+dt_hr [, urm_tech_blind := factor(urm_tech_blind,
+  levels = c("Blind", "Nonblind_URM", "Nonblind_NonURM"))]
+dt_eng[, urm_tech_blind := factor(urm_tech_blind,
+  levels = c("Blind", "Nonblind_URM", "Nonblind_NonURM"))]
+
+indices    <- c("dei_index_A_z", "dei_index_B_z", "dei_index_C_z")
+idx_labels <- c("Index A", "Index B", "Index C")
+chk <- "\\checkmark"
+
+fit_triple_urm <- function(d, idx, proxy_b) {
+  suppressMessages(suppressWarnings(feols(
+    as.formula(sprintf(
+      "I(-sc_overall_z) ~ i(urm_tech_blind, ref = 'Blind') + i(urm_tech_blind, %s, ref = 'Blind') + i(urm_tech_blind, %s, ref = 'Blind') + i(urm_tech_blind, I(%s * %s), ref = 'Blind') + resp_age + I(resp_age^2) + I(resp_age^3) | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income",
+      idx, proxy_b, idx, proxy_b)),
+    data = d, vcov = ~ responseid
+  )))
+}
+
+for (k in seq_along(indices)) {
+  idx <- indices[k]; lbl <- idx_labels[k]
+
+  m_hr  <- fit_triple_urm(dt_hr,  idx, "firm_dei_attention_z")
+  m_eng <- fit_triple_urm(dt_eng, idx, "firm_dei_attention_z")
+
+  models_trp <- list("HR" = m_hr, "Eng" = m_eng)
+
+  dict_trp <- c(
+    "urm_tech_blind::Nonblind_URM"                                        = "URM (WF, AF, HM, HF)",
+    "urm_tech_blind::Nonblind_NonURM"                                     = "Non-URM",
+    setNames("URM $\\times$ DEI Index",                                       paste0("urm_tech_blind::Nonblind_URM:", idx)),
+    setNames("Non-URM $\\times$ DEI Index",                                   paste0("urm_tech_blind::Nonblind_NonURM:", idx)),
+    "urm_tech_blind::Nonblind_URM:firm_dei_attention_z"                   = "URM $\\times$ Firm DEI Attn",
+    "urm_tech_blind::Nonblind_NonURM:firm_dei_attention_z"                = "Non-URM $\\times$ Firm DEI Attn",
+    setNames("URM $\\times$ DEI Index $\\times$ Firm DEI Attn",
+             paste0("urm_tech_blind::Nonblind_URM:I(", idx, " * firm_dei_attention_z)")),
+    setNames("Non-URM $\\times$ DEI Index $\\times$ Firm DEI Attn",
+             paste0("urm_tech_blind::Nonblind_NonURM:I(", idx, " * firm_dei_attention_z)"))
+  )
+
+  tbl_trp <- etable(
+    models_trp,
+    tex = TRUE, style.tex = style.tex("aer"),
+    placement = "H", depvar = FALSE,
+    keep = "%urm_tech_blind",
+    fitstat = c("n", "ar2"),
+    drop.section = "fixef",
+    digits = 3, se.below = TRUE,
+    signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+    dict = dict_trp,
+    notes = "Firm DEI Attn proxy is firm\\_dei\\_attention\\_z (within-cell z-score of the equal-weight average of firm\\_attention\\_race\\_z and firm\\_attention\\_gender\\_z). Coefficients flipped via I(-sc\\_overall\\_z) so positive => effect of blinding. Standard errors clustered by respondent. Sample: both arms.",
+    extralines = list(
+      "Resume (Content) FE"       = rep(chk, 2),
+      "Display Position FE"       = rep(chk, 2),
+      "Respondent Demographic FE" = rep(chk, 2)
+    )
+  )
+
+  tbl_trp <- sub(
+    "\\\\toprule",
+    paste0(
+      "\\\\multicolumn{3}{c}{\\\\textbf{", lbl, " --- signs flipped so + $\\\\Rightarrow$ effect of blinding}} \\\\\\\\ ",
+      "\\\\toprule",
+      " & \\\\multicolumn{2}{c}{\\\\textbf{Firm DEI Attn Lvl}} \\\\\\\\",
+      " \\\\cmidrule(lr){2-3}",
+      " & HR & Eng \\\\\\\\ \\\\addlinespace[2pt]"
+    ),
+    tbl_trp
+  )
+  tbl_trp <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering \\\\footnotesize", tbl_trp)
+  tbl_trp <- sub(
+    "\\\\begin\\{tabular\\}",
+    "{\\\\scriptsize\\\\setlength{\\\\tabcolsep}{3pt}\\\\renewcommand{\\\\arraystretch}{0.88}\\\\begin{tabular}",
+    tbl_trp
+  )
+  tbl_trp <- sub("\\\\end\\{tabular\\}", "\\\\end{tabular}}", tbl_trp)
+
+  cat(tbl_trp)
+  cat("\\vspace{0.5em}\n\n")
+}
+
+rm(dt_hr, dt_eng, indices, idx_labels, chk, fit_triple_urm,
+   m_hr, m_eng, models_trp, dict_trp, tbl_trp, idx, lbl, k)
+```
+
+
+\vspace{0.6em}
+\noindent \textbf{Visual: URM--Non-URM gap under nonblind by DEI Index $\times$ Firm DEI Attn.} One figure per DEI index (A, B, C). Each panel plots the URM--Non-URM premium under nonblind = the gap blinding eliminates. Rows: Firm DEI Attn fixed at $+1$ SD (high, top) and $-1$ SD (low, bottom). Columns: role. Substitution shows up as the HR gap curve flattening toward zero in the top-right region (high firm DEI attn, high individual DEI Index).
+
+```{r bh_dei_indices_triple_plot, echo = FALSE, warning = FALSE, message = FALSE, fig.width = 9, fig.height = 6.0, fig.align = 'center'}
+
+dt_hr  <- firm_long_dt[role == "HR"]
+dt_eng <- firm_long_dt[role == "Eng"]
+
+dt_hr [, urm_tech_blind := fcase(
+  treat == "blind",                    "Blind",
+  treat == "nonblind" & urm_tech == 1, "Nonblind_URM",
+  treat == "nonblind" & urm_tech == 0, "Nonblind_NonURM",
+  default = NA_character_)]
+dt_eng[, urm_tech_blind := fcase(
+  treat == "blind",                    "Blind",
+  treat == "nonblind" & urm_tech == 1, "Nonblind_URM",
+  treat == "nonblind" & urm_tech == 0, "Nonblind_NonURM",
+  default = NA_character_)]
+dt_hr [, urm_tech_blind := factor(urm_tech_blind,
+  levels = c("Blind", "Nonblind_URM", "Nonblind_NonURM"))]
+dt_eng[, urm_tech_blind := factor(urm_tech_blind,
+  levels = c("Blind", "Nonblind_URM", "Nonblind_NonURM"))]
+
+fit_triple_for_plot <- function(d, idx_var) {
+  feols(
+    as.formula(sprintf(
+      "I(-sc_overall_z) ~ i(urm_tech_blind, ref = 'Blind') + i(urm_tech_blind, %s, ref = 'Blind') + i(urm_tech_blind, firm_dei_attention_z, ref = 'Blind') + i(urm_tech_blind, I(%s * firm_dei_attention_z), ref = 'Blind') + resp_age + I(resp_age^2) + I(resp_age^3) | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income",
+      idx_var, idx_var)),
+    data = d, vcov = ~ responseid)
+}
+
+compute_gap_triple <- function(model, role_label, idx_var) {
+  cf <- coef(model); vc <- vcov(model)
+  cn <- list(
+    urm  = "urm_tech_blind::Nonblind_URM",
+    nurm = "urm_tech_blind::Nonblind_NonURM",
+    urm_idx  = paste0("urm_tech_blind::Nonblind_URM:",    idx_var),
+    nurm_idx = paste0("urm_tech_blind::Nonblind_NonURM:", idx_var),
+    urm_firm  = "urm_tech_blind::Nonblind_URM:firm_dei_attention_z",
+    nurm_firm = "urm_tech_blind::Nonblind_NonURM:firm_dei_attention_z",
+    urm_iaf  = paste0("urm_tech_blind::Nonblind_URM:I(",    idx_var, " * firm_dei_attention_z)"),
+    nurm_iaf = paste0("urm_tech_blind::Nonblind_NonURM:I(", idx_var, " * firm_dei_attention_z)")
+  )
+  idx_grid  <- seq(-2, 2, by = 0.1)
+  firm_grid <- c(-1, 1)
+  out_list <- list()
+  k <- 1
+  for (fv in firm_grid) for (iv in idx_grid) {
+    a <- setNames(numeric(length(cf)), names(cf))
+    a[cn$urm]      <- -1
+    a[cn$nurm]     <-  1
+    a[cn$urm_idx]  <- -iv
+    a[cn$nurm_idx] <-  iv
+    a[cn$urm_firm]  <- -fv
+    a[cn$nurm_firm] <-  fv
+    a[cn$urm_iaf]  <- -(iv * fv)
+    a[cn$nurm_iaf] <-  (iv * fv)
+    out_list[[k]] <- data.table(
+      role     = role_label,
+      idx_val  = iv,
+      firm_val = fv,
+      gap      = sum(a * cf),
+      se       = sqrt(as.numeric(t(a) %*% vc %*% a))
+    )
+    k <- k + 1
+  }
+  rbindlist(out_list)
+}
+
+indices_to_plot <- c("dei_index_A_z", "dei_index_B_z", "dei_index_C_z")
+idx_labels      <- c("Index A", "Index B", "Index C")
+
+for (k in seq_along(indices_to_plot)) {
+  iv  <- indices_to_plot[k]
+  lbl <- idx_labels[k]
+
+  m_hr  <- fit_triple_for_plot(dt_hr,  iv)
+  m_eng <- fit_triple_for_plot(dt_eng, iv)
+
+  dat <- rbind(compute_gap_triple(m_hr,  "HR",       iv),
+               compute_gap_triple(m_eng, "Engineer", iv))
+  dat[, ci_lo := gap - 1.96 * se]
+  dat[, ci_hi := gap + 1.96 * se]
+  dat[, role  := factor(role, levels = c("HR", "Engineer"))]
+  dat[, firm_label := factor(
+    ifelse(firm_val < 0, "Low Firm DEI Attn (−1 SD)", "High Firm DEI Attn (+1 SD)"),
+    levels = c("High Firm DEI Attn (+1 SD)", "Low Firm DEI Attn (−1 SD)"))]
+
+  p_3_3 <- ggplot(dat, aes(x = idx_val, y = gap)) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+    geom_ribbon(aes(ymin = ci_lo, ymax = ci_hi), fill = "steelblue", alpha = 0.25) +
+    geom_line(color = "steelblue", linewidth = 1.2) +
+    facet_grid(firm_label ~ role) +
+    labs(x = paste0("DEI ", lbl, " (z-score)"),
+         y = "URM − Non-URM gap under nonblind",
+         title = lbl) +
+    theme_minimal(base_size = 11) +
+    theme(panel.grid.minor = element_blank(),
+          strip.text = element_text(face = "bold"),
+          plot.title = element_text(face = "bold", size = 13, hjust = 0.5))
+
+  print(p_3_3)
+}
+
+rm(dt_hr, dt_eng, fit_triple_for_plot, compute_gap_triple,
+   indices_to_plot, idx_labels, m_hr, m_eng, dat, p_3_3, iv, lbl, k)
+```
+
+
+\newpage
+# Treatment Effect on Productivity of Hired
 
 ```{r blind_hiring_coding_quality, echo=FALSE, results='asis', warning=FALSE, message=FALSE, fig.width=10, fig.height=5}
 
@@ -267,7 +1771,7 @@ for (k in 1:18) {
     tryCatch({
       m_hr <- suppressMessages(suppressWarnings(
         feols(overall_score_std ~ i(treat, ref = "nonblind") + resp_age |
-                r_do_bythree + q_version + resp_gender + resp_race + s2_educ + s2_income,
+                r_do + q_version + resp_gender + resp_race + s2_educ + s2_income,
               data = hr_data, vcov = ~ responseid)
       ))
       ct <- coeftable(m_hr)
@@ -299,7 +1803,7 @@ for (k in 1:18) {
     tryCatch({
       m_eng <- suppressMessages(suppressWarnings(
         feols(overall_score_std ~ i(treat, ref = "nonblind") + resp_age |
-                r_do_bythree + q_version + resp_gender + resp_race + s2_educ + s2_income +
+                r_do + q_version + resp_gender + resp_race + s2_educ + s2_income +
                 resp_python + resp_java,
               data = eng_data, vcov = ~ responseid)
       ))
@@ -417,7 +1921,7 @@ for (k in 1:18) {
     m_eng <- suppressMessages(suppressWarnings(
       feols(as.formula(paste0(eng_col,
         " ~ i(race_gender, ref = 'Blind') + resp_age |
-          r_do_bythree + q_version + resp_gender + resp_race + s2_educ + s2_income +
+          r_do + q_version + resp_gender + resp_race + s2_educ + s2_income +
           resp_python + resp_java")),
         data = firm_long_dt[role == "Eng"],
         vcov = ~ responseid)

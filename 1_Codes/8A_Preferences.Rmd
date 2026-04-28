@@ -8,6 +8,7 @@ header-includes:
   - \usepackage{threeparttable}
   - \usepackage{float}
   - \usepackage{xcolor}
+  - \usepackage{array}
 geometry: margin=0.5in, landscape
 ---
 
@@ -1662,7 +1663,7 @@ tbl <- etable(
   extralines = list(
     "Resume (Content) FE" = rep(chk, 9),
     "Respondent FE" = rep(chk, 9),
-    "Display Position FE" = rep(chk, 9)
+    "Display Position FE (by three)" = rep(chk, 9)
   ),
   title = "Effect of Racial Concordance on Scores",
   notes = "Standard errors clustered by respondent."
@@ -1720,7 +1721,7 @@ tbl <- etable(
   extralines = list(
     "Resume (Content) FE" = rep(chk, 9),
     "Respondent FE" = rep(chk, 9),
-    "Display Position FE" = rep(chk, 9)
+    "Display Position FE (by three)" = rep(chk, 9)
   ),
   title = "Effect of Racial Concordance on Scores",
   notes = "Standard errors clustered by respondent."
@@ -1861,7 +1862,7 @@ rm(models_hr_hetero_detailed, models_eng_hetero_detailed,
 
 ## (2-way Interaction Models) By Individual DEI / Diversity Variables
 
-```{r dei_final_overall, eval = TRUE, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+```{r dei_final_overall, eval = FALSE, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
 
 dt_hr_nb  <- firm_long_dt[treat == "nonblind" & role == "HR"]
 dt_eng_nb <- firm_long_dt[treat == "nonblind" & role == "Eng"]
@@ -1962,7 +1963,98 @@ rm(dt_hr_nb, dt_eng_nb, proxies, col_labels, fit_one, models_hr, models_eng, all
 
 \scriptsize Standard errors clustered by respondent. Sample: non-blind arm. \normalsize
 
-```{r dei_final_urm, eval = TRUE, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+\newpage
+\noindent \textbf{Reproduction with three DEI / Diversity Index Options.} The same regression as above, replacing the six individual DEI proxies with three composite indices: \textit{Index A: Stated} --- the four-item average of stated DEI views (existing \texttt{pro\_dei\_index\_z}); \textit{Index B: Stated + Revealed} --- equal-weight composite of Index A and the revealed-priority ranking of ``Diversity and Representation'' from the goals question; \textit{Index C: PC1} --- first principal component of the same five items.
+
+```{r dei_indices_overall, eval = TRUE, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+
+dt_hr_nb  <- firm_long_dt[treat == "nonblind" & role == "HR"]
+dt_eng_nb <- firm_long_dt[treat == "nonblind" & role == "Eng"]
+
+indices    <- c("dei_index_A_z", "dei_index_B_z", "dei_index_C_z")
+idx_labels <- c("Index A", "Index B", "Index C")
+
+fit_one <- function(d, idx) {
+  feols(
+    as.formula(sprintf(
+      "sc_overall_z ~ i(race_gender, ref='White_Male') + i(race_gender, %s, ref='White_Male') | responseid + resume_index + r_do",
+      idx)),
+    data = d, vcov = ~ responseid)
+}
+
+models_hr  <- lapply(indices, function(p) fit_one(dt_hr_nb,  p))
+models_eng <- lapply(indices, function(p) fit_one(dt_eng_nb, p))
+all_models <- c(models_hr, models_eng)
+
+groups <- c("White_Female"   = "White Female",
+            "Asian_Male"     = "Asian Male",
+            "Asian_Female"   = "Asian Female",
+            "Hispanic_Male"  = "Hispanic Male",
+            "Hispanic_Female"= "Hispanic Female")
+
+dict_main  <- setNames(unname(groups), paste0("race_gender::", names(groups)))
+dict_inter <- unlist(lapply(indices, function(p) {
+  setNames(paste0(unname(groups), " $\\times$ DEI Index"),
+           paste0("race_gender::", names(groups), ":", p))
+}))
+dict_all <- c(dict_main, dict_inter)
+
+chk <- "\\checkmark"
+
+tbl <- etable(
+  all_models,
+  tex = TRUE, style.tex = style.tex("aer"),
+  placement = "H",
+  depvar = FALSE,
+  keep = "%race_gender",
+  fitstat = c("n", "ar2"),
+  drop.section = "fixef",
+  digits = 3, se.below = TRUE,
+  signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+  dict = dict_all,
+  extralines = list(
+    "Resume FE"     = rep(chk, 6),
+    "Respondent FE" = rep(chk, 6),
+    "Position FE"   = rep(chk, 6)
+  )
+)
+
+idx_hdr <- paste(idx_labels, collapse = " & ")
+tbl <- sub(
+  "\\\\toprule",
+  paste0(
+    "\\\\multicolumn{7}{c}{\\\\textbf{Outcome Var: Assigned Overall Score (Z) --- Three DEI / Diversity Index Options}} \\\\\\\\ ",
+    "\\\\toprule",
+    " & \\\\multicolumn{3}{c}{\\\\textbf{Panel A: HR}}",
+    " & \\\\multicolumn{3}{c}{\\\\textbf{Panel B: Engineer}} \\\\\\\\",
+    " \\\\cmidrule(lr){2-4} \\\\cmidrule(lr){5-7}",
+    " & ", idx_hdr, " & ", idx_hdr, " \\\\\\\\ \\\\addlinespace[2pt]"
+  ),
+  tbl
+)
+tbl <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering \\\\footnotesize", tbl)
+## Force equal-width centered data columns (the 6 model columns); the auto-width
+## `c` columns can become uneven when a multicolumn spanning header on one panel
+## is wider than the other.
+tbl <- sub("\\{lcccccc\\}",
+           "{l*{6}{>{\\\\centering\\\\arraybackslash}p{0.7in}}}",
+           tbl)
+tbl <- sub(
+  "\\\\begin\\{tabular\\}",
+  "{\\\\scriptsize\\\\setlength{\\\\tabcolsep}{2pt}\\\\renewcommand{\\\\arraystretch}{0.82}\\\\begin{tabular}",
+  tbl
+)
+tbl <- sub("\\\\end\\{tabular\\}", "\\\\end{tabular}}", tbl)
+
+cat(tbl)
+
+rm(dt_hr_nb, dt_eng_nb, indices, idx_labels, fit_one, models_hr, models_eng, all_models,
+   groups, dict_main, dict_inter, dict_all, chk, tbl, idx_hdr)
+```
+
+\scriptsize Index A is the existing four-item average of stated DEI views. Index B averages Index A with the respondent's revealed-priority ranking of ``Diversity and Representation'' from the seven-goals question. Index C is the first principal component of the same five items, sign-aligned so higher = more pro-DEI. \normalsize
+
+```{r dei_final_urm, eval = FALSE, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
 
 dt_hr_nb  <- firm_long_dt[treat == "nonblind" & role == "HR"]
 dt_eng_nb <- firm_long_dt[treat == "nonblind" & role == "Eng"]
@@ -2047,6 +2139,88 @@ cat(tbl)
 rm(dt_hr_nb, dt_eng_nb, zstd, proxies, col_labels, fit_urm,
    models_hr, models_eng, all_models, dict_all, chk, tbl, proxy_hdr)
 ```
+
+\newpage
+\noindent \textbf{Reproduction (URM cut) with three DEI / Diversity Index Options.}
+
+```{r dei_indices_urm, eval = TRUE, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+
+dt_hr_nb  <- firm_long_dt[treat == "nonblind" & role == "HR"]
+dt_eng_nb <- firm_long_dt[treat == "nonblind" & role == "Eng"]
+
+indices    <- c("dei_index_A_z", "dei_index_B_z", "dei_index_C_z")
+idx_labels <- c("Index A", "Index B", "Index C")
+
+fit_urm <- function(d, idx) {
+  feols(
+    as.formula(sprintf(
+      "sc_overall_z ~ urm_tech + urm_tech:%s | responseid + resume_index + r_do",
+      idx)),
+    data = d, vcov = ~ responseid)
+}
+
+models_hr  <- lapply(indices, function(p) fit_urm(dt_hr_nb,  p))
+models_eng <- lapply(indices, function(p) fit_urm(dt_eng_nb, p))
+all_models <- c(models_hr, models_eng)
+
+dict_all <- c(
+  "urm_tech" = "URM (WF, AF, HM, HF)",
+  setNames(rep("URM $\\times$ DEI Index", length(indices)),
+           paste0("urm_tech:", indices))
+)
+
+chk <- "\\checkmark"
+
+tbl <- etable(
+  all_models,
+  tex = TRUE, style.tex = style.tex("aer"),
+  placement = "H",
+  depvar = FALSE,
+  keep = "%urm_tech",
+  fitstat = c("n", "ar2"),
+  drop.section = "fixef",
+  digits = 3, se.below = TRUE,
+  signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+  dict = dict_all,
+  extralines = list(
+    "Resume FE"     = rep(chk, 6),
+    "Respondent FE" = rep(chk, 6),
+    "Position FE"   = rep(chk, 6)
+  )
+)
+
+idx_hdr <- paste(idx_labels, collapse = " & ")
+tbl <- sub(
+  "\\\\toprule",
+  paste0(
+    "\\\\multicolumn{7}{c}{\\\\textbf{Outcome Var: Assigned Overall Score (Z) --- URM Cut, Three DEI / Diversity Index Options}} \\\\\\\\ ",
+    "\\\\toprule",
+    " & \\\\multicolumn{3}{c}{\\\\textbf{Panel A: HR}}",
+    " & \\\\multicolumn{3}{c}{\\\\textbf{Panel B: Engineer}} \\\\\\\\",
+    " \\\\cmidrule(lr){2-4} \\\\cmidrule(lr){5-7}",
+    " & ", idx_hdr, " & ", idx_hdr, " \\\\\\\\ \\\\addlinespace[2pt]"
+  ),
+  tbl
+)
+tbl <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering \\\\footnotesize", tbl)
+## Force equal-width centered data columns (see note in indices_overall chunk).
+tbl <- sub("\\{lcccccc\\}",
+           "{l*{6}{>{\\\\centering\\\\arraybackslash}p{0.7in}}}",
+           tbl)
+tbl <- sub(
+  "\\\\begin\\{tabular\\}",
+  "{\\\\scriptsize\\\\setlength{\\\\tabcolsep}{2pt}\\\\renewcommand{\\\\arraystretch}{0.82}\\\\begin{tabular}",
+  tbl
+)
+tbl <- sub("\\\\end\\{tabular\\}", "\\\\end{tabular}}", tbl)
+
+cat(tbl)
+
+rm(dt_hr_nb, dt_eng_nb, indices, idx_labels, fit_urm,
+   models_hr, models_eng, all_models, dict_all, chk, tbl, idx_hdr)
+```
+
+\scriptsize URM-Tech $=$ \{White Female, Asian Female, Hispanic Male, Hispanic Female\}. Standard errors clustered by respondent. Sample: non-blind arm. \normalsize
 
 \newpage
 ## (2-way Interaction Models) By Whether the Firm Targets the Same Applicant Demographic
@@ -2146,8 +2320,8 @@ fit_urm_t <- function(d, target_var) {
   )
 }
 
-targets      <- c("firm_targets_fh", "firm_targets_fhb")
-col_labels_b <- c("Targets F or H", "Targets F, H, or B")
+targets      <- c("firm_targets_fh")
+col_labels_b <- c("Targets F or H")
 
 models_hr_b  <- lapply(targets, function(t) fit_urm_t(dt_hr_nb,  t))
 models_eng_b <- lapply(targets, function(t) fit_urm_t(dt_eng_nb, t))
@@ -2169,22 +2343,18 @@ tbl_b <- etable(
   signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
   dict = dict_b,
   extralines = list(
-    "Resume FE"     = rep(chk, 4),
-    "Respondent FE" = rep(chk, 4),
-    "Position FE"   = rep(chk, 4)
+    "Resume FE"     = rep(chk, 2),
+    "Respondent FE" = rep(chk, 2),
+    "Position FE"   = rep(chk, 2)
   )
 )
 
-proxy_hdr_b <- paste(col_labels_b, collapse = " & ")
 tbl_b <- sub(
   "\\\\toprule",
   paste0(
-    "\\\\multicolumn{5}{c}{\\\\textbf{URM-Tech Binary Cut $\\\\times$ Combined Firm-Target Dummy}} \\\\\\\\ ",
+    "\\\\multicolumn{3}{c}{\\\\textbf{URM-Tech Binary Cut $\\\\times$ Firm Targets (Female OR Hispanic)}} \\\\\\\\ ",
     "\\\\toprule",
-    " & \\\\multicolumn{2}{c}{\\\\textbf{Panel A: HR}}",
-    " & \\\\multicolumn{2}{c}{\\\\textbf{Panel B: Engineer}} \\\\\\\\",
-    " \\\\cmidrule(lr){2-3} \\\\cmidrule(lr){4-5}",
-    " & ", proxy_hdr_b, " & ", proxy_hdr_b, " \\\\\\\\ \\\\addlinespace[2pt]"
+    " & \\\\textbf{Panel A: HR} & \\\\textbf{Panel B: Engineer} \\\\\\\\ \\\\addlinespace[2pt]"
   ),
   tbl_b
 )
@@ -2200,7 +2370,7 @@ cat(tbl_b)
 
 rm(dt_hr_nb, dt_eng_nb, prep, fit_match_joint, m_hr_t, m_eng_t, dict_t, tbl_t,
    fit_urm_t, targets, col_labels_b, models_hr_b, models_eng_b, all_models_b,
-   dict_b, tbl_b, proxy_hdr_b, chk)
+   dict_b, tbl_b, chk)
 ```
 
 \scriptsize F = Female, H = Hispanic, B = Black. "Targets F or H" $\Rightarrow$ `firm_targets_female = 1` OR `firm_targets_hispanic = 1`; "Targets F, H, or B" additionally includes `firm_targets_black = 1` (robustness check; note that Black applicants are not in the study). URM $=$ \{WF, AF, HM, HF\}. \normalsize
@@ -2219,7 +2389,7 @@ rm(dt_hr_nb, dt_eng_nb, prep, fit_match_joint, m_hr_t, m_eng_t, dict_t, tbl_t,
 
 - **Backlash**: When a firm prioritizes DEI, individuals who do *not* personally prioritize DEI react by rating URM applicants lower. *Expect a positive sign on the triple interaction term.*
 
-```{r dei_final_triple, eval = TRUE, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+```{r dei_final_triple, eval = FALSE, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
 
 dt_hr_nb  <- firm_long_dt[treat == "nonblind" & role == "HR"]
 dt_eng_nb <- firm_long_dt[treat == "nonblind" & role == "Eng"]
@@ -2317,6 +2487,90 @@ rm(dt_hr_nb, dt_eng_nb, chk, fit_triple_urm, m_hr_r, m_eng_r, m_hr_g, m_eng_g,
 \vspace{0.5em}
 
 > *Note on interpretation*: On the full non-blind Engineer sample (all 74 respondents), a two-way model `sc_overall_z ~ urm_tech | responseid + resume_index + r_do_bythree` reports a statistically significant $\hat\beta_{\text{URM}} = +0.060$ ($p = .041$). It attenuates to statistically insignificant $\hat\beta \approx +0.040$ in the triple-model subsample for two reasons: (a) $\approx 18\%$ of Engineers are dropped due to answering ``Do Not Know'' in the question that elicits how much firm pays attentions to DEI, and (b) these dropped respondents happen to rate URM applicants more favorably than respondents who did characterize their firm's DEI posture.
+
+\newpage
+\noindent \textbf{Reproduction with three DEI / Diversity Index Options.} The same triple-interaction structure as above, but replacing the single revealed-priority variable (\texttt{div\_priority\_z}) with each of three composite DEI indices in turn. One sub-table per index.
+
+```{r dei_indices_triple, eval = TRUE, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+
+dt_hr_nb  <- firm_long_dt[treat == "nonblind" & role == "HR"]
+dt_eng_nb <- firm_long_dt[treat == "nonblind" & role == "Eng"]
+
+indices    <- c("dei_index_A_z", "dei_index_B_z", "dei_index_C_z")
+idx_labels <- c("Index A", "Index B", "Index C")
+chk <- "\\checkmark"
+
+fit_triple_urm <- function(d, idx, proxy_b) {
+  feols(
+    as.formula(sprintf(
+      "sc_overall_z ~ urm_tech * %s * %s | responseid + resume_index + r_do",
+      idx, proxy_b)),
+    data = d, vcov = ~ responseid)
+}
+
+for (k in seq_along(indices)) {
+  idx <- indices[k]; lbl <- idx_labels[k]
+
+  m_hr  <- suppressMessages(suppressWarnings(fit_triple_urm(dt_hr_nb,  idx, "firm_dei_attention_z")))
+  m_eng <- suppressMessages(suppressWarnings(fit_triple_urm(dt_eng_nb, idx, "firm_dei_attention_z")))
+
+  models_trp <- list("HR" = m_hr, "Eng" = m_eng)
+
+  dict_trp <- setNames(
+    c("URM (WF, AF, HM, HF)",
+      "URM $\\times$ DEI Index",
+      "URM $\\times$ Firm DEI Attn",
+      "URM $\\times$ DEI Index $\\times$ Firm DEI Attn"),
+    c("urm_tech",
+      paste0("urm_tech:", idx),
+      "urm_tech:firm_dei_attention_z",
+      paste0("urm_tech:", idx, ":firm_dei_attention_z")))
+
+  tbl_trp <- etable(
+    models_trp,
+    tex = TRUE, style.tex = style.tex("aer"),
+    placement = "H", depvar = FALSE,
+    keep = "%urm_tech",
+    fitstat = c("n", "ar2"),
+    drop.section = "fixef",
+    digits = 3, se.below = TRUE,
+    signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+    dict = dict_trp,
+    extralines = list(
+      "Resume FE"     = rep(chk, 2),
+      "Respondent FE" = rep(chk, 2),
+      "Position FE"   = rep(chk, 2)
+    )
+  )
+
+  tbl_trp <- sub(
+    "\\\\toprule",
+    paste0(
+      "\\\\multicolumn{3}{c}{\\\\textbf{", lbl, "}} \\\\\\\\ ",
+      "\\\\toprule",
+      " & \\\\multicolumn{2}{c}{\\\\textbf{Firm DEI Attn Lvl}} \\\\\\\\",
+      " \\\\cmidrule(lr){2-3}",
+      " & HR & Eng \\\\\\\\ \\\\addlinespace[2pt]"
+    ),
+    tbl_trp
+  )
+  tbl_trp <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering \\\\footnotesize", tbl_trp)
+  tbl_trp <- sub(
+    "\\\\begin\\{tabular\\}",
+    "{\\\\scriptsize\\\\setlength{\\\\tabcolsep}{3pt}\\\\renewcommand{\\\\arraystretch}{0.88}\\\\begin{tabular}",
+    tbl_trp
+  )
+  tbl_trp <- sub("\\\\end\\{tabular\\}", "\\\\end{tabular}}", tbl_trp)
+
+  cat(tbl_trp)
+  cat("\\vspace{0.5em}\n\n")
+}
+
+rm(dt_hr_nb, dt_eng_nb, indices, idx_labels, chk, fit_triple_urm,
+   m_hr, m_eng, models_trp, dict_trp, tbl_trp, idx, lbl, k)
+```
+
+\scriptsize Three sub-tables, one per DEI index. Each sub-table reports HR vs.\ Eng under the combined firm-DEI-attention-level proxy (\texttt{firm\_dei\_attention\_z}, the within-cell z-score of the equal-weight average of \texttt{firm\_attention\_race\_z} and \texttt{firm\_attention\_gender\_z}). The triple-interaction row tests the substitution-vs-backlash hypothesis with each index's notion of personal DEI alignment. Standard errors clustered by respondent. Sample: non-blind arm. \normalsize
 
 
 -->

@@ -259,13 +259,47 @@ firm_dt[!is.na(fl_193_do), c(paste0("r", 1:18, "_DO")) := lapply(tstrsplit(fl_19
           
   #### Three Tier - Pro DEI (Z) Index
   firm_dt[, pro_dei_index_3tiers := cut(pro_dei_index_z,
-                                      breaks = quantile(pro_dei_index_z, 
-                                                        probs = c(0, 1/3, 2/3, 1), 
+                                      breaks = quantile(pro_dei_index_z,
+                                                        probs = c(0, 1/3, 2/3, 1),
                                                         na.rm = TRUE),
                                       labels = c("Anti-DEI", "Mid-DEI", "Pro-DEI"),
                                       include.lowest = TRUE),
           by = .(role)]
   firm_dt[, pro_dei_index_3tiers := relevel(pro_dei_index_3tiers, ref = "Anti-DEI")]
+
+  #### Three DEI / Diversity Index Options (used in §3.1 / §3.3 reproduction tables)
+  ##  Index A:  4-item stated DEI views (alias of pro_dei_index_z above).
+  ##  Index B:  5-item composite of stated views + revealed priority ranking.
+  ##  Index C:  First principal component of the same 5 items.
+  ## All three are z-scored within (role, treat) cells for consistency with
+  ## the rest of the DEI proxies.
+  firm_dt[, dei_index_A_z := pro_dei_index_z]
+
+  ## Index B: equal-weight composite of stated and revealed signals.
+  firm_dt[, dei_index_B_z := rowMeans(.SD, na.rm = FALSE),
+          .SDcols = c("pro_dei_index_z", "div_priority_z")]
+  firm_dt[, dei_index_B_z := (dei_index_B_z - mean(dei_index_B_z, na.rm = TRUE)) /
+                                sd(dei_index_B_z, na.rm = TRUE),
+          by = .(role, treat)]
+
+  ## Index C: PC1 of 5 already-z-scored items.
+  ## We pool across (role, treat) for stability (small per-cell N), then re-z
+  ## the resulting PC1 within (role, treat) to match the convention.
+  ## Sign convention: flip if PC1 loads negatively on pro_dei_race_z so that
+  ## higher score always means more pro-DEI.
+  dei_items_C <- c("pro_dei_race_z", "pro_dei_gender_z",
+                   "pro_diverse_z", "pro_hiring_dei_z", "div_priority_z")
+  pc_in       <- complete.cases(firm_dt[, ..dei_items_C])
+  pc_mat      <- as.matrix(firm_dt[pc_in, ..dei_items_C])
+  pc_fit      <- prcomp(pc_mat, center = FALSE, scale. = FALSE)
+  pc1_scores  <- pc_fit$x[, 1]
+  if (pc_fit$rotation["pro_dei_race_z", 1] < 0) pc1_scores <- -pc1_scores
+  firm_dt[, dei_index_C_z := NA_real_]
+  firm_dt[pc_in, dei_index_C_z := pc1_scores]
+  firm_dt[, dei_index_C_z := (dei_index_C_z - mean(dei_index_C_z, na.rm = TRUE)) /
+                                sd(dei_index_C_z, na.rm = TRUE),
+          by = .(role, treat)]
+  rm(dei_items_C, pc_in, pc_mat, pc_fit, pc1_scores)
 
   #### Firm DEI Attention (perception of firm's current effort; 1=Very low ... 5=Very high)
   firm_dt[, firm_attention_race_z   := (s5_view_dei_race_f   - mean(s5_view_dei_race_f,   na.rm = TRUE)) /
@@ -273,6 +307,13 @@ firm_dt[!is.na(fl_193_do), c(paste0("r", 1:18, "_DO")) := lapply(tstrsplit(fl_19
           by = .(role, treat)]
   firm_dt[, firm_attention_gender_z := (s5_view_dei_gender_f - mean(s5_view_dei_gender_f, na.rm = TRUE)) /
                                           sd(s5_view_dei_gender_f, na.rm = TRUE),
+          by = .(role, treat)]
+  ## Combined firm DEI attention: equal-weight average of race + gender attention,
+  ## then re-z-scored within (role, treat) for consistency with the two parents.
+  firm_dt[, firm_dei_attention_z := rowMeans(.SD, na.rm = FALSE),
+          .SDcols = c("firm_attention_race_z", "firm_attention_gender_z")]
+  firm_dt[, firm_dei_attention_z := (firm_dei_attention_z - mean(firm_dei_attention_z, na.rm = TRUE)) /
+                                            sd(firm_dei_attention_z, na.rm = TRUE),
           by = .(role, treat)]
 
   #### Firm Racial / Gender Composition (self-reported; each block sums to 100)
@@ -354,12 +395,13 @@ firm_dt[!is.na(fl_193_do), c(paste0("r", 1:18, "_DO")) := lapply(tstrsplit(fl_19
                       "resp_race", "resp_white", "resp_asian", "resp_hispanic", "resp_black", "resp_raceother",
                       "resp_race_gender", "resp_race_gender_detailed",
                       "pro_dei_race_z", "pro_dei_gender_z", "pro_diverse_z", "pro_hiring_dei_z", "pro_dei_index_z", "pro_dei_basedon_index", "pro_dei_index_3tiers",
+                      "dei_index_A_z", "dei_index_B_z", "dei_index_C_z",
                       "div_priority_z", "div_priority_top3",
                       "dei_policy_count", "dei_policy_count_z", "dei_policy_3plus",
                       "bh_yes", "firm_targets_white", "firm_targets_black", "firm_targets_hispanic",
                       "firm_targets_asian", "firm_targets_male", "firm_targets_female",
                       "firm_targets_race_urm", "firm_targets_any_urm",
-                      "firm_attention_race_z", "firm_attention_gender_z",
+                      "firm_attention_race_z", "firm_attention_gender_z", "firm_dei_attention_z",
                       "own_race_share", "own_gender_share",
                       "flag_extreme_composition", "flag_own_zero",
                       "firm_id", "s2_firm_size", "firm_size", "firm_size_small", "firm_size_mid", "firm_size_large",
@@ -390,12 +432,13 @@ firm_dt[!is.na(fl_193_do), c(paste0("r", 1:18, "_DO")) := lapply(tstrsplit(fl_19
                 "resp_race", "resp_white", "resp_asian", "resp_hispanic", "resp_black", "resp_raceother",
                 "resp_race_gender", "resp_race_gender_detailed",
                 "pro_dei_race_z", "pro_dei_gender_z", "pro_diverse_z", "pro_hiring_dei_z", "pro_dei_index_z", "pro_dei_basedon_index", "pro_dei_index_3tiers",
+                "dei_index_A_z", "dei_index_B_z", "dei_index_C_z",
                 "div_priority_z", "div_priority_top3",
                 "dei_policy_count", "dei_policy_count_z", "dei_policy_3plus",
                 "bh_yes", "firm_targets_white", "firm_targets_black", "firm_targets_hispanic",
                 "firm_targets_asian", "firm_targets_male", "firm_targets_female",
                 "firm_targets_race_urm", "firm_targets_any_urm",
-                "firm_attention_race_z", "firm_attention_gender_z",
+                "firm_attention_race_z", "firm_attention_gender_z", "firm_dei_attention_z",
                 "own_race_share", "own_gender_share",
                 "flag_extreme_composition", "flag_own_zero",
                 "firm_id", "s2_firm_size", "firm_size", "firm_size_small", "firm_size_mid", "firm_size_large",
@@ -501,10 +544,20 @@ firm_dt[!is.na(fl_193_do), c(paste0("r", 1:18, "_DO")) := lapply(tstrsplit(fl_19
   firm_long_dt[treat == "nonblind" & 
                  resp_race == "Asian" & resp_race_gender_detailed %in% c("Chinese_Male", "Chinese_Female"), 
                concordance_race_detailed := fifelse(chinese == 1, 1, 0)]  
-  firm_long_dt[treat == "nonblind" & 
-                 resp_race == "Asian" & resp_race_gender_detailed %in% c("Indian_Male", "Indian_Female"), 
-               concordance_race_detailed := fifelse(indian == 1, 1, 0)]    
-  firm_long_dt[treat == "nonblind" & 
+  firm_long_dt[treat == "nonblind" &
+                 resp_race == "Asian" & resp_race_gender_detailed %in% c("Indian_Male", "Indian_Female"),
+               concordance_race_detailed := fifelse(indian == 1, 1, 0)]
+  ## Asian respondents whose detailed sub-ethnicity is not Chinese or Indian
+  ## (e.g., Korean, Japanese) are coded as always-discordant in nonblind:
+  ## the Asian applicant names in our resumes are exclusively Chinese or
+  ## Indian, so these respondents can never be concordant.
+  firm_long_dt[treat == "nonblind" &
+                 resp_race == "Asian" &
+                 !(resp_race_gender_detailed %in% c("Chinese_Male", "Chinese_Female",
+                                                    "Indian_Male",  "Indian_Female")) &
+                 is.na(concordance_race_detailed),
+               concordance_race_detailed := 0L]
+  firm_long_dt[treat == "nonblind" &
                  (resp_race_gender == "White_Male" | resp_race_gender == "White_Female" | 
                     resp_race_gender == "Asian_Male" | resp_race_gender == "Asian_Female" | 
                     resp_race_gender == "Hispanic_Male" | resp_race_gender == "Hispanic_Female"), 
@@ -518,7 +571,13 @@ firm_dt[!is.na(fl_193_do), c(paste0("r", 1:18, "_DO")) := lapply(tstrsplit(fl_19
   firm_long_dt[, concordance_race_gender_detailed_blind := fcase(
     concordance_race_gender_detailed == 1, "Concordant_Group",
     concordance_race_gender_detailed == 0, "Discordant_Group",
-    (is.na(concordance_race_gender_detailed) & treat == "blind"), "Blind"
+    ## Asian respondents whose detailed sub-ethnicity is not represented in
+    ## the applicant pool (e.g., Korean, Japanese) are coded as always-
+    ## discordant in nonblind: the Asian applicant names are exclusively
+    ## Chinese or Indian, so these respondents can never be concordant.
+    is.na(concordance_race_gender_detailed) & treat == "nonblind" &
+      resp_race == "Asian", "Discordant_Group",
+    is.na(concordance_race_gender_detailed) & treat == "blind", "Blind"
   )]
   firm_long_dt[, concordance_race_gender_detailed_blind := factor(concordance_race_gender_detailed_blind,
                                                                   levels = c("Blind", 
