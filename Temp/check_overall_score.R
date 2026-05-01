@@ -1,0 +1,25 @@
+library(pacman)
+p_load(haven, here, base, readr, data.table, stringr, labelled, tidyverse, dplyr)
+options(readr.show_types = FALSE)
+setwd(here())
+date      <- "18mar2026"
+data_root <- "C:/Users/sungs/Dropbox/2_Research/A_By_Topics/A_Blind_hiring/"
+source(here("1_Codes", "2_Import.R"))
+source(here("1_Codes", "3_Firm_Cleaning.R"))
+source(here("1_Codes", "4_Distribution_Cleaning.R"))
+source(here("1_Codes", "5_Cleaning.R"))
+
+cat("\n========== overall_score (true coding score) ==========\n")
+cat("Range:", range(firm_long_dt$overall_score, na.rm = TRUE), "\n")
+cat("Mean :", mean(firm_long_dt$overall_score,  na.rm = TRUE), "\n")
+cat("SD   :", sd(firm_long_dt$overall_score,    na.rm = TRUE), "\n")
+cat("Unique values  :", length(unique(firm_long_dt$overall_score)), "\n")
+cat("Resume-level unique values  :", length(unique(unique(firm_long_dt[, .(resume_index, overall_score)])$overall_score)), "\n")
+cat("\n-- Sorted unique resume-level values (one per resume) --\n")
+print(sort(unique(unique(firm_long_dt[, .(resume_index, overall_score)])$overall_score)))
+
+cat("\n========== sc_coding (evaluator's coding rating) ==========\n")
+cat("Range:", range(firm_long_dt$sc_coding, na.rm = TRUE), "\n")
+cat("Unique values:", length(unique(firm_long_dt$sc_coding)), "\n")
+cat("Sorted unique values:\n")
+print(sort(unique(firm_long_dt$sc_coding)))

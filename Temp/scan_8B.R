@@ -1,0 +1,6 @@
+library(pdftools)
+txt <- pdf_text("2_Reports/8B_Stage_BH.pdf")
+cat("Pages:", length(txt), "\n")
+cat("\n--- FULL PAGE 4 (S2.1) ---\n"); cat(txt[[4]])
+cat("\n--- FULL PAGE 5 (S2.2) ---\n"); cat(txt[[5]])
+cat("\n--- FULL PAGE 7 (S2.3) ---\n"); if(length(txt) >= 7) cat(txt[[7]])

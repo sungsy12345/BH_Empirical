@@ -267,39 +267,38 @@ firm_dt[!is.na(fl_193_do), c(paste0("r", 1:18, "_DO")) := lapply(tstrsplit(fl_19
           by = .(role)]
   firm_dt[, pro_dei_index_3tiers := relevel(pro_dei_index_3tiers, ref = "Anti-DEI")]
 
-  #### Three DEI / Diversity Index Options (used in §3.1 / §3.3 reproduction tables)
-  ##  Index A:  4-item stated DEI views (alias of pro_dei_index_z above).
-  ##  Index B:  5-item composite of stated views + revealed priority ranking.
-  ##  Index C:  First principal component of the same 5 items.
-  ## All three are z-scored within (role, treat) cells for consistency with
+  #### Two DEI / Diversity Index Options.
+  ##  Index A:  Equal-weight average of 5 already-z-scored items (4 stated DEI
+  ##            views + revealed-priority ranking from the seven-goals question),
+  ##            then re-z-scored within (role, treat).
+  ##  Index B:  First principal component of the same 5 items.
+  ## Both are z-scored within (role, treat) cells for consistency with
   ## the rest of the DEI proxies.
-  firm_dt[, dei_index_A_z := pro_dei_index_z]
+  dei_items_5 <- c("pro_dei_race_z", "pro_dei_gender_z",
+                   "pro_diverse_z", "pro_hiring_dei_z", "div_priority_z")
 
-  ## Index B: equal-weight composite of stated and revealed signals.
-  firm_dt[, dei_index_B_z := rowMeans(.SD, na.rm = FALSE),
-          .SDcols = c("pro_dei_index_z", "div_priority_z")]
-  firm_dt[, dei_index_B_z := (dei_index_B_z - mean(dei_index_B_z, na.rm = TRUE)) /
-                                sd(dei_index_B_z, na.rm = TRUE),
+  ## Index A: equal-weight 1/5 on each of the 5 z-scored items.
+  firm_dt[, dei_index_A_z := rowMeans(.SD, na.rm = FALSE), .SDcols = dei_items_5]
+  firm_dt[, dei_index_A_z := (dei_index_A_z - mean(dei_index_A_z, na.rm = TRUE)) /
+                                sd(dei_index_A_z, na.rm = TRUE),
           by = .(role, treat)]
 
-  ## Index C: PC1 of 5 already-z-scored items.
+  ## Index B: PC1 of the same 5 z-scored items.
   ## We pool across (role, treat) for stability (small per-cell N), then re-z
   ## the resulting PC1 within (role, treat) to match the convention.
   ## Sign convention: flip if PC1 loads negatively on pro_dei_race_z so that
   ## higher score always means more pro-DEI.
-  dei_items_C <- c("pro_dei_race_z", "pro_dei_gender_z",
-                   "pro_diverse_z", "pro_hiring_dei_z", "div_priority_z")
-  pc_in       <- complete.cases(firm_dt[, ..dei_items_C])
-  pc_mat      <- as.matrix(firm_dt[pc_in, ..dei_items_C])
+  pc_in       <- complete.cases(firm_dt[, ..dei_items_5])
+  pc_mat      <- as.matrix(firm_dt[pc_in, ..dei_items_5])
   pc_fit      <- prcomp(pc_mat, center = FALSE, scale. = FALSE)
   pc1_scores  <- pc_fit$x[, 1]
   if (pc_fit$rotation["pro_dei_race_z", 1] < 0) pc1_scores <- -pc1_scores
-  firm_dt[, dei_index_C_z := NA_real_]
-  firm_dt[pc_in, dei_index_C_z := pc1_scores]
-  firm_dt[, dei_index_C_z := (dei_index_C_z - mean(dei_index_C_z, na.rm = TRUE)) /
-                                sd(dei_index_C_z, na.rm = TRUE),
+  firm_dt[, dei_index_B_z := NA_real_]
+  firm_dt[pc_in, dei_index_B_z := pc1_scores]
+  firm_dt[, dei_index_B_z := (dei_index_B_z - mean(dei_index_B_z, na.rm = TRUE)) /
+                                sd(dei_index_B_z, na.rm = TRUE),
           by = .(role, treat)]
-  rm(dei_items_C, pc_in, pc_mat, pc_fit, pc1_scores)
+  rm(dei_items_5, pc_in, pc_mat, pc_fit, pc1_scores)
 
   #### Firm DEI Attention (perception of firm's current effort; 1=Very low ... 5=Very high)
   firm_dt[, firm_attention_race_z   := (s5_view_dei_race_f   - mean(s5_view_dei_race_f,   na.rm = TRUE)) /
@@ -395,7 +394,7 @@ firm_dt[!is.na(fl_193_do), c(paste0("r", 1:18, "_DO")) := lapply(tstrsplit(fl_19
                       "resp_race", "resp_white", "resp_asian", "resp_hispanic", "resp_black", "resp_raceother",
                       "resp_race_gender", "resp_race_gender_detailed",
                       "pro_dei_race_z", "pro_dei_gender_z", "pro_diverse_z", "pro_hiring_dei_z", "pro_dei_index_z", "pro_dei_basedon_index", "pro_dei_index_3tiers",
-                      "dei_index_A_z", "dei_index_B_z", "dei_index_C_z",
+                      "dei_index_A_z", "dei_index_B_z",
                       "div_priority_z", "div_priority_top3",
                       "dei_policy_count", "dei_policy_count_z", "dei_policy_3plus",
                       "bh_yes", "firm_targets_white", "firm_targets_black", "firm_targets_hispanic",
@@ -432,7 +431,7 @@ firm_dt[!is.na(fl_193_do), c(paste0("r", 1:18, "_DO")) := lapply(tstrsplit(fl_19
                 "resp_race", "resp_white", "resp_asian", "resp_hispanic", "resp_black", "resp_raceother",
                 "resp_race_gender", "resp_race_gender_detailed",
                 "pro_dei_race_z", "pro_dei_gender_z", "pro_diverse_z", "pro_hiring_dei_z", "pro_dei_index_z", "pro_dei_basedon_index", "pro_dei_index_3tiers",
-                "dei_index_A_z", "dei_index_B_z", "dei_index_C_z",
+                "dei_index_A_z", "dei_index_B_z",
                 "div_priority_z", "div_priority_top3",
                 "dei_policy_count", "dei_policy_count_z", "dei_policy_3plus",
                 "bh_yes", "firm_targets_white", "firm_targets_black", "firm_targets_hispanic",
