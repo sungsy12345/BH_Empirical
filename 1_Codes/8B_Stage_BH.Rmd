@@ -1920,8 +1920,6 @@ If blind hiring reshuffles outcomes (Sections 2--4), proponents might argue it i
 
 ## Does Blinding Lead to More Accurate Coding Evaluations?
 
-\textcolor{blue}{\textbf{Takeaway}}: Evaluators do extract signal about candidates' actual coding ability --- Engineers much more strongly than HR, consistent with Engineers seeing the code while HR sees only the resume. Blinding, however, does \emph{not} meaningfully change this signal-extraction ability in either role: the $\texttt{true\_coding\_z} \times \texttt{blind}$ interaction is small, negative, and statistically insignificant for both HR and Engineers. If blinding --- which in our experiment amounts to removing random, uninformative demographic noise --- improved signal-extraction ability, we would expect a positive and statistically significant interaction term. In short, blinding \emph{reshuffles} who receives high scores (Section 1.1) but does not change \emph{how well} those scores track actual coding skill.
-
 \textcolor{blue}{\textbf{Specification}}:
 \vspace{-0.7em}
 $$
@@ -2386,10 +2384,7 @@ rm(results_all, dt_plot, demo_labels, dg, k,
 
 
 \clearpage
-# Heterogeneity in Treatment Effects by Candidate Quality (Appendix)
-
-\textit{The §2 demographic-effect regression run on subsamples by candidate quality. Three cuts: per-cell (6 race-gender groups), URM-tech (URM = WF+AF+HM+HF vs Non-URM = WM+AM), and URM-axis (Male non-Hispanic / Female non-Hispanic / Hispanic). Two splits per cut: GPA tier (Low / Mid / Top) and Coding tier (Bottom / Top half on \texttt{test\_case}). LHS sign-flipped so positive $\Rightarrow$ blinding raises the score.}
-\vspace{-0.4em}
+# Heterogeneity in Treatment Effects by Candidate Quality
 
 
 ```{r appendix_het_by_quality_graphs, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE, fig.width = 11, fig.height = 6}
@@ -2546,15 +2541,15 @@ fig_eng <- (panels_eng$rg_gpa + panels_eng$rg_cod) /
            theme(legend.position = "top")
 
 suppressMessages(suppressWarnings({
-  ggsave(plot_file_hr,  plot = fig_hr,  width = 10, height = 9, device = "pdf")
-  ggsave(plot_file_eng, plot = fig_eng, width = 10, height = 9, device = "pdf")
+  ggsave(plot_file_hr,  plot = fig_hr,  width = 10, height = 6.2, device = "pdf")
+  ggsave(plot_file_eng, plot = fig_eng, width = 10, height = 6.2, device = "pdf")
 }))
 
-cat("\\noindent\\textbf{HR Evaluators}\\par\\vspace{0.2em}\n")
-cat("\\begin{center}\\includegraphics[width=0.85\\textwidth]{", plot_file_hr, "}\\end{center}\n", sep = "")
+cat("\\begin{center}\\textbf{HR Evaluators}\\par\\vspace{0.1em}\n")
+cat("\\includegraphics[width=0.95\\textwidth]{", plot_file_hr, "}\\end{center}\n", sep = "")
 cat("\\clearpage\n")
-cat("\\noindent\\textbf{Engineer Evaluators}\\par\\vspace{0.2em}\n")
-cat("\\begin{center}\\includegraphics[width=0.85\\textwidth]{", plot_file_eng, "}\\end{center}\n", sep = "")
+cat("\\begin{center}\\textbf{Engineer Evaluators}\\par\\vspace{0.1em}\n")
+cat("\\includegraphics[width=0.95\\textwidth]{", plot_file_eng, "}\\end{center}\n", sep = "")
 
 rm(dt_hr, dt_eng, build_aux, extract_split_te, make_split_plot, fit_split, build_role_panel,
    gpa_levels, gpa_labels, gpa_colors, gpa_shapes,
