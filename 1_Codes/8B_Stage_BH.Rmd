@@ -2021,11 +2021,11 @@ suppressMessages(suppressWarnings({
   ggsave(plot_file_h, plot = fig_h, width = 10, height = 6.2, device = "pdf")
 }))
 
-cat("\\begin{center}\\textbf{Engineer Backlash Hypothesis}\\par\\vspace{0.1em}\n")
-cat("\\includegraphics[width=0.95\\textwidth]{", plot_file_e, "}\\end{center}\n", sep = "")
-cat("\\clearpage\n")
 cat("\\begin{center}\\textbf{HR Compensation Hypothesis}\\par\\vspace{0.1em}\n")
 cat("\\includegraphics[width=0.95\\textwidth]{", plot_file_h, "}\\end{center}\n", sep = "")
+cat("\\clearpage\n")
+cat("\\begin{center}\\textbf{Engineer Backlash Hypothesis}\\par\\vspace{0.1em}\n")
+cat("\\includegraphics[width=0.95\\textwidth]{", plot_file_e, "}\\end{center}\n", sep = "")
 
 rm(fld, e_dt, h_dt,
    m_e_rg, m_e_ax, m_e_ut, m_h_rg, m_h_ax, m_h_ut,
@@ -2093,7 +2093,8 @@ fit_triple_p <- function(d, factor_col, third_col) {
 ## only, so the rebel "Misaligned" line ends up with the same slope in Z as the
 ## "Aligned" line (no differential slope is identified) plus the perc shift.
 build_scissors_dt <- function(model, factor_col, third_col,
-                              demos, demo_lbls, role_lbl, z_grid) {
+                              demos, demo_lbls, role_lbl, z_grid,
+                              perc_grid = c(0, 1)) {
   cf <- coef(model);  V <- vcov(model)
   rows <- list()
   for (i in seq_along(demos)) {
@@ -2108,7 +2109,7 @@ build_scissors_dt <- function(model, factor_col, third_col,
     cfi[is.na(cfi)] <- 0
     ix_pres <- ix[present]
     Vi      <- V[ix_pres, ix_pres, drop = FALSE]
-    for (p in c(0, 1)) {
+    for (p in perc_grid) {
       for (q in z_grid) {
         v       <- c(1, p, q, p * q)
         v_pres  <- v[present]
@@ -2137,18 +2138,20 @@ build_scissors_dt <- function(model, factor_col, third_col,
 ## y_lim is computed from the est range across all panels plus the HR-only CI
 ## extent, then padded. Engineer rebellion ribbons that exceed this get clipped
 ## by coord_cartesian -- the central est line stays visible.
-make_scissors_grid <- function(plot_dt, demo_lbls, x_lab, ncol_panels) {
+make_scissors_grid <- function(plot_dt, demo_lbls, x_lab, ncol_panels,
+                               low_label = "Aligned",
+                               high_label_template = "%s Misaligned") {
   plot_dt <- as.data.frame(plot_dt)
+  hr_high  <- sprintf(high_label_template, "HR")
+  eng_high <- sprintf(high_label_template, "Eng")
+  perc_vals <- sort(unique(plot_dt$Perc[!is.na(plot_dt$Perc)]))
+  perc_low_val <- perc_vals[1]
   plot_dt$bucket_chr <- ifelse(
-    plot_dt$Perc == 0, "Aligned",
-    ifelse(plot_dt$role == "HR", "HR Misaligned", "Eng Misaligned"))
-  bucket_levels <- c("Aligned", "HR Misaligned", "Eng Misaligned")
-  bcol <- c("Aligned" = "gray40",
-            "HR Misaligned" = "steelblue",
-            "Eng Misaligned" = "indianred")
-  blty <- c("Aligned" = "dashed",
-            "HR Misaligned" = "solid",
-            "Eng Misaligned" = "solid")
+    plot_dt$Perc == perc_low_val, low_label,
+    ifelse(plot_dt$role == "HR", hr_high, eng_high))
+  bucket_levels <- c(low_label, hr_high, eng_high)
+  bcol <- setNames(c("gray40", "steelblue", "indianred"), bucket_levels)
+  blty <- setNames(c("dashed", "solid", "solid"),         bucket_levels)
 
   ## Pad with NA-est rows so every (role, demo) panel sees all 3 bucket levels.
   combos   <- expand.grid(role = c("HR", "Eng"), demo = demo_lbls,
@@ -2170,12 +2173,14 @@ make_scissors_grid <- function(plot_dt, demo_lbls, x_lab, ncol_panels) {
   plot_dt$demo   <- factor(plot_dt$demo,   levels = demo_lbls)
   plot_dt$bucket <- factor(plot_dt$bucket_chr, levels = bucket_levels)
 
-  hr_idx <- plot_dt$role == "HR" & !is.na(plot_dt$est)
-  y_lim  <- range(c(plot_dt$est,
-                    plot_dt$lwr[hr_idx], plot_dt$upr[hr_idx]),
-                  na.rm = TRUE) * 1.10
-  y_lim[1] <- min(y_lim[1], -0.5)
-  y_lim[2] <- max(y_lim[2],  0.5)
+  ## y_lim from est range only (with 50% buffer): some 6-cell x continuous-perc
+  ## CI bounds blow up to absurd magnitudes when cells are thin, which would
+  ## squash all visible signal. Hard-cap at +/-2 (outcome is z-scored, so
+  ## meaningful effects should sit within +/-1.5). Ribbons that exceed get
+  ## clipped by coord_cartesian; the central est lines stay visible.
+  y_lim <- range(plot_dt$est, na.rm = TRUE) * 1.5
+  y_lim[1] <- max(min(y_lim[1], -0.5), -2)
+  y_lim[2] <- min(max(y_lim[2],  0.5),  2)
 
   panel_one <- function(rl, dm) {
     d <- plot_dt[plot_dt$role == rl & plot_dt$demo == dm, ]
@@ -2600,10 +2605,509 @@ cat("\\includegraphics[width=0.75\\textwidth]{", plot_file_cod, "}\\par\\vspace{
 cat("{\\raggedright\\scriptsize Same layout as Triple A. X-axis: candidate's coding ability (test\\_case z-score). Same Eng-rebellion caveat applies.\\par}\n")
 cat("\\end{center}\n")
 
+## Keep flip / fit_simple_p / fit_triple_p / build_scissors_dt /
+## make_scissors_grid in scope: §9 reuses them with a continuous perc_role.
 rm(m1, m2, m3, m4, m5, m6, all_models, demos, demo_lbls, fcol,
    coef_map, gof_custom, chk, nox, fe_rows,
    z_grid, df_dei, df_cod, fig_dei, fig_cod,
    plot_file_dei, plot_file_cod, fig_dir,
-   fld, dt_hr, dt_eng, n_e0, n_e1, n_h0, n_h1,
+   fld, dt_hr, dt_eng, n_e0, n_e1, n_h0, n_h1)
+```
+
+
+\clearpage
+# Inter-Departmental Backlash and Compensation: Continuous Misalignment Index
+
+\textit{Spec.} Replicates §8 with the binary perception (\texttt{eng\_perceives\_hr\_overreach} / \texttt{hr\_sees\_eng\_apathy}) replaced by a \textbf{continuous z-scored ``perceived misalignment'' index} per role.
+
+\textit{Index construction (per role, computed at respondent level then merged back).} For role $\in \{\text{Eng}, \text{HR}\}$:
+\begin{enumerate}\setlength\itemsep{2pt}\setlength\parskip{0pt}\setlength\topsep{0pt}
+  \item \textbf{Multi-select count:} sum of \texttt{aligndiff\{role\}\_*} indicators marked --- the number of DEI dimensions on which the respondent perceives misalignment with the other side.
+  \item \textbf{Likert:} \texttt{s5\_view\_aligndiff\{role\}} --- the respondent's overall self-rating of alignment difference.
+  \item Each component is z-scored within the role; the Likert is auto-flipped if anti-correlated with the count (so both increase with perceived misalignment).
+  \item The two z-scores are equal-weight averaged; the average is z-scored within role to produce \texttt{misalign\_z}.
+\end{enumerate}
+
+\textit{Why this beats the binary indicator from §7-§8.} With a continuous perception measure, every respondent contributes identifying variation along the perception dimension. The 1-rebel-in-nonblind collinearity that forced \texttt{fixest} to drop all three Eng D $\times$ Perc $\times$ Z three-way interactions in §8 is dissolved: \texttt{misalign\_z} varies smoothly over the full Eng sample (n $\approx$ 154), so the three-way coefficients are now identifiable from cross-respondent variation along the index. The Eng scissors panels in §9 should therefore show \emph{actual} differential slopes in Z (not the parallel-line identification artifact of §8).
+
+\textit{Triple-interaction model (identical to §8 except perc\_role is continuous).} \texttt{sc\_overall\_z $\sim$ perc\_role + Z + I(perc\_role $\cdot$ Z) + i(factor) + i(factor, perc\_role) + i(factor, Z) + i(factor, I(perc\_role $\cdot$ Z)) + resp\_age $|$ resume\_index + r\_do + resp FEs}, two-way cluster on \texttt{responseid + resume\_index}. \textbf{All coefficients flipped post-fit so positive = effect of blinding raises that group's score.} The scissors plots evaluate the linear combination at \texttt{perc\_role} $\in \{-1, +1\}$ SD (``Low Misalign'' vs ``High Misalign'') over a Z grid covering $\pm 2$ SD.
+
+```{r perception_misalign_data, echo = FALSE, warning = FALSE, message = FALSE}
+## Build dt_hr / dt_eng with the continuous misalignment index as perc_role.
+extra_perc <- c("s5_view_aligndiffeng", "s5_view_aligndiffhr",
+                grep("^aligndiff(hr|eng)_", names(firm_dt), value = TRUE))
+extra_perc <- intersect(extra_perc, names(firm_dt))
+
+fld <- merge(firm_long_dt,
+             firm_dt[, c("responseid", extra_perc), with = FALSE],
+             by = "responseid", all.x = TRUE)
+
+fld[, urm_axis_blind := fcase(
+       treat == "blind",                                                            "Blind",
+       treat == "nonblind" & race_gender %in% c("White_Male", "Asian_Male"),         "Nonblind_MaleNonHisp",
+       treat == "nonblind" & race_gender %in% c("White_Female", "Asian_Female"),     "Nonblind_FemaleNonHisp",
+       treat == "nonblind" & race_gender %in% c("Hispanic_Male", "Hispanic_Female"), "Nonblind_Hispanic",
+       default = NA_character_)]
+fld[, urm_axis_blind := factor(urm_axis_blind,
+       levels = c("Blind", "Nonblind_MaleNonHisp", "Nonblind_FemaleNonHisp", "Nonblind_Hispanic"))]
+fld[, urm_tech_blind := fcase(
+       treat == "blind",                    "Blind",
+       treat == "nonblind" & urm_tech == 1, "Nonblind_URM",
+       treat == "nonblind" & urm_tech == 0, "Nonblind_NonURM",
+       default = NA_character_)]
+fld[, urm_tech_blind := factor(urm_tech_blind,
+       levels = c("Blind", "Nonblind_NonURM", "Nonblind_URM"))]
+fld[, race_gender := factor(race_gender,
+       levels = c("Blind", "White_Male", "White_Female",
+                  "Asian_Male", "Asian_Female",
+                  "Hispanic_Male", "Hispanic_Female"))]
+fld[, test_case_z := as.numeric(scale(test_case))]
+
+## Compute the misalignment index at respondent level (one row per respondent),
+## then merge back to fld so the panel structure is preserved.
+resp_dt <- unique(fld[, c("responseid", "role", extra_perc), with = FALSE])
+
+## Cast labelled / haven columns to plain numeric so mean/sd/rowSums work.
+for (col in extra_perc) {
+  if (col %in% names(resp_dt)) {
+    set(resp_dt, j = col, value = as.numeric(resp_dt[[col]]))
+  }
+}
+
+eng_items <- grep("^aligndiffeng_", names(resp_dt), value = TRUE)
+hr_items  <- grep("^aligndiffhr_",  names(resp_dt), value = TRUE)
+
+z <- function(x) {
+  if (sum(!is.na(x)) < 2) return(rep(NA_real_, length(x)))
+  mu <- mean(x, na.rm = TRUE); sg <- sd(x, na.rm = TRUE)
+  if (!is.finite(sg) || sg == 0) return(rep(0, length(x)))
+  (x - mu) / sg
+}
+
+## Engineer-side components
+if (length(eng_items) > 0) {
+  resp_dt[role == "Eng", eng_count := rowSums(.SD, na.rm = TRUE), .SDcols = eng_items]
+} else {
+  resp_dt[role == "Eng", eng_count := NA_real_]
+}
+resp_dt[role == "Eng", eng_likert := s5_view_aligndiffeng]
+resp_dt[role == "Eng", eng_count_z  := z(eng_count)]
+resp_dt[role == "Eng", eng_likert_z := z(eng_likert)]
+
+## HR-side components
+if (length(hr_items) > 0) {
+  resp_dt[role == "HR", hr_count := rowSums(.SD, na.rm = TRUE), .SDcols = hr_items]
+} else {
+  resp_dt[role == "HR", hr_count := NA_real_]
+}
+resp_dt[role == "HR", hr_likert := s5_view_aligndiffhr]
+resp_dt[role == "HR", hr_count_z  := z(hr_count)]
+resp_dt[role == "HR", hr_likert_z := z(hr_likert)]
+
+## Direction check: if Likert anti-correlates with count, flip the Likert sign so
+## both components increase with perceived misalignment.
+eng_cor <- suppressWarnings(cor(resp_dt[role == "Eng", eng_count_z],
+                                resp_dt[role == "Eng", eng_likert_z],
+                                use = "pairwise.complete.obs"))
+hr_cor  <- suppressWarnings(cor(resp_dt[role == "HR",  hr_count_z],
+                                resp_dt[role == "HR",  hr_likert_z],
+                                use = "pairwise.complete.obs"))
+eng_flip <- !is.na(eng_cor) && eng_cor < 0
+hr_flip  <- !is.na(hr_cor)  && hr_cor  < 0
+if (eng_flip) resp_dt[role == "Eng", eng_likert_z := -eng_likert_z]
+if (hr_flip)  resp_dt[role == "HR",  hr_likert_z  := -hr_likert_z]
+
+## Equal-weight average then z-score within role.
+resp_dt[role == "Eng",
+        misalign_avg := rowMeans(cbind(eng_count_z, eng_likert_z), na.rm = TRUE)]
+resp_dt[role == "HR",
+        misalign_avg := rowMeans(cbind(hr_count_z, hr_likert_z), na.rm = TRUE)]
+resp_dt[role == "Eng" & is.nan(misalign_avg), misalign_avg := NA_real_]
+resp_dt[role == "HR"  & is.nan(misalign_avg), misalign_avg := NA_real_]
+resp_dt[role == "Eng", misalign_z := z(misalign_avg)]
+resp_dt[role == "HR",  misalign_z := z(misalign_avg)]
+
+fld <- merge(fld, resp_dt[, .(responseid, misalign_z)],
+             by = "responseid", all.x = TRUE)
+
+dt_hr  <- fld[role == "HR"  & !is.na(misalign_z)]
+dt_eng <- fld[role == "Eng" & !is.na(misalign_z)]
+dt_hr [, perc_role := misalign_z]
+dt_eng[, perc_role := misalign_z]
+
+n_h_idx <- uniqueN(dt_hr$responseid)
+n_e_idx <- uniqueN(dt_eng$responseid)
+
+cat(sprintf(
+  "\n[Misalignment Index] Eng: cor(count_z, likert_z) = %s%s; n = %d.\n",
+  ifelse(is.na(eng_cor), "NA", sprintf("%.3f", eng_cor)),
+  if (eng_flip) " (Likert sign flipped)" else "",
+  n_e_idx))
+cat(sprintf(
+  "[Misalignment Index] HR:  cor(count_z, likert_z) = %s%s; n = %d.\n",
+  ifelse(is.na(hr_cor), "NA", sprintf("%.3f", hr_cor)),
+  if (hr_flip) " (Likert sign flipped)" else "",
+  n_h_idx))
+```
+
+
+\clearpage
+## Per-Race-Gender (6 cells) --- Continuous Misalignment Index
+
+```{r perception_misalign_rg, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+demos     <- c("White_Male", "White_Female", "Asian_Male", "Asian_Female",
+               "Hispanic_Male", "Hispanic_Female")
+demo_lbls <- c("White Male", "White Female", "Asian Male", "Asian Female",
+               "Hispanic Male", "Hispanic Female")
+fcol      <- "race_gender"
+
+m1 <- flip(fit_simple_p (dt_hr,  fcol))
+m2 <- flip(fit_simple_p (dt_eng, fcol))
+m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
+m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
+m5 <- flip(fit_triple_p (dt_hr,  fcol, "test_case_z"))
+m6 <- flip(fit_triple_p (dt_eng, fcol, "test_case_z"))
+
+all_models <- list("HR" = m1, "Engineer" = m2,
+                   "HR " = m3, "Engineer " = m4,
+                   "HR  " = m5, "Engineer  " = m6)
+
+coef_map <- c(
+  setNames(demo_lbls, paste0(fcol, "::", demos)),
+  setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z)"),
+           paste0(fcol, "::", demos, ":perc_role")),
+  setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
+           paste0(fcol, "::", demos, ":dei_index_A_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Candidate Coding (Z)"),
+           paste0(fcol, "::", demos, ":test_case_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z) $\\times$ Own DEI Index (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)")),
+  setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z) $\\times$ Candidate Coding (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
+)
+
+gof_custom <- tribble(~raw, ~clean, ~fmt, "nobs", "Observations", 0)
+chk <- "\\checkmark"; nox <- "$\\times$"
+fe_rows <- data.frame(
+  term = c("Resume (Content) FE", "Display Position FE",
+           "Respondent FE", "Respondent Characteristics"),
+  V1 = c(chk, chk, nox, chk), V2 = c(chk, chk, nox, chk),
+  V3 = c(chk, chk, nox, chk), V4 = c(chk, chk, nox, chk),
+  V5 = c(chk, chk, nox, chk), V6 = c(chk, chk, nox, chk),
+  stringsAsFactors = FALSE
+)
+names(fe_rows) <- c("term", names(all_models))
+attr(fe_rows, "position") <- 37:40
+
+modelsummary(
+  all_models,
+  estimate  = "{estimate}{stars} ({std.error})",
+  statistic = NULL,
+  stars     = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  coef_map  = coef_map,
+  gof_map   = gof_custom,
+  add_rows  = fe_rows,
+  escape    = FALSE,
+  output    = "kableExtra"
+) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 6) %>%
+  add_header_above(c(" " = 1,
+                     "Simple Misalign Het." = 2,
+                     "Triple: Misalign x Own DEI" = 2,
+                     "Triple: Misalign x Coding" = 2)) %>%
+  row_spec(6,  extra_latex_after = "\\hdashline") %>%
+  row_spec(12, extra_latex_after = "\\hdashline") %>%
+  row_spec(18, extra_latex_after = "\\hdashline") %>%
+  row_spec(24, extra_latex_after = "\\hdashline") %>%
+  row_spec(30, extra_latex_after = "\\hdashline") %>%
+  row_spec(36, extra_latex_after = "\\midrule") %>%
+  row_spec(40, extra_latex_after = "\\midrule") %>%
+  footnote(general = sprintf(
+            "Misalign Idx (Z) = continuous z-scored perceived-misalignment index, equal-weight average of (z-scored count of aligndiff items + z-scored s5 view-aligndiff Likert), z-scored within role. n = %d HR, %d Eng. Coefs flipped post-fit so positive = effect of blinding raises the score. Two-way cluster on responseid and resume index.",
+            n_h_idx, n_e_idx),
+           general_title = "", threeparttable = TRUE,
+           footnote_as_chunk = FALSE, escape = FALSE)
+
+z_grid <- seq(-2, 2, length.out = 41)
+df_dei <- rbind(
+  build_scissors_dt(m3, fcol, "dei_index_A_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m4, fcol, "dei_index_A_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
+                              ncol_panels = 6,
+                              low_label = "Low Misalign",
+                              high_label_template = "%s High Misalign")
+
+df_cod <- rbind(
+  build_scissors_dt(m5, fcol, "test_case_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m6, fcol, "test_case_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Coding Ability (Z)",
+                              ncol_panels = 6,
+                              low_label = "Low Misalign",
+                              high_label_template = "%s High Misalign")
+
+fig_dir <- here("2_Reports", "figures")
+plot_file_dei <- file.path(fig_dir, "8B_perception_misalign_dei_rg.pdf")
+plot_file_cod <- file.path(fig_dir, "8B_perception_misalign_coding_rg.pdf")
+suppressMessages(suppressWarnings({
+  ggsave(plot_file_dei, plot = fig_dei, width = 14, height = 5.5, device = "pdf")
+  ggsave(plot_file_cod, plot = fig_cod, width = 14, height = 5.5, device = "pdf")
+}))
+
+cat("\\clearpage\n")
+cat("\\begin{center}\\textbf{Triple A: Misalign Idx $\\times$ Own DEI Index --- Per Race-Gender (6 cells)}\\par\\vspace{0.1em}\n")
+cat("\\includegraphics[width=\\textwidth]{", plot_file_dei, "}\\par\\vspace{0.1em}\n", sep = "")
+cat("{\\raggedright\\scriptsize Top row: HR. Bottom row: Engineer. ``Low Misalign'' (perc\\_role = $-1$ SD): respondent perceives little inter-departmental DEI misalignment. ``High Misalign'' ($+1$ SD): perceives substantial misalignment. Bands = 95\\% CI from the linear combination of triple-interaction coefs (SE clustered two-way on responseid + resume\\_index). Differential slopes between Low and High lines are now identified from the entire sample, not 1 rebel.\\par}\n")
+cat("\\end{center}\n")
+
+cat("\\clearpage\n")
+cat("\\begin{center}\\textbf{Triple B: Misalign Idx $\\times$ Candidate Coding Ability --- Per Race-Gender (6 cells)}\\par\\vspace{0.1em}\n")
+cat("\\includegraphics[width=\\textwidth]{", plot_file_cod, "}\\par\\vspace{0.1em}\n", sep = "")
+cat("{\\raggedright\\scriptsize Same panel layout as Triple A. X-axis: candidate's coding ability (test\\_case z-score).\\par}\n")
+cat("\\end{center}\n")
+
+rm(m1, m2, m3, m4, m5, m6, all_models, demos, demo_lbls, fcol,
+   coef_map, gof_custom, chk, nox, fe_rows,
+   z_grid, df_dei, df_cod, fig_dei, fig_cod,
+   plot_file_dei, plot_file_cod, fig_dir)
+```
+
+
+\clearpage
+## URM-Axis Trichotomy --- Continuous Misalignment Index
+
+```{r perception_misalign_axis, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+demos     <- c("Nonblind_MaleNonHisp", "Nonblind_FemaleNonHisp", "Nonblind_Hispanic")
+demo_lbls <- c("Male (NH)", "Female (NH)", "Hispanic")
+fcol      <- "urm_axis_blind"
+
+m1 <- flip(fit_simple_p (dt_hr,  fcol))
+m2 <- flip(fit_simple_p (dt_eng, fcol))
+m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
+m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
+m5 <- flip(fit_triple_p (dt_hr,  fcol, "test_case_z"))
+m6 <- flip(fit_triple_p (dt_eng, fcol, "test_case_z"))
+
+all_models <- list("HR" = m1, "Engineer" = m2,
+                   "HR " = m3, "Engineer " = m4,
+                   "HR  " = m5, "Engineer  " = m6)
+
+coef_map <- c(
+  setNames(demo_lbls, paste0(fcol, "::", demos)),
+  setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z)"),
+           paste0(fcol, "::", demos, ":perc_role")),
+  setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
+           paste0(fcol, "::", demos, ":dei_index_A_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Candidate Coding (Z)"),
+           paste0(fcol, "::", demos, ":test_case_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z) $\\times$ Own DEI Index (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)")),
+  setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z) $\\times$ Candidate Coding (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
+)
+
+gof_custom <- tribble(~raw, ~clean, ~fmt, "nobs", "Observations", 0)
+chk <- "\\checkmark"; nox <- "$\\times$"
+fe_rows <- data.frame(
+  term = c("Resume (Content) FE", "Display Position FE",
+           "Respondent FE", "Respondent Characteristics"),
+  V1 = c(chk, chk, nox, chk), V2 = c(chk, chk, nox, chk),
+  V3 = c(chk, chk, nox, chk), V4 = c(chk, chk, nox, chk),
+  V5 = c(chk, chk, nox, chk), V6 = c(chk, chk, nox, chk),
+  stringsAsFactors = FALSE
+)
+names(fe_rows) <- c("term", names(all_models))
+attr(fe_rows, "position") <- 19:22
+
+modelsummary(
+  all_models,
+  estimate  = "{estimate}{stars} ({std.error})",
+  statistic = NULL,
+  stars     = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  coef_map  = coef_map,
+  gof_map   = gof_custom,
+  add_rows  = fe_rows,
+  escape    = FALSE,
+  output    = "kableExtra"
+) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 7) %>%
+  add_header_above(c(" " = 1,
+                     "Simple Misalign Het." = 2,
+                     "Triple: Misalign x Own DEI" = 2,
+                     "Triple: Misalign x Coding" = 2)) %>%
+  row_spec(3,  extra_latex_after = "\\hdashline") %>%
+  row_spec(6,  extra_latex_after = "\\hdashline") %>%
+  row_spec(9,  extra_latex_after = "\\hdashline") %>%
+  row_spec(12, extra_latex_after = "\\hdashline") %>%
+  row_spec(15, extra_latex_after = "\\hdashline") %>%
+  row_spec(18, extra_latex_after = "\\midrule") %>%
+  row_spec(22, extra_latex_after = "\\midrule") %>%
+  footnote(general = sprintf(
+            "Misalign Idx (Z) = continuous z-scored perceived-misalignment index. n = %d HR, %d Eng. Coefs flipped post-fit so positive = effect of blinding raises the score. Two-way cluster on responseid and resume index.",
+            n_h_idx, n_e_idx),
+           general_title = "", threeparttable = TRUE,
+           footnote_as_chunk = FALSE, escape = FALSE)
+
+z_grid <- seq(-2, 2, length.out = 41)
+df_dei <- rbind(
+  build_scissors_dt(m3, fcol, "dei_index_A_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m4, fcol, "dei_index_A_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
+                              ncol_panels = 3,
+                              low_label = "Low Misalign",
+                              high_label_template = "%s High Misalign")
+
+df_cod <- rbind(
+  build_scissors_dt(m5, fcol, "test_case_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m6, fcol, "test_case_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Coding Ability (Z)",
+                              ncol_panels = 3,
+                              low_label = "Low Misalign",
+                              high_label_template = "%s High Misalign")
+
+fig_dir <- here("2_Reports", "figures")
+plot_file_dei <- file.path(fig_dir, "8B_perception_misalign_dei_axis.pdf")
+plot_file_cod <- file.path(fig_dir, "8B_perception_misalign_coding_axis.pdf")
+suppressMessages(suppressWarnings({
+  ggsave(plot_file_dei, plot = fig_dei, width = 11, height = 5.5, device = "pdf")
+  ggsave(plot_file_cod, plot = fig_cod, width = 11, height = 5.5, device = "pdf")
+}))
+
+cat("\\clearpage\n")
+cat("\\begin{center}\\textbf{Triple A: Misalign Idx $\\times$ Own DEI Index --- URM-Axis Trichotomy}\\par\\vspace{0.1em}\n")
+cat("\\includegraphics[width=0.95\\textwidth]{", plot_file_dei, "}\\par\\vspace{0.1em}\n", sep = "")
+cat("{\\raggedright\\scriptsize Top row: HR. Bottom row: Engineer. ``Low Misalign'' (perc\\_role = $-1$ SD), ``High Misalign'' ($+1$ SD). Bands = 95\\% CI.\\par}\n")
+cat("\\end{center}\n")
+
+cat("\\clearpage\n")
+cat("\\begin{center}\\textbf{Triple B: Misalign Idx $\\times$ Candidate Coding Ability --- URM-Axis Trichotomy}\\par\\vspace{0.1em}\n")
+cat("\\includegraphics[width=0.95\\textwidth]{", plot_file_cod, "}\\par\\vspace{0.1em}\n", sep = "")
+cat("{\\raggedright\\scriptsize Same layout as Triple A. X-axis: candidate's coding ability (test\\_case z-score).\\par}\n")
+cat("\\end{center}\n")
+
+rm(m1, m2, m3, m4, m5, m6, all_models, demos, demo_lbls, fcol,
+   coef_map, gof_custom, chk, nox, fe_rows,
+   z_grid, df_dei, df_cod, fig_dei, fig_cod,
+   plot_file_dei, plot_file_cod, fig_dir)
+```
+
+
+\clearpage
+## URM-Tech Dichotomy (Majority in Tech / URM in Tech) --- Continuous Misalignment Index
+
+```{r perception_misalign_utech, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+demos     <- c("Nonblind_NonURM", "Nonblind_URM")
+demo_lbls <- c("Majority", "URM in Tech")
+fcol      <- "urm_tech_blind"
+
+m1 <- flip(fit_simple_p (dt_hr,  fcol))
+m2 <- flip(fit_simple_p (dt_eng, fcol))
+m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
+m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
+m5 <- flip(fit_triple_p (dt_hr,  fcol, "test_case_z"))
+m6 <- flip(fit_triple_p (dt_eng, fcol, "test_case_z"))
+
+all_models <- list("HR" = m1, "Engineer" = m2,
+                   "HR " = m3, "Engineer " = m4,
+                   "HR  " = m5, "Engineer  " = m6)
+
+coef_map <- c(
+  setNames(demo_lbls, paste0(fcol, "::", demos)),
+  setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z)"),
+           paste0(fcol, "::", demos, ":perc_role")),
+  setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
+           paste0(fcol, "::", demos, ":dei_index_A_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Candidate Coding (Z)"),
+           paste0(fcol, "::", demos, ":test_case_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z) $\\times$ Own DEI Index (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)")),
+  setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z) $\\times$ Candidate Coding (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
+)
+
+gof_custom <- tribble(~raw, ~clean, ~fmt, "nobs", "Observations", 0)
+chk <- "\\checkmark"; nox <- "$\\times$"
+fe_rows <- data.frame(
+  term = c("Resume (Content) FE", "Display Position FE",
+           "Respondent FE", "Respondent Characteristics"),
+  V1 = c(chk, chk, nox, chk), V2 = c(chk, chk, nox, chk),
+  V3 = c(chk, chk, nox, chk), V4 = c(chk, chk, nox, chk),
+  V5 = c(chk, chk, nox, chk), V6 = c(chk, chk, nox, chk),
+  stringsAsFactors = FALSE
+)
+names(fe_rows) <- c("term", names(all_models))
+attr(fe_rows, "position") <- 13:16
+
+modelsummary(
+  all_models,
+  estimate  = "{estimate}{stars} ({std.error})",
+  statistic = NULL,
+  stars     = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  coef_map  = coef_map,
+  gof_map   = gof_custom,
+  add_rows  = fe_rows,
+  escape    = FALSE,
+  output    = "kableExtra"
+) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 8) %>%
+  add_header_above(c(" " = 1,
+                     "Simple Misalign Het." = 2,
+                     "Triple: Misalign x Own DEI" = 2,
+                     "Triple: Misalign x Coding" = 2)) %>%
+  row_spec(2,  extra_latex_after = "\\hdashline") %>%
+  row_spec(4,  extra_latex_after = "\\hdashline") %>%
+  row_spec(6,  extra_latex_after = "\\hdashline") %>%
+  row_spec(8,  extra_latex_after = "\\hdashline") %>%
+  row_spec(10, extra_latex_after = "\\hdashline") %>%
+  row_spec(12, extra_latex_after = "\\midrule") %>%
+  row_spec(16, extra_latex_after = "\\midrule") %>%
+  footnote(general = sprintf(
+            "Misalign Idx (Z) = continuous z-scored perceived-misalignment index. n = %d HR, %d Eng. Coefs flipped post-fit so positive = effect of blinding raises the score. Two-way cluster on responseid and resume index.",
+            n_h_idx, n_e_idx),
+           general_title = "", threeparttable = TRUE,
+           footnote_as_chunk = FALSE, escape = FALSE)
+
+z_grid <- seq(-2, 2, length.out = 41)
+df_dei <- rbind(
+  build_scissors_dt(m3, fcol, "dei_index_A_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m4, fcol, "dei_index_A_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
+                              ncol_panels = 2,
+                              low_label = "Low Misalign",
+                              high_label_template = "%s High Misalign")
+
+df_cod <- rbind(
+  build_scissors_dt(m5, fcol, "test_case_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m6, fcol, "test_case_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Coding Ability (Z)",
+                              ncol_panels = 2,
+                              low_label = "Low Misalign",
+                              high_label_template = "%s High Misalign")
+
+fig_dir <- here("2_Reports", "figures")
+plot_file_dei <- file.path(fig_dir, "8B_perception_misalign_dei_utech.pdf")
+plot_file_cod <- file.path(fig_dir, "8B_perception_misalign_coding_utech.pdf")
+suppressMessages(suppressWarnings({
+  ggsave(plot_file_dei, plot = fig_dei, width = 8, height = 5.5, device = "pdf")
+  ggsave(plot_file_cod, plot = fig_cod, width = 8, height = 5.5, device = "pdf")
+}))
+
+cat("\\clearpage\n")
+cat("\\begin{center}\\textbf{Triple A: Misalign Idx $\\times$ Own DEI Index --- URM-Tech Dichotomy}\\par\\vspace{0.1em}\n")
+cat("\\includegraphics[width=0.75\\textwidth]{", plot_file_dei, "}\\par\\vspace{0.1em}\n", sep = "")
+cat("{\\raggedright\\scriptsize Top row: HR. Bottom row: Engineer. ``Low Misalign'' (perc\\_role = $-1$ SD), ``High Misalign'' ($+1$ SD). Bands = 95\\% CI.\\par}\n")
+cat("\\end{center}\n")
+
+cat("\\clearpage\n")
+cat("\\begin{center}\\textbf{Triple B: Misalign Idx $\\times$ Candidate Coding Ability --- URM-Tech Dichotomy}\\par\\vspace{0.1em}\n")
+cat("\\includegraphics[width=0.75\\textwidth]{", plot_file_cod, "}\\par\\vspace{0.1em}\n", sep = "")
+cat("{\\raggedright\\scriptsize Same layout as Triple A. X-axis: candidate's coding ability (test\\_case z-score).\\par}\n")
+cat("\\end{center}\n")
+
+rm(m1, m2, m3, m4, m5, m6, all_models, demos, demo_lbls, fcol,
+   coef_map, gof_custom, chk, nox, fe_rows,
+   z_grid, df_dei, df_cod, fig_dei, fig_cod,
+   plot_file_dei, plot_file_cod, fig_dir,
+   fld, dt_hr, dt_eng, resp_dt, eng_items, hr_items, extra_perc,
+   eng_cor, hr_cor, eng_flip, hr_flip, n_h_idx, n_e_idx, z,
    flip, fit_simple_p, fit_triple_p, build_scissors_dt, make_scissors_grid)
 ```
