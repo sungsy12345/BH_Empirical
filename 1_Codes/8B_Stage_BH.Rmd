@@ -2053,6 +2053,8 @@ rm(fld, e_dt, h_dt,
 
 \textcolor{red}{\textbf{Carry-over caveat (from §7).}} The Engineer rebellion bucket has only \textbf{1 of 9 rebels in the nonblind arm}. Every Eng ``Misaligned'' (Perc = 1) coefficient and every Eng ``Misaligned'' line in the scissors plots is identified essentially off that single respondent's ratings. Treat magnitudes as anecdotal; the 95\% CI bands rely on the full cluster sandwich and \emph{understate} true uncertainty for the rebellion line. The HR compensation bucket (19 blind / 14 nonblind) is not subject to this concern.
 
+\textbf{Identification note for Eng panels.} With only one nonblind rebel, the variable $\texttt{perc\_role}\cdot \text{Z}$ collapses to a constant times $\texttt{perc\_role}$ for that respondent and is collinear with the lower-order interactions, so \texttt{fixest} drops all three D $\times$ Perc $\times$ Z coefficients (see \texttt{\$collin.var}). The plotted Eng ``Misaligned'' line therefore inherits the slope of the ``Aligned'' line and differs only by the constant Demo $\times$ Perc shift --- the two lines are mechanically parallel. No \emph{differential} Z slope is identified for Engineer; visual divergence between the lines is purely the perc-bucket intercept shift.
+
 ```{r perception_triple_helpers, echo = FALSE, warning = FALSE, message = FALSE}
 ## Shared §8 helpers: fit + flip + scissors-data + scissors-plot.
 
@@ -2085,6 +2087,11 @@ fit_triple_p <- function(d, factor_col, third_col) {
 
 ## TE_X(p, q) = beta_X + p*beta_{X:perc} + q*beta_{X:Z} + p*q*beta_{X:perc:Z}
 ## Returns long-format scissors data with role/demo/Perc/Z and 95% CI.
+## Coefs that fixest dropped due to collinearity (e.g. the Eng 3-way Demo:perc:Z
+## when only 1 rebel sits in nonblind) are treated as constrained-to-zero in the
+## linear combination. The SE is computed from the sub-vcov of the present coefs
+## only, so the rebel "Misaligned" line ends up with the same slope in Z as the
+## "Aligned" line (no differential slope is identified) plus the perc shift.
 build_scissors_dt <- function(model, factor_col, third_col,
                               demos, demo_lbls, role_lbl, z_grid) {
   cf <- coef(model);  V <- vcov(model)
@@ -2094,13 +2101,20 @@ build_scissors_dt <- function(model, factor_col, third_col,
     nm_lvl_p  <- paste0(factor_col, "::", demos[i], ":perc_role")
     nm_lvl_z  <- paste0(factor_col, "::", demos[i], ":", third_col)
     nm_lvl_pz <- paste0(factor_col, "::", demos[i], ":I(perc_role * ", third_col, ")")
-    ix <- c(nm_lvl, nm_lvl_p, nm_lvl_z, nm_lvl_pz)
-    if (!all(ix %in% names(cf))) next
-    cfi <- cf[ix];  Vi <- V[ix, ix]
+    ix      <- c(nm_lvl, nm_lvl_p, nm_lvl_z, nm_lvl_pz)
+    present <- ix %in% names(cf)
+    if (!present[1]) next  # no main demo coef -> nothing to plot
+    cfi <- ifelse(present, as.numeric(cf[ix]), 0)
+    cfi[is.na(cfi)] <- 0
+    ix_pres <- ix[present]
+    Vi      <- V[ix_pres, ix_pres, drop = FALSE]
     for (p in c(0, 1)) {
       for (q in z_grid) {
-        v   <- c(1, p, q, p * q)
-        est <- sum(v * cfi); se <- sqrt(c(v %*% Vi %*% v))
+        v       <- c(1, p, q, p * q)
+        v_pres  <- v[present]
+        est <- sum(v * cfi)
+        var_v <- as.numeric(t(v_pres) %*% Vi %*% v_pres)
+        se  <- sqrt(max(0, var_v))
         rows[[length(rows) + 1L]] <- data.frame(
           role = role_lbl, demo = demo_lbls[i],
           Perc = p, Z = q, est = est,
@@ -2112,19 +2126,56 @@ build_scissors_dt <- function(model, factor_col, third_col,
   do.call(rbind, rows)
 }
 
-## Two-row scissors grid (HR top, Eng bottom). Bucket = role x perception.
+## Two-row scissors grid (HR top, Eng bottom). Three legend entries:
+##   "Aligned" (Perc=0; gray dashed, shared across roles)
+##   "HR Misaligned" (HR sees Eng apathy; steelblue solid)
+##   "Eng Misaligned" (Eng sees HR overreach; indianred solid)
+## To force patchwork's `guides = "collect"` to produce a single merged legend,
+## we pad plot_dt so every (role, demo) panel has at least one row per bucket
+## level (NA est for absent levels means nothing is drawn but the scale's
+## domain is uniform across panels, which is what the merge logic checks).
+## y_lim is computed from the est range across all panels plus the HR-only CI
+## extent, then padded. Engineer rebellion ribbons that exceed this get clipped
+## by coord_cartesian -- the central est line stays visible.
 make_scissors_grid <- function(plot_dt, demo_lbls, x_lab, ncol_panels) {
   plot_dt <- as.data.frame(plot_dt)
-  plot_dt$role <- factor(plot_dt$role, levels = c("HR", "Eng"))
-  plot_dt$demo <- factor(plot_dt$demo, levels = demo_lbls)
-  plot_dt$bucket <- factor(
-    paste(plot_dt$role, ifelse(plot_dt$Perc == 0, "Aligned", "Misaligned")),
-    levels = c("HR Aligned", "HR Misaligned", "Eng Aligned", "Eng Misaligned"))
-  bcol <- c("HR Aligned" = "gray40", "HR Misaligned" = "steelblue",
-            "Eng Aligned" = "gray40", "Eng Misaligned" = "indianred")
-  blty <- c("HR Aligned" = "dashed", "HR Misaligned" = "solid",
-            "Eng Aligned" = "dashed", "Eng Misaligned" = "solid")
-  y_lim <- range(c(plot_dt$lwr, plot_dt$upr)) * 1.05
+  plot_dt$bucket_chr <- ifelse(
+    plot_dt$Perc == 0, "Aligned",
+    ifelse(plot_dt$role == "HR", "HR Misaligned", "Eng Misaligned"))
+  bucket_levels <- c("Aligned", "HR Misaligned", "Eng Misaligned")
+  bcol <- c("Aligned" = "gray40",
+            "HR Misaligned" = "steelblue",
+            "Eng Misaligned" = "indianred")
+  blty <- c("Aligned" = "dashed",
+            "HR Misaligned" = "solid",
+            "Eng Misaligned" = "solid")
+
+  ## Pad with NA-est rows so every (role, demo) panel sees all 3 bucket levels.
+  combos   <- expand.grid(role = c("HR", "Eng"), demo = demo_lbls,
+                          bucket_chr = bucket_levels, stringsAsFactors = FALSE)
+  combos$k <- paste(combos$role, combos$demo, combos$bucket_chr)
+  have     <- unique(paste(plot_dt$role, plot_dt$demo, plot_dt$bucket_chr))
+  miss     <- combos[!combos$k %in% have, c("role", "demo", "bucket_chr")]
+  if (nrow(miss) > 0) {
+    pad <- data.frame(
+      role = miss$role, demo = miss$demo,
+      Perc = NA_integer_, Z = NA_real_,
+      est  = NA_real_, lwr = NA_real_, upr = NA_real_,
+      bucket_chr = miss$bucket_chr,
+      stringsAsFactors = FALSE)
+    plot_dt <- rbind(plot_dt, pad)
+  }
+
+  plot_dt$role   <- factor(plot_dt$role,   levels = c("HR", "Eng"))
+  plot_dt$demo   <- factor(plot_dt$demo,   levels = demo_lbls)
+  plot_dt$bucket <- factor(plot_dt$bucket_chr, levels = bucket_levels)
+
+  hr_idx <- plot_dt$role == "HR" & !is.na(plot_dt$est)
+  y_lim  <- range(c(plot_dt$est,
+                    plot_dt$lwr[hr_idx], plot_dt$upr[hr_idx]),
+                  na.rm = TRUE) * 1.10
+  y_lim[1] <- min(y_lim[1], -0.5)
+  y_lim[2] <- max(y_lim[2],  0.5)
 
   panel_one <- function(rl, dm) {
     d <- plot_dt[plot_dt$role == rl & plot_dt$demo == dm, ]
@@ -2132,19 +2183,19 @@ make_scissors_grid <- function(plot_dt, demo_lbls, x_lab, ncol_panels) {
       annotate("rect", xmin = -2, xmax = 2, ymin = 0,        ymax = y_lim[2], fill = "#e8f4ea", alpha = 0.4) +
       annotate("rect", xmin = -2, xmax = 2, ymin = y_lim[1], ymax = 0,        fill = "#fbeaea", alpha = 0.4) +
       geom_hline(yintercept = 0, linetype = "dashed", color = "gray30", linewidth = 0.4) +
-      geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.15, color = NA) +
-      geom_line(linewidth = 0.7) +
+      geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.15, color = NA, na.rm = TRUE) +
+      geom_line(linewidth = 0.7, na.rm = TRUE) +
       annotate("text", x = 0, y = y_lim[2] * 0.93, label = "Blinding helps",
                hjust = 0.5, vjust = 1, size = 1.9, fontface = "italic", color = "darkgreen") +
       annotate("text", x = 0, y = y_lim[1] * 0.93, label = "Blinding hurts",
                hjust = 0.5, vjust = 0, size = 1.9, fontface = "italic", color = "darkred") +
-      scale_color_manual(values = bcol, drop = FALSE) +
-      scale_fill_manual( values = bcol, drop = FALSE) +
-      scale_linetype_manual(values = blty, drop = FALSE) +
+      scale_color_manual(   name = NULL, values = bcol, drop = FALSE) +
+      scale_fill_manual(    name = NULL, values = bcol, drop = FALSE) +
+      scale_linetype_manual(name = NULL, values = blty, drop = FALSE) +
+      guides(fill = "none") +
       coord_cartesian(xlim = c(-2, 2), ylim = y_lim) +
       labs(title = paste0(rl, " --- ", dm),
-           x = x_lab, y = "Effect of Blinding (Z)",
-           color = NULL, fill = NULL, linetype = NULL) +
+           x = x_lab, y = "Effect of Blinding (Z)") +
       theme_bw(base_size = 7) +
       theme(legend.position  = "bottom",
             plot.title       = element_text(size = 7.5, face = "bold"),
