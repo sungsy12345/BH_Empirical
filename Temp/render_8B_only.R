@@ -23,6 +23,8 @@ source(here("1_Codes", "4_Distribution_Cleaning.R"))
 source(here("1_Codes", "5_Cleaning.R"))
 source(here("1_Codes", "6_Hiring_Simulation.R"))
 
+today_str <- format(Sys.Date(), "%Y%m%d")
 rmarkdown::render(here("1_Codes", "8B_Stage_BH.Rmd"),
+                  output_file       = sprintf("Main_Results_%s.pdf", today_str),
                   output_dir        = here("2_Reports"),
                   intermediates_dir = tempdir())

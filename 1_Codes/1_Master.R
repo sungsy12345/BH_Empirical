@@ -61,16 +61,22 @@ source(here("1_Codes", "5_Cleaning.R"))
 source(here("1_Codes", "6_Hiring_Simulation.R"))
 
 ## Analysis
+## Output PDFs are named "<Label>_YYYYMMDD.pdf" using today's date so each
+## render produces a date-stamped artifact. Update `today_str` if you want
+## to overwrite a specific historical date.
+today_str <- format(Sys.Date(), "%Y%m%d")
+
 rmarkdown::render(
   here("1_Codes", "7_Descriptive.Rmd"),
+  output_file       = sprintf("Descriptive_%s.pdf", today_str),
   output_dir        = here("2_Reports"),
   intermediates_dir = tempdir()
 )
 
 ## ----- Steps below are temporarily disabled. -----
 ## Re-enable them one at a time as each Rmd is migrated.
-rmarkdown::render(here("1_Codes", "8A_Preferences.Rmd"),     output_dir = here("2_Reports"), intermediates_dir = tempdir())
-rmarkdown::render(here("1_Codes", "8B_Stage_BH.Rmd"),        output_dir = here("2_Reports"), intermediates_dir = tempdir())
+rmarkdown::render(here("1_Codes", "8A_Preferences.Rmd"),     output_file = sprintf("Preference_%s.pdf",   today_str), output_dir = here("2_Reports"), intermediates_dir = tempdir())
+rmarkdown::render(here("1_Codes", "8B_Stage_BH.Rmd"),        output_file = sprintf("Main_Results_%s.pdf", today_str), output_dir = here("2_Reports"), intermediates_dir = tempdir())
 # rmarkdown::render(here("1_Codes", "8C_Dynamic_BH.Rmd"),      output_dir = here("2_Reports"), intermediates_dir = tempdir())
 # rmarkdown::render(here("1_Codes", "8C_Dynamic_BH_Jobs.Rmd"), output_dir = here("2_Reports"), intermediates_dir = tempdir())
 
