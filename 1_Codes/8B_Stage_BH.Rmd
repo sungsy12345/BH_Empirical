@@ -1658,6 +1658,12 @@ resp_dt[role == "HR",  misalign_z := hr_dir_z]
 fld <- merge(fld, resp_dt[, .(responseid, misalign_z)],
              by = "responseid", all.x = TRUE)
 
+## Also persist misalign_z on firm_long_dt so §4.5 (productivity heterogeneity
+## by misalignment) can reference it without rebuilding the whole index.
+if ("misalign_z" %in% names(firm_long_dt)) firm_long_dt[, misalign_z := NULL]
+firm_long_dt <- merge(firm_long_dt, resp_dt[, .(responseid, misalign_z)],
+                      by = "responseid", all.x = TRUE)
+
 dt_hr  <- fld[role == "HR"  & !is.na(misalign_z)]
 dt_eng <- fld[role == "Eng" & !is.na(misalign_z)]
 dt_hr [, perc_role := misalign_z]
@@ -2435,6 +2441,256 @@ ggplot(dt_plot, aes(x = k, y = estimate, color = dei_level, fill = dei_level)) +
   )
 
 rm(results_list, dt_plot, dei_pts, dei_lbl, k,
+   hr_col, hr_data, ctrl_mean_hr, ctrl_sd_hr, m_hr,
+   eng_col, eng_data, ctrl_mean_eng, ctrl_sd_eng, m_eng,
+   cf, V, idx_main, idx_int, est, se, q, v, j)
+```
+
+
+\clearpage
+## Does Blinding's Productivity Effect Differ by Firm DEI-Targeting Policy?
+
+Same per-$k$ design as §4.3, but the moderator is now \texttt{firm\_targets\_fh} --- a binary indicator for whether the respondent's firm formally targets Female or Hispanic candidates in hiring (constructed from \texttt{s5\_policy\_diversity}). Two-row $\times$ two-column grid: rows are ``firm does NOT target'' vs ``firm DOES target,'' columns are HR vs Engineer. The substantive question: does formal firm policy crowd out blinding's effect on the productivity of the selected pool?
+
+```{r blind_hiring_coding_quality_by_firmtarget, echo=FALSE, results='asis', warning=FALSE, message=FALSE, fig.width=10, fig.height=6}
+
+results_list <- list()
+ft_pts <- c(0, 1)
+ft_lbl <- c("Firm does NOT target Fem/His", "Firm DOES target Fem/His")
+
+## Build firm_targets_fh on firm_long_dt if not already present.
+if (!"firm_targets_fh" %in% names(firm_long_dt)) {
+  firm_long_dt[, firm_targets_fh := as.integer(
+    firm_targets_female == 1L | firm_targets_hispanic == 1L)]
+}
+
+for (k in 1:18) {
+
+  ## --- HR ---
+  hr_col  <- paste0("hr_pass", k)
+  hr_data <- firm_long_dt[role == "HR" & get(hr_col) == 1 & !is.na(firm_targets_fh)]
+  ctrl_mean_hr <- hr_data[treat == "nonblind", mean(overall_score, na.rm = TRUE)]
+  ctrl_sd_hr   <- hr_data[treat == "nonblind", sd(overall_score,   na.rm = TRUE)]
+
+  if (!is.na(ctrl_sd_hr) && ctrl_sd_hr > 0) {
+    hr_data[, overall_score_std := (overall_score - ctrl_mean_hr) / ctrl_sd_hr]
+
+    tryCatch({
+      m_hr <- suppressMessages(suppressWarnings(
+        feols(overall_score_std ~ i(treat, ref = "nonblind") * firm_targets_fh + resp_age |
+                q_version + resp_gender + resp_race + s2_educ + s2_income,
+              data = hr_data, vcov = ~ responseid)
+      ))
+      cf <- coef(m_hr); V <- vcov(m_hr)
+      idx_main <- match("treat::blind", names(cf))
+      idx_int  <- match("firm_targets_fh:treat::blind", names(cf))
+      if (!is.na(idx_main) && !is.na(idx_int)) {
+        for (j in seq_along(ft_pts)) {
+          q <- ft_pts[j]
+          v <- numeric(length(cf))
+          v[idx_main] <- 1; v[idx_int] <- q
+          est <- sum(v * cf); se <- sqrt(c(v %*% V %*% v))
+          results_list[[length(results_list) + 1L]] <- data.table(
+            Stage = "HR Stage", k = k, ft_level = ft_lbl[j],
+            estimate = est, ci_low = est - 1.96 * se, ci_high = est + 1.96 * se
+          )
+        }
+      }
+    }, error = function(e) {})
+  }
+
+  ## --- Engineer ---
+  eng_col  <- paste0("eng_top", k)
+  eng_data <- firm_long_dt[role == "Eng" & get(eng_col) == 1 & !is.na(firm_targets_fh)]
+  ctrl_mean_eng <- eng_data[treat == "nonblind", mean(overall_score, na.rm = TRUE)]
+  ctrl_sd_eng   <- eng_data[treat == "nonblind", sd(overall_score,   na.rm = TRUE)]
+
+  if (!is.na(ctrl_sd_eng) && ctrl_sd_eng > 0) {
+    eng_data[, overall_score_std := (overall_score - ctrl_mean_eng) / ctrl_sd_eng]
+
+    tryCatch({
+      m_eng <- suppressMessages(suppressWarnings(
+        feols(overall_score_std ~ i(treat, ref = "nonblind") * firm_targets_fh + resp_age |
+                q_version + resp_gender + resp_race + s2_educ + s2_income +
+                resp_python + resp_java,
+              data = eng_data, vcov = ~ responseid)
+      ))
+      cf <- coef(m_eng); V <- vcov(m_eng)
+      idx_main <- match("treat::blind", names(cf))
+      idx_int  <- match("firm_targets_fh:treat::blind", names(cf))
+      if (!is.na(idx_main) && !is.na(idx_int)) {
+        for (j in seq_along(ft_pts)) {
+          q <- ft_pts[j]
+          v <- numeric(length(cf))
+          v[idx_main] <- 1; v[idx_int] <- q
+          est <- sum(v * cf); se <- sqrt(c(v %*% V %*% v))
+          results_list[[length(results_list) + 1L]] <- data.table(
+            Stage = "Engineer Stage", k = k, ft_level = ft_lbl[j],
+            estimate = est, ci_low = est - 1.96 * se, ci_high = est + 1.96 * se
+          )
+        }
+      }
+    }, error = function(e) {})
+  }
+}
+
+dt_plot <- rbindlist(results_list)
+dt_plot[, Stage := factor(Stage, levels = c("HR Stage", "Engineer Stage"))]
+dt_plot[, ft_level := factor(ft_level, levels = ft_lbl)]
+
+ggplot(dt_plot, aes(x = k, y = estimate, color = ft_level, fill = ft_level)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.6) +
+  geom_ribbon(aes(ymin = ci_low, ymax = ci_high), alpha = 0.18, color = NA) +
+  geom_line(linewidth = 0.8) +
+  geom_point(size = 1.3) +
+  facet_grid(ft_level ~ Stage) +
+  scale_color_manual(values = c("Firm does NOT target Fem/His" = "#D9534F",
+                                "Firm DOES target Fem/His"     = "#4C72B0"),
+                     guide = "none") +
+  scale_fill_manual( values = c("Firm does NOT target Fem/His" = "#D9534F",
+                                "Firm DOES target Fem/His"     = "#4C72B0"),
+                     guide = "none") +
+  scale_x_continuous(breaks = 1:18, name = "Number of Candidates Selected (k)") +
+  coord_cartesian(ylim = c(-0.3, 0.3)) +
+  labs(
+    subtitle = "TE on hired candidates' actual coding score, by firm DEI-targeting policy",
+    y       = "Effect on Actual Coding Score (SD, relative to nonblind)",
+    caption = "Rows: firm DOES vs does NOT formally target Female or Hispanic candidates. Columns: HR vs Engineer. Bands: 95% CI."
+  ) +
+  theme_bw() +
+  theme(
+    plot.subtitle      = element_text(size = 10, color = "gray30"),
+    strip.text         = element_text(face = "bold", size = 11),
+    panel.grid.minor.x = element_blank(),
+    axis.title.x       = element_text(margin = margin(t = 10)),
+    axis.title.y       = element_text(margin = margin(r = 10)),
+    plot.caption       = element_text(size = 8, hjust = 0)
+  )
+
+rm(results_list, dt_plot, ft_pts, ft_lbl, k,
+   hr_col, hr_data, ctrl_mean_hr, ctrl_sd_hr, m_hr,
+   eng_col, eng_data, ctrl_mean_eng, ctrl_sd_eng, m_eng,
+   cf, V, idx_main, idx_int, est, se, q, v, j)
+```
+
+
+\clearpage
+## Does Blinding's Productivity Effect Differ by Inter-Departmental DEI Misalignment?
+
+Same per-$k$ design, but the moderator is now \texttt{misalign\_z}, the signed directional misalignment index from §3 (Eng: HR-overreach direction = rebellion conditions; HR: Eng-undercare direction = compensation conditions). Three-row $\times$ two-column grid: rows evaluate at low ($-1$ SD), mid ($0$), and high ($+1$ SD) of the index. The substantive question: does perceived inter-departmental DEI misalignment moderate the productivity-of-hired effect?
+
+```{r blind_hiring_coding_quality_by_misalign, echo=FALSE, results='asis', warning=FALSE, message=FALSE, fig.width=10, fig.height=8}
+
+results_list <- list()
+ms_pts <- c(-1, 0, 1)
+ms_lbl <- c("Low Misalign (-1 SD)", "Mid Misalign (0)", "High Misalign (+1 SD)")
+
+for (k in 1:18) {
+
+  ## --- HR ---
+  hr_col  <- paste0("hr_pass", k)
+  hr_data <- firm_long_dt[role == "HR" & get(hr_col) == 1 & !is.na(misalign_z)]
+  ctrl_mean_hr <- hr_data[treat == "nonblind", mean(overall_score, na.rm = TRUE)]
+  ctrl_sd_hr   <- hr_data[treat == "nonblind", sd(overall_score,   na.rm = TRUE)]
+
+  if (!is.na(ctrl_sd_hr) && ctrl_sd_hr > 0) {
+    hr_data[, overall_score_std := (overall_score - ctrl_mean_hr) / ctrl_sd_hr]
+
+    tryCatch({
+      m_hr <- suppressMessages(suppressWarnings(
+        feols(overall_score_std ~ i(treat, ref = "nonblind") * misalign_z + resp_age |
+                q_version + resp_gender + resp_race + s2_educ + s2_income,
+              data = hr_data, vcov = ~ responseid)
+      ))
+      cf <- coef(m_hr); V <- vcov(m_hr)
+      idx_main <- match("treat::blind", names(cf))
+      idx_int  <- match("misalign_z:treat::blind", names(cf))
+      if (!is.na(idx_main) && !is.na(idx_int)) {
+        for (j in seq_along(ms_pts)) {
+          q <- ms_pts[j]
+          v <- numeric(length(cf))
+          v[idx_main] <- 1; v[idx_int] <- q
+          est <- sum(v * cf); se <- sqrt(c(v %*% V %*% v))
+          results_list[[length(results_list) + 1L]] <- data.table(
+            Stage = "HR Stage", k = k, ms_level = ms_lbl[j],
+            estimate = est, ci_low = est - 1.96 * se, ci_high = est + 1.96 * se
+          )
+        }
+      }
+    }, error = function(e) {})
+  }
+
+  ## --- Engineer ---
+  eng_col  <- paste0("eng_top", k)
+  eng_data <- firm_long_dt[role == "Eng" & get(eng_col) == 1 & !is.na(misalign_z)]
+  ctrl_mean_eng <- eng_data[treat == "nonblind", mean(overall_score, na.rm = TRUE)]
+  ctrl_sd_eng   <- eng_data[treat == "nonblind", sd(overall_score,   na.rm = TRUE)]
+
+  if (!is.na(ctrl_sd_eng) && ctrl_sd_eng > 0) {
+    eng_data[, overall_score_std := (overall_score - ctrl_mean_eng) / ctrl_sd_eng]
+
+    tryCatch({
+      m_eng <- suppressMessages(suppressWarnings(
+        feols(overall_score_std ~ i(treat, ref = "nonblind") * misalign_z + resp_age |
+                q_version + resp_gender + resp_race + s2_educ + s2_income +
+                resp_python + resp_java,
+              data = eng_data, vcov = ~ responseid)
+      ))
+      cf <- coef(m_eng); V <- vcov(m_eng)
+      idx_main <- match("treat::blind", names(cf))
+      idx_int  <- match("misalign_z:treat::blind", names(cf))
+      if (!is.na(idx_main) && !is.na(idx_int)) {
+        for (j in seq_along(ms_pts)) {
+          q <- ms_pts[j]
+          v <- numeric(length(cf))
+          v[idx_main] <- 1; v[idx_int] <- q
+          est <- sum(v * cf); se <- sqrt(c(v %*% V %*% v))
+          results_list[[length(results_list) + 1L]] <- data.table(
+            Stage = "Engineer Stage", k = k, ms_level = ms_lbl[j],
+            estimate = est, ci_low = est - 1.96 * se, ci_high = est + 1.96 * se
+          )
+        }
+      }
+    }, error = function(e) {})
+  }
+}
+
+dt_plot <- rbindlist(results_list)
+dt_plot[, Stage := factor(Stage, levels = c("HR Stage", "Engineer Stage"))]
+dt_plot[, ms_level := factor(ms_level, levels = ms_lbl)]
+
+ggplot(dt_plot, aes(x = k, y = estimate, color = ms_level, fill = ms_level)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.6) +
+  geom_ribbon(aes(ymin = ci_low, ymax = ci_high), alpha = 0.18, color = NA) +
+  geom_line(linewidth = 0.8) +
+  geom_point(size = 1.3) +
+  facet_grid(ms_level ~ Stage) +
+  scale_color_manual(values = c("Low Misalign (-1 SD)"  = "#5BC0DE",
+                                "Mid Misalign (0)"       = "gray40",
+                                "High Misalign (+1 SD)"  = "#D9534F"),
+                     guide = "none") +
+  scale_fill_manual( values = c("Low Misalign (-1 SD)"  = "#5BC0DE",
+                                "Mid Misalign (0)"       = "gray40",
+                                "High Misalign (+1 SD)"  = "#D9534F"),
+                     guide = "none") +
+  scale_x_continuous(breaks = 1:18, name = "Number of Candidates Selected (k)") +
+  coord_cartesian(ylim = c(-0.3, 0.3)) +
+  labs(
+    subtitle = "TE on hired candidates' actual coding score, by signed directional misalignment index",
+    y       = "Effect on Actual Coding Score (SD, relative to nonblind)",
+    caption = "Rows: TE evaluated at -1, 0, +1 SD of the within-role z-scored signed directional misalignment index from §3. Columns: HR vs Engineer. Bands: 95% CI."
+  ) +
+  theme_bw() +
+  theme(
+    plot.subtitle      = element_text(size = 10, color = "gray30"),
+    strip.text         = element_text(face = "bold", size = 11),
+    panel.grid.minor.x = element_blank(),
+    axis.title.x       = element_text(margin = margin(t = 10)),
+    axis.title.y       = element_text(margin = margin(r = 10)),
+    plot.caption       = element_text(size = 8, hjust = 0)
+  )
+
+rm(results_list, dt_plot, ms_pts, ms_lbl, k,
    hr_col, hr_data, ctrl_mean_hr, ctrl_sd_hr, m_hr,
    eng_col, eng_data, ctrl_mean_eng, ctrl_sd_eng, m_eng,
    cf, V, idx_main, idx_int, est, se, q, v, j)
