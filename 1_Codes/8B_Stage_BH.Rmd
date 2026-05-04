@@ -2289,7 +2289,7 @@ ggplot(dt_plot, aes(x = k, y = estimate, color = Stage)) +
   facet_wrap(~ Stage, ncol = 2) +
   scale_color_manual(values = c("HR Stage" = "#C44E52", "Engineer Stage" = "#4C72B0")) +
   scale_x_continuous(breaks = 1:18, name = "Number of Candidates Selected (k)") +
-  scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+  coord_cartesian(ylim = c(-0.3, 0.3)) +
   labs(
     subtitle = paste("Treatment effect on true productivity measure (coding lab evaluation)",
                      "of selected candidates, standardized relative to selected candidates",
@@ -2316,10 +2316,12 @@ rm(results_list, dt_plot, k,
 ```
 
 
-\vspace{0.4em}
-\textit{Heterogeneity by Respondent DEI Index.} Same per-$k$ loop as above, but the regression interacts \texttt{treat} with the respondent's z-scored DEI index (\texttt{dei\_index\_z}, the canonical Individual DEI Index from §2). The treatment effect at each $k$ is then evaluated at low ($-1$ SD), mid ($0$), and high ($+1$ SD) of the DEI index distribution via the linear combination $\hat\beta_{\text{blind}} + q\hat\beta_{\text{blind}\times\text{DEI}}$, with 95\% CIs from $\sqrt{v'\Sigma v}$ where $v = (1, q)$. The substantive question: do pro-DEI respondents pick more productive candidates under blinding than anti-DEI respondents do?
+\clearpage
+## Does Blinding's Productivity Effect Differ by Evaluator's DEI Orientation?
 
-```{r blind_hiring_coding_quality_by_dei, echo=FALSE, results='asis', warning=FALSE, message=FALSE, fig.width=10, fig.height=5}
+Same per-$k$ loop as §4.2, but the regression interacts \texttt{treat} with the respondent's z-scored DEI index (\texttt{dei\_index\_z}, the canonical Individual DEI Index from §2). The treatment effect at each $k$ is then evaluated at low ($-1$ SD), mid ($0$), and high ($+1$ SD) of the DEI index distribution via the linear combination $\hat\beta_{\text{blind}} + q\hat\beta_{\text{blind}\times\text{DEI}}$, with 95\% CIs from $\sqrt{v'\Sigma v}$ where $v = (1, q)$. The substantive question: do pro-DEI respondents pick more productive candidates under blinding than anti-DEI respondents do?
+
+```{r blind_hiring_coding_quality_by_dei, echo=FALSE, results='asis', warning=FALSE, message=FALSE, fig.width=10, fig.height=8}
 
 results_list <- list()
 dei_pts <- c(-1, 0, 1)
@@ -2403,29 +2405,29 @@ dt_plot[, dei_level := factor(dei_level, levels = dei_lbl)]
 
 ggplot(dt_plot, aes(x = k, y = estimate, color = dei_level, fill = dei_level)) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.6) +
-  geom_ribbon(aes(ymin = ci_low, ymax = ci_high), alpha = 0.15, color = NA) +
+  geom_ribbon(aes(ymin = ci_low, ymax = ci_high), alpha = 0.18, color = NA) +
   geom_line(linewidth = 0.8) +
-  geom_point(size = 1.4) +
-  facet_wrap(~ Stage, ncol = 2) +
+  geom_point(size = 1.3) +
+  facet_grid(dei_level ~ Stage) +
   scale_color_manual(values = c("Low DEI (-1 SD)"  = "#D9534F",
                                 "Mid DEI (0)"      = "gray40",
-                                "High DEI (+1 SD)" = "#4C72B0")) +
+                                "High DEI (+1 SD)" = "#4C72B0"),
+                     guide = "none") +
   scale_fill_manual( values = c("Low DEI (-1 SD)"  = "#D9534F",
                                 "Mid DEI (0)"      = "gray40",
-                                "High DEI (+1 SD)" = "#4C72B0")) +
+                                "High DEI (+1 SD)" = "#4C72B0"),
+                     guide = "none") +
   scale_x_continuous(breaks = 1:18, name = "Number of Candidates Selected (k)") +
-  scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+  coord_cartesian(ylim = c(-0.3, 0.3)) +
   labs(
     subtitle = "TE on hired candidates' actual coding score, by respondent's DEI index level",
     y       = "Effect on Actual Coding Score (SD, relative to nonblind)",
-    color   = "Respondent DEI Index", fill = "Respondent DEI Index",
-    caption = "Three lines per panel: TE evaluated at -1, 0, +1 SD of the within-role z-scored DEI index. Bands: 95% CI from the linear combination of treat::blind and treat::blind:dei_index_z."
+    caption = "Rows: TE evaluated at -1, 0, +1 SD of the within-role z-scored DEI index. Columns: HR vs Engineer. Bands: 95% CI from the linear combination of treat::blind and treat::blind:dei_index_z."
   ) +
   theme_bw() +
   theme(
-    legend.position    = "bottom",
     plot.subtitle      = element_text(size = 10, color = "gray30"),
-    strip.text         = element_text(face = "bold", size = 12),
+    strip.text         = element_text(face = "bold", size = 11),
     panel.grid.minor.x = element_blank(),
     axis.title.x       = element_text(margin = margin(t = 10)),
     axis.title.y       = element_text(margin = margin(r = 10)),
