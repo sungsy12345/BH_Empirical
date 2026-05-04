@@ -517,7 +517,7 @@ cat("\\clearpage\n")
 cat("\\begin{center}\n")
 cat("\\includegraphics[width=\\textwidth]{", plot_file_44_rg, "}\n", sep = "")
 cat("\\par\\vspace{0.1em}\n")
-cat("{\\raggedright\\scriptsize Marginal-effects ``scissors'' plot built from the §4.4 columns 3-4 (HR \\& Engineer triple with Firm Targets Fem/His), per race-gender. Top row: HR evaluators (Panels A1--F1). Bottom row: Engineer evaluators (Panels A2--F2). Lines: predicted effect of blinding on each group's overall score as a function of the rater's Individual DEI Index (Z); shaded bands are 95\\% CIs (SE clustered by respondent).\\par}\n")
+cat("{\\raggedright\\scriptsize Marginal-effects ``scissors'' plot built from the §3.1 columns 3-4 (HR \\& Engineer triple with Firm Targets Fem/His), per race-gender. Top row: HR evaluators (Panels A1--F1). Bottom row: Engineer evaluators (Panels A2--F2). Lines: predicted effect of blinding on each group's overall score as a function of the rater's Individual DEI Index (Z); shaded bands are 95\\% CIs (SE clustered by respondent).\\par}\n")
 cat("\\end{center}\n")
 
 rm(dt_hr, dt_eng, fit_simple, fit_triple, flip,
@@ -784,7 +784,7 @@ cat("\\clearpage\n")
 cat("\\begin{center}\n")
 cat("\\includegraphics[width=0.95\\textwidth]{", plot_file_44, "}\n", sep = "")
 cat("\\par\\vspace{0.1em}\n")
-cat("{\\raggedright\\scriptsize Marginal-effects ``scissors'' plot built from the §4.4 columns 3-4 (HR \\& Engineer triple with Firm Targets Fem/His). Top row: HR evaluators (Panels A1, B1, C1). Bottom row: Engineer evaluators (Panels A2, B2, C2). Lines: predicted effect of blinding on each group's overall score as a function of the rater's Individual DEI Index (Z); shaded bands are 95\\% CIs from the linear combination of axis-triple coefficients (SE clustered by respondent).\\par}\n")
+cat("{\\raggedright\\scriptsize Marginal-effects ``scissors'' plot built from the §3.2 columns 3-4 (HR \\& Engineer triple with Firm Targets Fem/His). Top row: HR evaluators (Panels A1, B1, C1). Bottom row: Engineer evaluators (Panels A2, B2, C2). Lines: predicted effect of blinding on each group's overall score as a function of the rater's Individual DEI Index (Z); shaded bands are 95\\% CIs from the linear combination of axis-triple coefficients (SE clustered by respondent).\\par}\n")
 cat("\\end{center}\n")
 
 rm(dt_hr, dt_eng, build_axis, fit_simple, fit_triple, flip,
@@ -1021,7 +1021,7 @@ cat("\\clearpage\n")
 cat("\\begin{center}\n")
 cat("\\includegraphics[width=0.85\\textwidth]{", plot_file_45, "}\n", sep = "")
 cat("\\par\\vspace{0.1em}\n")
-cat("{\\raggedright\\scriptsize Marginal-effects ``scissors'' plot built from the §4.5 columns 3-4 (HR \\& Engineer triple with Firm Targets Fem/His) under the URM-Tech dichotomy. Top row: HR evaluators (Panels A1, B1). Bottom row: Engineer evaluators (Panels A2, B2). Lines: predicted effect of blinding on each group's overall score as a function of the rater's Individual DEI Index (Z); shaded bands are 95\\% CIs (SE clustered by respondent).\\par}\n")
+cat("{\\raggedright\\scriptsize Marginal-effects ``scissors'' plot built from the §3.3 columns 3-4 (HR \\& Engineer triple with Firm Targets Fem/His) under the URM-Tech dichotomy. Top row: HR evaluators (Panels A1, B1). Bottom row: Engineer evaluators (Panels A2, B2). Lines: predicted effect of blinding on each group's overall score as a function of the rater's Individual DEI Index (Z); shaded bands are 95\\% CIs (SE clustered by respondent).\\par}\n")
 cat("\\end{center}\n")
 
 rm(dt_hr, dt_eng, build_urm, fit_simple, fit_triple, flip,
