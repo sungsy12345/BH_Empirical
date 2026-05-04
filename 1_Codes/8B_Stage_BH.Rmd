@@ -2303,7 +2303,14 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
 )
 
-gof_custom <- tribble(~raw, ~clean, ~fmt, "nobs", "Observations", 0)
+gof_custom <- tribble(
+  ~raw,                 ~clean,                  ~fmt,
+  "nobs",               "Observations",          0,
+  "r.squared",          "R$^2$",                 3,
+  "adj.r.squared",      "Adj. R$^2$",            3,
+  "r2.within",          "R$^2$ Within",          3,
+  "r2.within.adjusted", "Adj. R$^2$ Within",     3
+)
 chk <- "\\checkmark"; nox <- "$\\times$"
 fe_rows <- data.frame(
   term = c("Resume (Content) FE", "Display Position FE",
@@ -2417,7 +2424,14 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
 )
 
-gof_custom <- tribble(~raw, ~clean, ~fmt, "nobs", "Observations", 0)
+gof_custom <- tribble(
+  ~raw,                 ~clean,                  ~fmt,
+  "nobs",               "Observations",          0,
+  "r.squared",          "R$^2$",                 3,
+  "adj.r.squared",      "Adj. R$^2$",            3,
+  "r2.within",          "R$^2$ Within",          3,
+  "r2.within.adjusted", "Adj. R$^2$ Within",     3
+)
 chk <- "\\checkmark"; nox <- "$\\times$"
 fe_rows <- data.frame(
   term = c("Resume (Content) FE", "Display Position FE",
@@ -2531,7 +2545,14 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
 )
 
-gof_custom <- tribble(~raw, ~clean, ~fmt, "nobs", "Observations", 0)
+gof_custom <- tribble(
+  ~raw,                 ~clean,                  ~fmt,
+  "nobs",               "Observations",          0,
+  "r.squared",          "R$^2$",                 3,
+  "adj.r.squared",      "Adj. R$^2$",            3,
+  "r2.within",          "R$^2$ Within",          3,
+  "r2.within.adjusted", "Adj. R$^2$ Within",     3
+)
 chk <- "\\checkmark"; nox <- "$\\times$"
 fe_rows <- data.frame(
   term = c("Resume (Content) FE", "Display Position FE",
@@ -2786,7 +2807,14 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
 )
 
-gof_custom <- tribble(~raw, ~clean, ~fmt, "nobs", "Observations", 0)
+gof_custom <- tribble(
+  ~raw,                 ~clean,                  ~fmt,
+  "nobs",               "Observations",          0,
+  "r.squared",          "R$^2$",                 3,
+  "adj.r.squared",      "Adj. R$^2$",            3,
+  "r2.within",          "R$^2$ Within",          3,
+  "r2.within.adjusted", "Adj. R$^2$ Within",     3
+)
 chk <- "\\checkmark"; nox <- "$\\times$"
 fe_rows <- data.frame(
   term = c("Resume (Content) FE", "Display Position FE",
@@ -2905,7 +2933,14 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
 )
 
-gof_custom <- tribble(~raw, ~clean, ~fmt, "nobs", "Observations", 0)
+gof_custom <- tribble(
+  ~raw,                 ~clean,                  ~fmt,
+  "nobs",               "Observations",          0,
+  "r.squared",          "R$^2$",                 3,
+  "adj.r.squared",      "Adj. R$^2$",            3,
+  "r2.within",          "R$^2$ Within",          3,
+  "r2.within.adjusted", "Adj. R$^2$ Within",     3
+)
 chk <- "\\checkmark"; nox <- "$\\times$"
 fe_rows <- data.frame(
   term = c("Resume (Content) FE", "Display Position FE",
@@ -3024,7 +3059,14 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
 )
 
-gof_custom <- tribble(~raw, ~clean, ~fmt, "nobs", "Observations", 0)
+gof_custom <- tribble(
+  ~raw,                 ~clean,                  ~fmt,
+  "nobs",               "Observations",          0,
+  "r.squared",          "R$^2$",                 3,
+  "adj.r.squared",      "Adj. R$^2$",            3,
+  "r2.within",          "R$^2$ Within",          3,
+  "r2.within.adjusted", "Adj. R$^2$ Within",     3
+)
 chk <- "\\checkmark"; nox <- "$\\times$"
 fe_rows <- data.frame(
   term = c("Resume (Content) FE", "Display Position FE",
@@ -3293,7 +3335,14 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
 )
 
-gof_custom <- tribble(~raw, ~clean, ~fmt, "nobs", "Observations", 0)
+gof_custom <- tribble(
+  ~raw,                 ~clean,                  ~fmt,
+  "nobs",               "Observations",          0,
+  "r.squared",          "R$^2$",                 3,
+  "adj.r.squared",      "Adj. R$^2$",            3,
+  "r2.within",          "R$^2$ Within",          3,
+  "r2.within.adjusted", "Adj. R$^2$ Within",     3
+)
 chk <- "\\checkmark"; nox <- "$\\times$"
 fe_rows <- data.frame(
   term = c("Resume (Content) FE", "Display Position FE",
@@ -3412,7 +3461,14 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
 )
 
-gof_custom <- tribble(~raw, ~clean, ~fmt, "nobs", "Observations", 0)
+gof_custom <- tribble(
+  ~raw,                 ~clean,                  ~fmt,
+  "nobs",               "Observations",          0,
+  "r.squared",          "R$^2$",                 3,
+  "adj.r.squared",      "Adj. R$^2$",            3,
+  "r2.within",          "R$^2$ Within",          3,
+  "r2.within.adjusted", "Adj. R$^2$ Within",     3
+)
 chk <- "\\checkmark"; nox <- "$\\times$"
 fe_rows <- data.frame(
   term = c("Resume (Content) FE", "Display Position FE",
@@ -3531,7 +3587,14 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
 )
 
-gof_custom <- tribble(~raw, ~clean, ~fmt, "nobs", "Observations", 0)
+gof_custom <- tribble(
+  ~raw,                 ~clean,                  ~fmt,
+  "nobs",               "Observations",          0,
+  "r.squared",          "R$^2$",                 3,
+  "adj.r.squared",      "Adj. R$^2$",            3,
+  "r2.within",          "R$^2$ Within",          3,
+  "r2.within.adjusted", "Adj. R$^2$ Within",     3
+)
 chk <- "\\checkmark"; nox <- "$\\times$"
 fe_rows <- data.frame(
   term = c("Resume (Content) FE", "Display Position FE",
@@ -3769,7 +3832,14 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
 )
 
-gof_custom <- tribble(~raw, ~clean, ~fmt, "nobs", "Observations", 0)
+gof_custom <- tribble(
+  ~raw,                 ~clean,                  ~fmt,
+  "nobs",               "Observations",          0,
+  "r.squared",          "R$^2$",                 3,
+  "adj.r.squared",      "Adj. R$^2$",            3,
+  "r2.within",          "R$^2$ Within",          3,
+  "r2.within.adjusted", "Adj. R$^2$ Within",     3
+)
 chk <- "\\checkmark"; nox <- "$\\times$"
 fe_rows <- data.frame(
   term = c("Resume (Content) FE", "Display Position FE",
@@ -3888,7 +3958,14 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
 )
 
-gof_custom <- tribble(~raw, ~clean, ~fmt, "nobs", "Observations", 0)
+gof_custom <- tribble(
+  ~raw,                 ~clean,                  ~fmt,
+  "nobs",               "Observations",          0,
+  "r.squared",          "R$^2$",                 3,
+  "adj.r.squared",      "Adj. R$^2$",            3,
+  "r2.within",          "R$^2$ Within",          3,
+  "r2.within.adjusted", "Adj. R$^2$ Within",     3
+)
 chk <- "\\checkmark"; nox <- "$\\times$"
 fe_rows <- data.frame(
   term = c("Resume (Content) FE", "Display Position FE",
@@ -4007,7 +4084,14 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
 )
 
-gof_custom <- tribble(~raw, ~clean, ~fmt, "nobs", "Observations", 0)
+gof_custom <- tribble(
+  ~raw,                 ~clean,                  ~fmt,
+  "nobs",               "Observations",          0,
+  "r.squared",          "R$^2$",                 3,
+  "adj.r.squared",      "Adj. R$^2$",            3,
+  "r2.within",          "R$^2$ Within",          3,
+  "r2.within.adjusted", "Adj. R$^2$ Within",     3
+)
 chk <- "\\checkmark"; nox <- "$\\times$"
 fe_rows <- data.frame(
   term = c("Resume (Content) FE", "Display Position FE",
