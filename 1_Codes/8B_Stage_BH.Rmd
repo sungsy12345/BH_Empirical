@@ -2215,7 +2215,7 @@ for (k in 1:18) {
     tryCatch({
       m_hr <- suppressMessages(suppressWarnings(
         feols(overall_score_std ~ i(treat, ref = "nonblind") + resp_age |
-                r_do + q_version + resp_gender + resp_race + s2_educ + s2_income,
+                q_version + resp_gender + resp_race + s2_educ + s2_income,
               data = hr_data, vcov = ~ responseid)
       ))
       ct <- coeftable(m_hr)
@@ -2247,7 +2247,7 @@ for (k in 1:18) {
     tryCatch({
       m_eng <- suppressMessages(suppressWarnings(
         feols(overall_score_std ~ i(treat, ref = "nonblind") + resp_age |
-                r_do + q_version + resp_gender + resp_race + s2_educ + s2_income +
+                q_version + resp_gender + resp_race + s2_educ + s2_income +
                 resp_python + resp_java,
               data = eng_data, vcov = ~ responseid)
       ))
@@ -2341,7 +2341,7 @@ for (k in 1:18) {
     tryCatch({
       m_hr <- suppressMessages(suppressWarnings(
         feols(overall_score_std ~ i(treat, ref = "nonblind") * dei_index_z + resp_age |
-                r_do + q_version + resp_gender + resp_race + s2_educ + s2_income,
+                q_version + resp_gender + resp_race + s2_educ + s2_income,
               data = hr_data, vcov = ~ responseid)
       ))
       cf <- coef(m_hr); V <- vcov(m_hr)
@@ -2375,7 +2375,7 @@ for (k in 1:18) {
     tryCatch({
       m_eng <- suppressMessages(suppressWarnings(
         feols(overall_score_std ~ i(treat, ref = "nonblind") * dei_index_z + resp_age |
-                r_do + q_version + resp_gender + resp_race + s2_educ + s2_income +
+                q_version + resp_gender + resp_race + s2_educ + s2_income +
                 resp_python + resp_java,
               data = eng_data, vcov = ~ responseid)
       ))
@@ -2462,7 +2462,7 @@ for (k in 1:18) {
     m_hr <- suppressMessages(suppressWarnings(
       feols(as.formula(paste0(hr_col,
         " ~ i(race_gender, ref = 'Blind') |
-          r_do + q_version + resp_gender + resp_race + s2_educ + s2_income")),
+          q_version + resp_gender + resp_race + s2_educ + s2_income")),
         data = firm_long_dt[role == "HR"],
         vcov = ~ responseid)
     ))
@@ -2490,7 +2490,7 @@ for (k in 1:18) {
     m_eng <- suppressMessages(suppressWarnings(
       feols(as.formula(paste0(eng_col,
         " ~ i(race_gender, ref = 'Blind') + resp_age |
-          r_do + q_version + resp_gender + resp_race + s2_educ + s2_income +
+          q_version + resp_gender + resp_race + s2_educ + s2_income +
           resp_python + resp_java")),
         data = firm_long_dt[role == "Eng"],
         vcov = ~ responseid)
