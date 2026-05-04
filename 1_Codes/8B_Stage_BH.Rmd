@@ -2127,76 +2127,59 @@ build_scissors_dt <- function(model, factor_col, third_col,
   do.call(rbind, rows)
 }
 
-## Two-row scissors grid (HR top, Eng bottom). Three legend entries:
-##   "Aligned" (Perc=0; gray dashed, shared across roles)
-##   "HR Misaligned" (HR sees Eng apathy; steelblue solid)
-##   "Eng Misaligned" (Eng sees HR overreach; indianred solid)
-## To force patchwork's `guides = "collect"` to produce a single merged legend,
-## we pad plot_dt so every (role, demo) panel has at least one row per bucket
-## level (NA est for absent levels means nothing is drawn but the scale's
-## domain is uniform across panels, which is what the merge logic checks).
-## y_lim is computed from the est range across all panels plus the HR-only CI
-## extent, then padded. Engineer rebellion ribbons that exceed this get clipped
-## by coord_cartesian -- the central est line stays visible.
+## Two-row scissors grid (HR top, Eng bottom). Per-row legends: each role's
+## row has its own collected legend strip with role-specific labels (HR row:
+## HR-aligned/misaligned-with-Eng; Eng row: Eng-aligned/misaligned-with-HR).
+## "Blinding Boosts/Penalizes [demographic]" annotations are panel-specific.
+## y_lim from est range only with a ±2 hard cap so thin-cell CI explosions
+## don't squash visible signal; ribbons that exceed get clipped by
+## coord_cartesian, central est lines stay visible.
 make_scissors_grid <- function(plot_dt, demo_lbls, x_lab, ncol_panels,
-                               low_label = "Aligned",
-                               high_label_template = "%s Misaligned") {
+                               hr_low_label   = "HR who feel aligned with Eng",
+                               hr_high_label  = "HR who feel highly misaligned with Eng",
+                               eng_low_label  = "Eng who feel aligned with HR",
+                               eng_high_label = "Eng who feel highly misaligned with HR") {
   plot_dt <- as.data.frame(plot_dt)
-  hr_high  <- sprintf(high_label_template, "HR")
-  eng_high <- sprintf(high_label_template, "Eng")
+  plot_dt$role <- factor(plot_dt$role, levels = c("HR", "Eng"))
+  plot_dt$demo <- factor(plot_dt$demo, levels = demo_lbls)
+
   perc_vals <- sort(unique(plot_dt$Perc[!is.na(plot_dt$Perc)]))
   perc_low_val <- perc_vals[1]
-  plot_dt$bucket_chr <- ifelse(
-    plot_dt$Perc == perc_low_val, low_label,
-    ifelse(plot_dt$role == "HR", hr_high, eng_high))
-  bucket_levels <- c(low_label, hr_high, eng_high)
-  bcol <- setNames(c("gray40", "steelblue", "indianred"), bucket_levels)
-  blty <- setNames(c("dashed", "solid", "solid"),         bucket_levels)
 
-  ## Pad with NA-est rows so every (role, demo) panel sees all 3 bucket levels.
-  combos   <- expand.grid(role = c("HR", "Eng"), demo = demo_lbls,
-                          bucket_chr = bucket_levels, stringsAsFactors = FALSE)
-  combos$k <- paste(combos$role, combos$demo, combos$bucket_chr)
-  have     <- unique(paste(plot_dt$role, plot_dt$demo, plot_dt$bucket_chr))
-  miss     <- combos[!combos$k %in% have, c("role", "demo", "bucket_chr")]
-  if (nrow(miss) > 0) {
-    pad <- data.frame(
-      role = miss$role, demo = miss$demo,
-      Perc = NA_integer_, Z = NA_real_,
-      est  = NA_real_, lwr = NA_real_, upr = NA_real_,
-      bucket_chr = miss$bucket_chr,
-      stringsAsFactors = FALSE)
-    plot_dt <- rbind(plot_dt, pad)
-  }
-
-  plot_dt$role   <- factor(plot_dt$role,   levels = c("HR", "Eng"))
-  plot_dt$demo   <- factor(plot_dt$demo,   levels = demo_lbls)
-  plot_dt$bucket <- factor(plot_dt$bucket_chr, levels = bucket_levels)
-
-  ## y_lim from est range only (with 50% buffer): some 6-cell x continuous-perc
-  ## CI bounds blow up to absurd magnitudes when cells are thin, which would
-  ## squash all visible signal. Hard-cap at +/-2 (outcome is z-scored, so
-  ## meaningful effects should sit within +/-1.5). Ribbons that exceed get
-  ## clipped by coord_cartesian; the central est lines stay visible.
   y_lim <- range(plot_dt$est, na.rm = TRUE) * 1.5
   y_lim[1] <- max(min(y_lim[1], -0.5), -2)
   y_lim[2] <- min(max(y_lim[2],  0.5),  2)
 
   panel_one <- function(rl, dm) {
     d <- plot_dt[plot_dt$role == rl & plot_dt$demo == dm, ]
+    if (rl == "HR") {
+      low_lab    <- hr_low_label
+      high_lab   <- hr_high_label
+      high_color <- "steelblue"
+    } else {
+      low_lab    <- eng_low_label
+      high_lab   <- eng_high_label
+      high_color <- "indianred"
+    }
+    d$bucket <- factor(
+      ifelse(d$Perc == perc_low_val, low_lab, high_lab),
+      levels = c(low_lab, high_lab))
+    bcol <- setNames(c("gray40", high_color), c(low_lab, high_lab))
+    blty <- setNames(c("dashed", "solid"),    c(low_lab, high_lab))
+
     ggplot(d, aes(x = Z, y = est, color = bucket, fill = bucket, linetype = bucket)) +
       annotate("rect", xmin = -2, xmax = 2, ymin = 0,        ymax = y_lim[2], fill = "#e8f4ea", alpha = 0.4) +
       annotate("rect", xmin = -2, xmax = 2, ymin = y_lim[1], ymax = 0,        fill = "#fbeaea", alpha = 0.4) +
       geom_hline(yintercept = 0, linetype = "dashed", color = "gray30", linewidth = 0.4) +
       geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.15, color = NA, na.rm = TRUE) +
       geom_line(linewidth = 0.7, na.rm = TRUE) +
-      annotate("text", x = 0, y = y_lim[2] * 0.93, label = "Blinding helps",
+      annotate("text", x = 0, y = y_lim[2] * 0.93, label = paste0("Blinding Boosts ", dm),
                hjust = 0.5, vjust = 1, size = 1.9, fontface = "italic", color = "darkgreen") +
-      annotate("text", x = 0, y = y_lim[1] * 0.93, label = "Blinding hurts",
+      annotate("text", x = 0, y = y_lim[1] * 0.93, label = paste0("Blinding Penalizes ", dm),
                hjust = 0.5, vjust = 0, size = 1.9, fontface = "italic", color = "darkred") +
-      scale_color_manual(   name = NULL, values = bcol, drop = FALSE) +
-      scale_fill_manual(    name = NULL, values = bcol, drop = FALSE) +
-      scale_linetype_manual(name = NULL, values = blty, drop = FALSE) +
+      scale_color_manual(   name = NULL, values = bcol) +
+      scale_fill_manual(    name = NULL, values = bcol) +
+      scale_linetype_manual(name = NULL, values = blty) +
       guides(fill = "none") +
       coord_cartesian(xlim = c(-2, 2), ylim = y_lim) +
       labs(title = paste0(rl, " --- ", dm),
@@ -2209,13 +2192,17 @@ make_scissors_grid <- function(plot_dt, demo_lbls, x_lab, ncol_panels,
             panel.grid.minor = element_blank())
   }
 
-  panels <- list()
-  for (rl in c("HR", "Eng")) for (dm in demo_lbls) {
-    panels[[length(panels) + 1L]] <- panel_one(rl, dm)
-  }
-  wrap_plots(panels, ncol = ncol_panels) +
-    plot_layout(guides = "collect") &
-    theme(legend.position = "bottom")
+  hr_panels  <- lapply(demo_lbls, function(dm) panel_one("HR",  dm))
+  eng_panels <- lapply(demo_lbls, function(dm) panel_one("Eng", dm))
+
+  hr_grid  <- wrap_plots(hr_panels,  ncol = ncol_panels) +
+              plot_layout(guides = "collect") &
+              theme(legend.position = "bottom")
+  eng_grid <- wrap_plots(eng_panels, ncol = ncol_panels) +
+              plot_layout(guides = "collect") &
+              theme(legend.position = "bottom")
+
+  hr_grid / eng_grid
 }
 ```
 
@@ -2367,8 +2354,8 @@ fig_dir <- here("2_Reports", "figures")
 plot_file_dei <- file.path(fig_dir, "8B_perception_triple_dei_rg.pdf")
 plot_file_cod <- file.path(fig_dir, "8B_perception_triple_coding_rg.pdf")
 suppressMessages(suppressWarnings({
-  ggsave(plot_file_dei, plot = fig_dei, width = 14, height = 5.5, device = "pdf")
-  ggsave(plot_file_cod, plot = fig_cod, width = 14, height = 5.5, device = "pdf")
+  ggsave(plot_file_dei, plot = fig_dei, width = 14, height = 6.5, device = "pdf")
+  ggsave(plot_file_cod, plot = fig_cod, width = 14, height = 6.5, device = "pdf")
 }))
 
 cat("\\clearpage\n")
@@ -2488,8 +2475,8 @@ fig_dir <- here("2_Reports", "figures")
 plot_file_dei <- file.path(fig_dir, "8B_perception_triple_dei_axis.pdf")
 plot_file_cod <- file.path(fig_dir, "8B_perception_triple_coding_axis.pdf")
 suppressMessages(suppressWarnings({
-  ggsave(plot_file_dei, plot = fig_dei, width = 11, height = 5.5, device = "pdf")
-  ggsave(plot_file_cod, plot = fig_cod, width = 11, height = 5.5, device = "pdf")
+  ggsave(plot_file_dei, plot = fig_dei, width = 11, height = 6.5, device = "pdf")
+  ggsave(plot_file_cod, plot = fig_cod, width = 11, height = 6.5, device = "pdf")
 }))
 
 cat("\\clearpage\n")
@@ -2609,8 +2596,8 @@ fig_dir <- here("2_Reports", "figures")
 plot_file_dei <- file.path(fig_dir, "8B_perception_triple_dei_utech.pdf")
 plot_file_cod <- file.path(fig_dir, "8B_perception_triple_coding_utech.pdf")
 suppressMessages(suppressWarnings({
-  ggsave(plot_file_dei, plot = fig_dei, width = 8, height = 5.5, device = "pdf")
-  ggsave(plot_file_cod, plot = fig_cod, width = 8, height = 5.5, device = "pdf")
+  ggsave(plot_file_dei, plot = fig_dei, width = 8, height = 6.5, device = "pdf")
+  ggsave(plot_file_cod, plot = fig_cod, width = 8, height = 6.5, device = "pdf")
 }))
 
 cat("\\clearpage\n")
@@ -2860,23 +2847,21 @@ df_dei <- rbind(
   build_scissors_dt(m4, fcol, "dei_index_A_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
 fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
                               ncol_panels = 6,
-                              low_label = "Low Misalign",
-                              high_label_template = "%s High Misalign")
+                              )
 
 df_cod <- rbind(
   build_scissors_dt(m5, fcol, "true_coding_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
   build_scissors_dt(m6, fcol, "true_coding_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
 fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Productivity (Z)",
                               ncol_panels = 6,
-                              low_label = "Low Misalign",
-                              high_label_template = "%s High Misalign")
+                              )
 
 fig_dir <- here("2_Reports", "figures")
 plot_file_dei <- file.path(fig_dir, "8B_perception_misalign_dei_rg.pdf")
 plot_file_cod <- file.path(fig_dir, "8B_perception_misalign_coding_rg.pdf")
 suppressMessages(suppressWarnings({
-  ggsave(plot_file_dei, plot = fig_dei, width = 14, height = 5.5, device = "pdf")
-  ggsave(plot_file_cod, plot = fig_cod, width = 14, height = 5.5, device = "pdf")
+  ggsave(plot_file_dei, plot = fig_dei, width = 14, height = 6.5, device = "pdf")
+  ggsave(plot_file_cod, plot = fig_cod, width = 14, height = 6.5, device = "pdf")
 }))
 
 cat("\\clearpage\n")
@@ -2986,23 +2971,21 @@ df_dei <- rbind(
   build_scissors_dt(m4, fcol, "dei_index_A_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
 fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
                               ncol_panels = 3,
-                              low_label = "Low Misalign",
-                              high_label_template = "%s High Misalign")
+                              )
 
 df_cod <- rbind(
   build_scissors_dt(m5, fcol, "true_coding_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
   build_scissors_dt(m6, fcol, "true_coding_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
 fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Productivity (Z)",
                               ncol_panels = 3,
-                              low_label = "Low Misalign",
-                              high_label_template = "%s High Misalign")
+                              )
 
 fig_dir <- here("2_Reports", "figures")
 plot_file_dei <- file.path(fig_dir, "8B_perception_misalign_dei_axis.pdf")
 plot_file_cod <- file.path(fig_dir, "8B_perception_misalign_coding_axis.pdf")
 suppressMessages(suppressWarnings({
-  ggsave(plot_file_dei, plot = fig_dei, width = 11, height = 5.5, device = "pdf")
-  ggsave(plot_file_cod, plot = fig_cod, width = 11, height = 5.5, device = "pdf")
+  ggsave(plot_file_dei, plot = fig_dei, width = 11, height = 6.5, device = "pdf")
+  ggsave(plot_file_cod, plot = fig_cod, width = 11, height = 6.5, device = "pdf")
 }))
 
 cat("\\clearpage\n")
@@ -3112,23 +3095,21 @@ df_dei <- rbind(
   build_scissors_dt(m4, fcol, "dei_index_A_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
 fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
                               ncol_panels = 2,
-                              low_label = "Low Misalign",
-                              high_label_template = "%s High Misalign")
+                              )
 
 df_cod <- rbind(
   build_scissors_dt(m5, fcol, "true_coding_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
   build_scissors_dt(m6, fcol, "true_coding_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
 fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Productivity (Z)",
                               ncol_panels = 2,
-                              low_label = "Low Misalign",
-                              high_label_template = "%s High Misalign")
+                              )
 
 fig_dir <- here("2_Reports", "figures")
 plot_file_dei <- file.path(fig_dir, "8B_perception_misalign_dei_utech.pdf")
 plot_file_cod <- file.path(fig_dir, "8B_perception_misalign_coding_utech.pdf")
 suppressMessages(suppressWarnings({
-  ggsave(plot_file_dei, plot = fig_dei, width = 8, height = 5.5, device = "pdf")
-  ggsave(plot_file_cod, plot = fig_cod, width = 8, height = 5.5, device = "pdf")
+  ggsave(plot_file_dei, plot = fig_dei, width = 8, height = 6.5, device = "pdf")
+  ggsave(plot_file_cod, plot = fig_cod, width = 8, height = 6.5, device = "pdf")
 }))
 
 cat("\\clearpage\n")
@@ -3387,23 +3368,21 @@ df_dei <- rbind(
   build_scissors_dt(m4, fcol, "dei_index_A_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
 fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
                               ncol_panels = 6,
-                              low_label = "Low Misalign",
-                              high_label_template = "%s High Misalign")
+                              )
 
 df_cod <- rbind(
   build_scissors_dt(m5, fcol, "true_coding_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
   build_scissors_dt(m6, fcol, "true_coding_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
 fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Productivity (Z)",
                               ncol_panels = 6,
-                              low_label = "Low Misalign",
-                              high_label_template = "%s High Misalign")
+                              )
 
 fig_dir <- here("2_Reports", "figures")
 plot_file_dei <- file.path(fig_dir, "8B_perception_misalign2_dei_rg.pdf")
 plot_file_cod <- file.path(fig_dir, "8B_perception_misalign2_coding_rg.pdf")
 suppressMessages(suppressWarnings({
-  ggsave(plot_file_dei, plot = fig_dei, width = 14, height = 5.5, device = "pdf")
-  ggsave(plot_file_cod, plot = fig_cod, width = 14, height = 5.5, device = "pdf")
+  ggsave(plot_file_dei, plot = fig_dei, width = 14, height = 6.5, device = "pdf")
+  ggsave(plot_file_cod, plot = fig_cod, width = 14, height = 6.5, device = "pdf")
 }))
 
 cat("\\clearpage\n")
@@ -3513,23 +3492,21 @@ df_dei <- rbind(
   build_scissors_dt(m4, fcol, "dei_index_A_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
 fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
                               ncol_panels = 3,
-                              low_label = "Low Misalign",
-                              high_label_template = "%s High Misalign")
+                              )
 
 df_cod <- rbind(
   build_scissors_dt(m5, fcol, "true_coding_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
   build_scissors_dt(m6, fcol, "true_coding_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
 fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Productivity (Z)",
                               ncol_panels = 3,
-                              low_label = "Low Misalign",
-                              high_label_template = "%s High Misalign")
+                              )
 
 fig_dir <- here("2_Reports", "figures")
 plot_file_dei <- file.path(fig_dir, "8B_perception_misalign2_dei_axis.pdf")
 plot_file_cod <- file.path(fig_dir, "8B_perception_misalign2_coding_axis.pdf")
 suppressMessages(suppressWarnings({
-  ggsave(plot_file_dei, plot = fig_dei, width = 11, height = 5.5, device = "pdf")
-  ggsave(plot_file_cod, plot = fig_cod, width = 11, height = 5.5, device = "pdf")
+  ggsave(plot_file_dei, plot = fig_dei, width = 11, height = 6.5, device = "pdf")
+  ggsave(plot_file_cod, plot = fig_cod, width = 11, height = 6.5, device = "pdf")
 }))
 
 cat("\\clearpage\n")
@@ -3639,23 +3616,21 @@ df_dei <- rbind(
   build_scissors_dt(m4, fcol, "dei_index_A_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
 fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
                               ncol_panels = 2,
-                              low_label = "Low Misalign",
-                              high_label_template = "%s High Misalign")
+                              )
 
 df_cod <- rbind(
   build_scissors_dt(m5, fcol, "true_coding_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
   build_scissors_dt(m6, fcol, "true_coding_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
 fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Productivity (Z)",
                               ncol_panels = 2,
-                              low_label = "Low Misalign",
-                              high_label_template = "%s High Misalign")
+                              )
 
 fig_dir <- here("2_Reports", "figures")
 plot_file_dei <- file.path(fig_dir, "8B_perception_misalign2_dei_utech.pdf")
 plot_file_cod <- file.path(fig_dir, "8B_perception_misalign2_coding_utech.pdf")
 suppressMessages(suppressWarnings({
-  ggsave(plot_file_dei, plot = fig_dei, width = 8, height = 5.5, device = "pdf")
-  ggsave(plot_file_cod, plot = fig_cod, width = 8, height = 5.5, device = "pdf")
+  ggsave(plot_file_dei, plot = fig_dei, width = 8, height = 6.5, device = "pdf")
+  ggsave(plot_file_cod, plot = fig_cod, width = 8, height = 6.5, device = "pdf")
 }))
 
 cat("\\clearpage\n")
@@ -3883,23 +3858,27 @@ df_dei <- rbind(
   build_scissors_dt(m4, fcol, "dei_index_A_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
 fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
                               ncol_panels = 6,
-                              low_label = "Low Dir (counterpart cares less)",
-                              high_label_template = "%s High Dir (Overreach/Undercare)")
+                              hr_low_label   = "HR perceives Eng overcaring on DEI",
+                              hr_high_label  = "HR perceives Eng undercaring on DEI",
+                              eng_low_label  = "Eng perceives HR underreaching on DEI",
+                              eng_high_label = "Eng perceives HR overreaching on DEI")
 
 df_cod <- rbind(
   build_scissors_dt(m5, fcol, "true_coding_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
   build_scissors_dt(m6, fcol, "true_coding_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
 fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Productivity (Z)",
                               ncol_panels = 6,
-                              low_label = "Low Dir (counterpart cares less)",
-                              high_label_template = "%s High Dir (Overreach/Undercare)")
+                              hr_low_label   = "HR perceives Eng overcaring on DEI",
+                              hr_high_label  = "HR perceives Eng undercaring on DEI",
+                              eng_low_label  = "Eng perceives HR underreaching on DEI",
+                              eng_high_label = "Eng perceives HR overreaching on DEI")
 
 fig_dir <- here("2_Reports", "figures")
 plot_file_dei <- file.path(fig_dir, "8B_perception_dir_dei_rg.pdf")
 plot_file_cod <- file.path(fig_dir, "8B_perception_dir_coding_rg.pdf")
 suppressMessages(suppressWarnings({
-  ggsave(plot_file_dei, plot = fig_dei, width = 14, height = 5.5, device = "pdf")
-  ggsave(plot_file_cod, plot = fig_cod, width = 14, height = 5.5, device = "pdf")
+  ggsave(plot_file_dei, plot = fig_dei, width = 14, height = 6.5, device = "pdf")
+  ggsave(plot_file_cod, plot = fig_cod, width = 14, height = 6.5, device = "pdf")
 }))
 
 cat("\\clearpage\n")
@@ -4009,23 +3988,27 @@ df_dei <- rbind(
   build_scissors_dt(m4, fcol, "dei_index_A_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
 fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
                               ncol_panels = 3,
-                              low_label = "Low Dir (counterpart cares less)",
-                              high_label_template = "%s High Dir (Overreach/Undercare)")
+                              hr_low_label   = "HR perceives Eng overcaring on DEI",
+                              hr_high_label  = "HR perceives Eng undercaring on DEI",
+                              eng_low_label  = "Eng perceives HR underreaching on DEI",
+                              eng_high_label = "Eng perceives HR overreaching on DEI")
 
 df_cod <- rbind(
   build_scissors_dt(m5, fcol, "true_coding_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
   build_scissors_dt(m6, fcol, "true_coding_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
 fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Productivity (Z)",
                               ncol_panels = 3,
-                              low_label = "Low Dir (counterpart cares less)",
-                              high_label_template = "%s High Dir (Overreach/Undercare)")
+                              hr_low_label   = "HR perceives Eng overcaring on DEI",
+                              hr_high_label  = "HR perceives Eng undercaring on DEI",
+                              eng_low_label  = "Eng perceives HR underreaching on DEI",
+                              eng_high_label = "Eng perceives HR overreaching on DEI")
 
 fig_dir <- here("2_Reports", "figures")
 plot_file_dei <- file.path(fig_dir, "8B_perception_dir_dei_axis.pdf")
 plot_file_cod <- file.path(fig_dir, "8B_perception_dir_coding_axis.pdf")
 suppressMessages(suppressWarnings({
-  ggsave(plot_file_dei, plot = fig_dei, width = 11, height = 5.5, device = "pdf")
-  ggsave(plot_file_cod, plot = fig_cod, width = 11, height = 5.5, device = "pdf")
+  ggsave(plot_file_dei, plot = fig_dei, width = 11, height = 6.5, device = "pdf")
+  ggsave(plot_file_cod, plot = fig_cod, width = 11, height = 6.5, device = "pdf")
 }))
 
 cat("\\clearpage\n")
@@ -4135,23 +4118,27 @@ df_dei <- rbind(
   build_scissors_dt(m4, fcol, "dei_index_A_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
 fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
                               ncol_panels = 2,
-                              low_label = "Low Dir (counterpart cares less)",
-                              high_label_template = "%s High Dir (Overreach/Undercare)")
+                              hr_low_label   = "HR perceives Eng overcaring on DEI",
+                              hr_high_label  = "HR perceives Eng undercaring on DEI",
+                              eng_low_label  = "Eng perceives HR underreaching on DEI",
+                              eng_high_label = "Eng perceives HR overreaching on DEI")
 
 df_cod <- rbind(
   build_scissors_dt(m5, fcol, "true_coding_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
   build_scissors_dt(m6, fcol, "true_coding_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
 fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Productivity (Z)",
                               ncol_panels = 2,
-                              low_label = "Low Dir (counterpart cares less)",
-                              high_label_template = "%s High Dir (Overreach/Undercare)")
+                              hr_low_label   = "HR perceives Eng overcaring on DEI",
+                              hr_high_label  = "HR perceives Eng undercaring on DEI",
+                              eng_low_label  = "Eng perceives HR underreaching on DEI",
+                              eng_high_label = "Eng perceives HR overreaching on DEI")
 
 fig_dir <- here("2_Reports", "figures")
 plot_file_dei <- file.path(fig_dir, "8B_perception_dir_dei_utech.pdf")
 plot_file_cod <- file.path(fig_dir, "8B_perception_dir_coding_utech.pdf")
 suppressMessages(suppressWarnings({
-  ggsave(plot_file_dei, plot = fig_dei, width = 8, height = 5.5, device = "pdf")
-  ggsave(plot_file_cod, plot = fig_cod, width = 8, height = 5.5, device = "pdf")
+  ggsave(plot_file_dei, plot = fig_dei, width = 8, height = 6.5, device = "pdf")
+  ggsave(plot_file_cod, plot = fig_cod, width = 8, height = 6.5, device = "pdf")
 }))
 
 cat("\\clearpage\n")
