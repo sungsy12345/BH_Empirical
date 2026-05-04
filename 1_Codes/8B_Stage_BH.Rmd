@@ -3175,6 +3175,18 @@ for (col in extra_perc) {
   }
 }
 
+## Belt-and-suspenders: enforce 99 ("Don't know" sentinel) -> NA on the Likert
+## items used in the index. The Stata cleaning script already does this for
+## s5_hr_influence and s5_engineer_care, but applying it again here ensures
+## no 99 leaks into the misalignment composite if the upstream pipeline ever
+## changes. Non-Likert items (the multi-select string, the count dummies)
+## are unaffected.
+for (col in c("s5_view_align", "s5_hr_influence", "s5_engineer_care")) {
+  if (col %in% names(resp_dt)) {
+    resp_dt[get(col) == 99, (col) := NA_real_]
+  }
+}
+
 eng_items <- grep("^aligndiffeng_", names(resp_dt), value = TRUE)
 hr_items  <- grep("^aligndiffhr_",  names(resp_dt), value = TRUE)
 
