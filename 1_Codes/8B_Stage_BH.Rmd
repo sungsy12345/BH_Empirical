@@ -20,6 +20,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 <!-- +++++ ++++++ ++++++ Part 5-2: Analysis (Stage-by-Stage Impact of Blind Hiring) +++++ ++++++ ++++++ -->
 
+\setcounter{section}{-1}
 
 # Summary
 
@@ -254,26 +255,47 @@ rm(m_hr_race, m_hr_gen, m_hr_rg, m_eng_race, m_eng_gen, m_eng_rg,
    fit_overall, chk, nox, fe_rows)
 ```
 \clearpage
-# Institutional Substitution (Firm Policy vs. Individual Bias)
+# Individual Response to Institutional Policy (Institutional Crowding Out or Compensatory Bias)
 
+\textit{Takeaway / Summary.}
 \begin{itemize}\setlength\itemsep{2pt}\setlength\parskip{0pt}\setlength\topsep{0pt}\setlength\partopsep{0pt}
-  \item \textbf{The Puzzle of Individual Ideology (Section 4.1):} If one merely examines the two-way relationship between an evaluator's personal DEI priority and their evaluation scores, the effects appear surprisingly \emph{muted and statistically noisy}. At first glance, one might incorrectly conclude that personal ideology has little impact on how blind hiring reshuffles outcomes.
+  \item \textbf{The Puzzle of Individual Ideology:} The two-way relationship between an evaluator's personal DEI priority and their evaluation scores is surprisingly \emph{muted and statistically noisy}. At first glance, personal ideology appears to have little impact on how blind hiring reshuffles outcomes.
   \begin{itemize}\setlength\itemsep{2pt}\setlength\parskip{0pt}\setlength\topsep{0pt}\setlength\partopsep{0pt}
-    \item \textbf{Compensatory Bias} (Firms with NO Diversity Mandate, see \textcolor{red}{red lines}): When a firm lacks an explicit objective policy targeting URMs, highly pro-DEI HR professionals engage in \emph{compensatory bias}. They fill the perceived institutional void by informally inflating minority candidates' scores in the baseline.
-    \item \textbf{Institutional Crowding-Out} (Firms WITH a Diversity Mandate, see \textcolor{blue}{blue lines}): Conversely, when the firm explicitly mandates URM targeting, this formal policy \emph{crowds out} the evaluator's informal efforts. The pro-DEI HR professional, when combined with institutional DEI targeting policy, \emph{mutes} from assigning premium to under-represented minority's scores.
+    \item \textbf{Compensatory Bias} (Firms with NO Diversity Mandate, see \textcolor{red}{red lines}): When a firm lacks an explicit objective policy targeting URMs, highly pro-DEI HR professionals engage in \emph{compensatory bias} --- filling the perceived institutional void by informally inflating minority candidates' scores in the baseline.
+    \item \textbf{Institutional Crowding-Out} (Firms WITH a Diversity Mandate, see \textcolor{blue}{blue lines}): Conversely, when the firm explicitly mandates URM targeting, this formal policy \emph{crowds out} the evaluator's informal efforts; pro-DEI HR professionals \emph{mute} their premium to under-represented minorities' scores.
   \end{itemize}
-  \item (Note \emph{Divergence between HR and Engineer Results}, particularly in Triple Interaction.)
+  \item (Note the \emph{divergence between HR and Engineer results}, particularly in the triple-interaction columns.)
 \end{itemize}
-\vspace{-0.9em}
+\vspace{0.4em}
+
+\textit{Note on Key Index Creation.}
+\begin{itemize}\setlength\itemsep{2pt}\setlength\parskip{0pt}\setlength\topsep{0pt}\setlength\partopsep{0pt}
+  \item \textit{Individual DEI Index (Z)}: respondent's personal DEI orientation, condensed into a single z-scored score.
+  \begin{itemize}\setlength\itemsep{1pt}\setlength\parskip{0pt}\setlength\topsep{0pt}
+    \item Mathematical expression: $\text{Index} = z\big(\tfrac{1}{5}\sum_{j=1}^{5} z(x_j)\big)$, z-scored within (\texttt{role}, \texttt{treat}) cells.
+    \item \texttt{pro\_dei\_race} --- stated agreement that race DEI is important in hiring (Likert).
+    \item \texttt{pro\_dei\_gender} --- stated agreement that gender DEI is important in hiring (Likert).
+    \item \texttt{pro\_diverse} --- stated importance of working at a company with a diverse workforce (Likert).
+    \item \texttt{pro\_hiring\_dei} --- stated belief that DEI initiatives help firms hire better candidates (Likert).
+    \item \texttt{div\_priority} --- revealed-priority rank of ``Diversity and Representation'' in the seven-goals question.
+  \end{itemize}
+  \item \textit{Firm Targets Fem/His (0/1)}: indicator for whether the respondent's firm formally targets Female or Hispanic candidates in hiring.
+  \begin{itemize}\setlength\itemsep{1pt}\setlength\parskip{0pt}\setlength\topsep{0pt}
+    \item Mathematical expression: $\text{Idx} = \mathbb{1}\{\texttt{firm\_targets\_female} = 1 \;\lor\; \texttt{firm\_targets\_hispanic} = 1\}$.
+    \item \texttt{firm\_targets\_female} --- 1 if option 6 (``Female'') was selected on \texttt{s5\_policy\_diversity} (multi-select).
+    \item \texttt{firm\_targets\_hispanic} --- 1 if option 3 (``Hispanic or Latino'') was selected on the same multi-select.
+  \end{itemize}
+  \item \textit{Firm DEI Attn Index (Z)}: respondent's perception of how much attention their firm currently pays to race and gender DEI in hiring, condensed into a single z-scored score.
+  \begin{itemize}\setlength\itemsep{1pt}\setlength\parskip{0pt}\setlength\topsep{0pt}
+    \item Mathematical expression: $\text{Index} = z\big(\tfrac{1}{2}\big(z(\texttt{race\_attn}) + z(\texttt{gender\_attn})\big)\big)$, z-scored within (\texttt{role}, \texttt{treat}) cells.
+    \item \texttt{s5\_view\_dei\_race\_f} --- Likert: respondent's perception of firm's current attention to race DEI in hiring.
+    \item \texttt{s5\_view\_dei\_gender\_f} --- Likert: respondent's perception of firm's current attention to gender DEI in hiring.
+  \end{itemize}
+\end{itemize}
+\vspace{-0.6em}
 
 \clearpage
-## (Combined) Per-Race-Gender Heterogeneity by DEI Preference, Firm URM Targeting, and Firm DEI Attention
-
-\begin{itemize}\setlength{\itemsep}{1pt}\setlength{\parskip}{0pt}\setlength{\topsep}{2pt}
-  \item \textbf{Individual DEI Index (Z)} --- equal-weight average (1/5 each) of five z-scored items: the four stated DEI views plus the revealed-priority ranking of ``Diversity and Representation'' from the seven-goals question.
-  \item \textbf{Firm Targets Fem/His (0/1)} --- indicator for whether the respondent's firm has explicit policies targeting Female or Hispanic candidates.
-  \item \textbf{Firm DEI Attn Index (Z)} --- within-cell z-score of the equal-weight average of the respondent's perceived firm attention to race and gender DEI.
-\end{itemize}
+## By Six Demographics
 
 ```{r bh_dei_combined_rg, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
 ## Replicates the §4.5 / §4.6 combined structure but using the full
@@ -508,7 +530,7 @@ rm(dt_hr, dt_eng, fit_simple, fit_triple, flip,
 
 
 \clearpage
-## (Combined) URM-Axis Heterogeneity by DEI Preference, Firm URM Targeting, and Firm DEI Attention
+## By Trichotomy (Majority vs Gender Minority vs Racial Minority)
 
 ```{r bh_dei_combined_axis, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
 ## Combines §4.1, §4.2, §4.3 into a single 6-column URM-axis table.
@@ -774,7 +796,7 @@ rm(dt_hr, dt_eng, build_axis, fit_simple, fit_triple, flip,
 
 
 \clearpage
-## (Combined) URM-Tech Dichotomy by DEI Preference, Firm URM Targeting, and Firm DEI Attention
+## By Dichotomy (Majority vs Minority)
 
 ```{r bh_dei_combined_urm, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
 ## Replicates §4.4 but using the URM-Tech dichotomy (Majority = WM+AM vs.
