@@ -2139,12 +2139,9 @@ m1 <- flip(fit_simple_p (dt_hr,  fcol))
 m2 <- flip(fit_simple_p (dt_eng, fcol))
 m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
 m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
-m5 <- flip(fit_triple_p (dt_hr,  fcol, "true_coding_z"))
-m6 <- flip(fit_triple_p (dt_eng, fcol, "true_coding_z"))
 
 all_models <- list("HR" = m1, "Engineer" = m2,
-                   "HR " = m3, "Engineer " = m4,
-                   "HR  " = m5, "Engineer  " = m6)
+                   "HR " = m3, "Engineer " = m4)
 
 coef_map <- c(
   setNames(demo_lbls, paste0(fcol, "::", demos)),
@@ -2152,12 +2149,8 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":perc_role")),
   setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":dei_index_A_z")),
-  setNames(paste0(demo_lbls, " $\\times$ Candidate Productivity (Z)"),
-           paste0(fcol, "::", demos, ":true_coding_z")),
   setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Own DEI Index (Z)"),
-           paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)")),
-  setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Candidate Productivity (Z)"),
-           paste0(fcol, "::", demos, ":I(perc_role * true_coding_z)"))
+           paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)"))
 )
 
 gof_custom <- tribble(
@@ -2174,11 +2167,10 @@ fe_rows <- data.frame(
            "Respondent FE", "Respondent Characteristics"),
   V1 = c(chk, chk, nox, chk), V2 = c(chk, chk, nox, chk),
   V3 = c(chk, chk, nox, chk), V4 = c(chk, chk, nox, chk),
-  V5 = c(chk, chk, nox, chk), V6 = c(chk, chk, nox, chk),
   stringsAsFactors = FALSE
 )
 names(fe_rows) <- c("term", names(all_models))
-attr(fe_rows, "position") <- 37:40
+attr(fe_rows, "position") <- 25:28
 
 modelsummary(
   all_models,
@@ -2191,18 +2183,15 @@ modelsummary(
   escape    = FALSE,
   output    = "kableExtra"
 ) %>%
-  kable_styling(latex_options = "HOLD_position", font_size = 6) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 7) %>%
   add_header_above(c(" " = 1,
                      "Simple Dir Het." = 2,
-                     "Triple: Dir x Own DEI" = 2,
-                     "Triple: Dir x Coding" = 2)) %>%
+                     "Triple: Dir x Own DEI" = 2)) %>%
   row_spec(6,  extra_latex_after = "\\hdashline") %>%
   row_spec(12, extra_latex_after = "\\hdashline") %>%
   row_spec(18, extra_latex_after = "\\hdashline") %>%
-  row_spec(24, extra_latex_after = "\\hdashline") %>%
-  row_spec(30, extra_latex_after = "\\hdashline") %>%
-  row_spec(36, extra_latex_after = "\\midrule") %>%
-  row_spec(40, extra_latex_after = "\\midrule") %>%
+  row_spec(24, extra_latex_after = "\\midrule") %>%
+  row_spec(28, extra_latex_after = "\\midrule") %>%
   footnote(general = sprintf(
             "Dir Idx (Z) = signed directional misalignment index: for Eng, HR Overreach direction (Likert + 0.5 times signed multi-select); for HR, Eng Undercare direction. Z-scored within role. Positive = rebellion conditions for Eng / compensation conditions for HR; negative = opposite. n = %d HR, %d Eng. Coefs flipped post-fit so positive = effect of blinding raises the score. Two-way cluster on responseid and resume index.",
             n_h_idx, n_e_idx),
@@ -2220,40 +2209,22 @@ fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
                               eng_low_label  = "Eng perceives HR underreaching on DEI",
                               eng_high_label = "Eng perceives HR overreaching on DEI")
 
-df_cod <- rbind(
-  build_scissors_dt(m5, fcol, "true_coding_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
-  build_scissors_dt(m6, fcol, "true_coding_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
-fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Productivity (Z)",
-                              ncol_panels = 6,
-                              hr_low_label   = "HR perceives Eng overcaring on DEI",
-                              hr_high_label  = "HR perceives Eng undercaring on DEI",
-                              eng_low_label  = "Eng perceives HR underreaching on DEI",
-                              eng_high_label = "Eng perceives HR overreaching on DEI")
-
 fig_dir <- here("2_Reports", "figures")
 plot_file_dei <- file.path(fig_dir, "8B_perception_dir_dei_rg.pdf")
-plot_file_cod <- file.path(fig_dir, "8B_perception_dir_coding_rg.pdf")
-suppressMessages(suppressWarnings({
+suppressMessages(suppressWarnings(
   ggsave(plot_file_dei, plot = fig_dei, width = 14, height = 6.5, device = "pdf")
-  ggsave(plot_file_cod, plot = fig_cod, width = 14, height = 6.5, device = "pdf")
-}))
+))
 
 cat("\\clearpage\n")
-cat("\\begin{center}\\textbf{Triple A: Dir Idx (signed) $\\times$ Own DEI Index --- Per Race-Gender (6 cells)}\\par\\vspace{0.1em}\n")
+cat("\\begin{center}\\textbf{Dir Idx (signed) $\\times$ Own DEI Index --- Per Race-Gender (6 cells)}\\par\\vspace{0.1em}\n")
 cat("\\includegraphics[width=\\textwidth]{", plot_file_dei, "}\\par\\vspace{0.1em}\n", sep = "")
 cat("{\\raggedright\\scriptsize Top row: HR (high Dir = perceives Eng undercare = compensation conditions). Bottom row: Eng (high Dir = perceives HR overreach = rebellion conditions). Bands = 95\\% CI.\\par}\n")
 cat("\\end{center}\n")
 
-cat("\\clearpage\n")
-cat("\\begin{center}\\textbf{Triple B: Dir Idx (signed) $\\times$ Candidate Productivity --- Per Race-Gender (6 cells)}\\par\\vspace{0.1em}\n")
-cat("\\includegraphics[width=\\textwidth]{", plot_file_cod, "}\\par\\vspace{0.1em}\n", sep = "")
-cat("{\\raggedright\\scriptsize Same panel layout as Triple A. X-axis: candidate's coding ability (test\\_case z-score).\\par}\n")
-cat("\\end{center}\n")
-
-rm(m1, m2, m3, m4, m5, m6, all_models, demos, demo_lbls, fcol,
+rm(m1, m2, m3, m4, all_models, demos, demo_lbls, fcol,
    coef_map, gof_custom, chk, nox, fe_rows,
-   z_grid, df_dei, df_cod, fig_dei, fig_cod,
-   plot_file_dei, plot_file_cod, fig_dir)
+   z_grid, df_dei, fig_dei,
+   plot_file_dei, fig_dir)
 ```
 
 
@@ -2269,12 +2240,9 @@ m1 <- flip(fit_simple_p (dt_hr,  fcol))
 m2 <- flip(fit_simple_p (dt_eng, fcol))
 m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
 m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
-m5 <- flip(fit_triple_p (dt_hr,  fcol, "true_coding_z"))
-m6 <- flip(fit_triple_p (dt_eng, fcol, "true_coding_z"))
 
 all_models <- list("HR" = m1, "Engineer" = m2,
-                   "HR " = m3, "Engineer " = m4,
-                   "HR  " = m5, "Engineer  " = m6)
+                   "HR " = m3, "Engineer " = m4)
 
 coef_map <- c(
   setNames(demo_lbls, paste0(fcol, "::", demos)),
@@ -2282,12 +2250,8 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":perc_role")),
   setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":dei_index_A_z")),
-  setNames(paste0(demo_lbls, " $\\times$ Candidate Productivity (Z)"),
-           paste0(fcol, "::", demos, ":true_coding_z")),
   setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Own DEI Index (Z)"),
-           paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)")),
-  setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Candidate Productivity (Z)"),
-           paste0(fcol, "::", demos, ":I(perc_role * true_coding_z)"))
+           paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)"))
 )
 
 gof_custom <- tribble(
@@ -2304,137 +2268,6 @@ fe_rows <- data.frame(
            "Respondent FE", "Respondent Characteristics"),
   V1 = c(chk, chk, nox, chk), V2 = c(chk, chk, nox, chk),
   V3 = c(chk, chk, nox, chk), V4 = c(chk, chk, nox, chk),
-  V5 = c(chk, chk, nox, chk), V6 = c(chk, chk, nox, chk),
-  stringsAsFactors = FALSE
-)
-names(fe_rows) <- c("term", names(all_models))
-attr(fe_rows, "position") <- 19:22
-
-modelsummary(
-  all_models,
-  estimate  = "{estimate}{stars} ({std.error})",
-  statistic = NULL,
-  stars     = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
-  coef_map  = coef_map,
-  gof_map   = gof_custom,
-  add_rows  = fe_rows,
-  escape    = FALSE,
-  output    = "kableExtra"
-) %>%
-  kable_styling(latex_options = "HOLD_position", font_size = 7) %>%
-  add_header_above(c(" " = 1,
-                     "Simple Dir Het." = 2,
-                     "Triple: Dir x Own DEI" = 2,
-                     "Triple: Dir x Coding" = 2)) %>%
-  row_spec(3,  extra_latex_after = "\\hdashline") %>%
-  row_spec(6,  extra_latex_after = "\\hdashline") %>%
-  row_spec(9,  extra_latex_after = "\\hdashline") %>%
-  row_spec(12, extra_latex_after = "\\hdashline") %>%
-  row_spec(15, extra_latex_after = "\\hdashline") %>%
-  row_spec(18, extra_latex_after = "\\midrule") %>%
-  row_spec(22, extra_latex_after = "\\midrule") %>%
-  footnote(general = sprintf(
-            "Dir Idx (Z) = signed directional misalignment index. n = %d HR, %d Eng. Coefs flipped post-fit so positive = effect of blinding raises the score. Two-way cluster on responseid and resume index.",
-            n_h_idx, n_e_idx),
-           general_title = "", threeparttable = TRUE,
-           footnote_as_chunk = FALSE, escape = FALSE)
-
-z_grid <- seq(-2, 2, length.out = 41)
-df_dei <- rbind(
-  build_scissors_dt(m3, fcol, "dei_index_A_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
-  build_scissors_dt(m4, fcol, "dei_index_A_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
-fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
-                              ncol_panels = 3,
-                              hr_low_label   = "HR perceives Eng overcaring on DEI",
-                              hr_high_label  = "HR perceives Eng undercaring on DEI",
-                              eng_low_label  = "Eng perceives HR underreaching on DEI",
-                              eng_high_label = "Eng perceives HR overreaching on DEI")
-
-df_cod <- rbind(
-  build_scissors_dt(m5, fcol, "true_coding_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
-  build_scissors_dt(m6, fcol, "true_coding_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
-fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Productivity (Z)",
-                              ncol_panels = 3,
-                              hr_low_label   = "HR perceives Eng overcaring on DEI",
-                              hr_high_label  = "HR perceives Eng undercaring on DEI",
-                              eng_low_label  = "Eng perceives HR underreaching on DEI",
-                              eng_high_label = "Eng perceives HR overreaching on DEI")
-
-fig_dir <- here("2_Reports", "figures")
-plot_file_dei <- file.path(fig_dir, "8B_perception_dir_dei_axis.pdf")
-plot_file_cod <- file.path(fig_dir, "8B_perception_dir_coding_axis.pdf")
-suppressMessages(suppressWarnings({
-  ggsave(plot_file_dei, plot = fig_dei, width = 11, height = 6.5, device = "pdf")
-  ggsave(plot_file_cod, plot = fig_cod, width = 11, height = 6.5, device = "pdf")
-}))
-
-cat("\\clearpage\n")
-cat("\\begin{center}\\textbf{Triple A: Dir Idx (signed) $\\times$ Own DEI Index --- URM-Axis Trichotomy}\\par\\vspace{0.1em}\n")
-cat("\\includegraphics[width=0.95\\textwidth]{", plot_file_dei, "}\\par\\vspace{0.1em}\n", sep = "")
-cat("{\\raggedright\\scriptsize Top row: HR (high Dir = compensation conditions). Bottom row: Eng (high Dir = rebellion conditions). Bands = 95\\% CI.\\par}\n")
-cat("\\end{center}\n")
-
-cat("\\clearpage\n")
-cat("\\begin{center}\\textbf{Triple B: Dir Idx (signed) $\\times$ Candidate Productivity --- URM-Axis Trichotomy}\\par\\vspace{0.1em}\n")
-cat("\\includegraphics[width=0.95\\textwidth]{", plot_file_cod, "}\\par\\vspace{0.1em}\n", sep = "")
-cat("{\\raggedright\\scriptsize Same layout as Triple A. X-axis: candidate's coding ability (test\\_case z-score).\\par}\n")
-cat("\\end{center}\n")
-
-rm(m1, m2, m3, m4, m5, m6, all_models, demos, demo_lbls, fcol,
-   coef_map, gof_custom, chk, nox, fe_rows,
-   z_grid, df_dei, df_cod, fig_dei, fig_cod,
-   plot_file_dei, plot_file_cod, fig_dir)
-```
-
-
-\clearpage
-## URM-Tech Dichotomy (Majority in Tech / URM in Tech) --- Signed Directional Index
-
-```{r perception_dir_utech, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
-demos     <- c("Nonblind_NonURM", "Nonblind_URM")
-demo_lbls <- c("Majority", "URM in Tech")
-fcol      <- "urm_tech_blind"
-
-m1 <- flip(fit_simple_p (dt_hr,  fcol))
-m2 <- flip(fit_simple_p (dt_eng, fcol))
-m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
-m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
-m5 <- flip(fit_triple_p (dt_hr,  fcol, "true_coding_z"))
-m6 <- flip(fit_triple_p (dt_eng, fcol, "true_coding_z"))
-
-all_models <- list("HR" = m1, "Engineer" = m2,
-                   "HR " = m3, "Engineer " = m4,
-                   "HR  " = m5, "Engineer  " = m6)
-
-coef_map <- c(
-  setNames(demo_lbls, paste0(fcol, "::", demos)),
-  setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z)"),
-           paste0(fcol, "::", demos, ":perc_role")),
-  setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
-           paste0(fcol, "::", demos, ":dei_index_A_z")),
-  setNames(paste0(demo_lbls, " $\\times$ Candidate Productivity (Z)"),
-           paste0(fcol, "::", demos, ":true_coding_z")),
-  setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Own DEI Index (Z)"),
-           paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)")),
-  setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Candidate Productivity (Z)"),
-           paste0(fcol, "::", demos, ":I(perc_role * true_coding_z)"))
-)
-
-gof_custom <- tribble(
-  ~raw,                 ~clean,                  ~fmt,
-  "nobs",               "Observations",          0,
-  "r.squared",          "R$^2$",                 3,
-  "adj.r.squared",      "Adj. R$^2$",            3,
-  "r2.within",          "R$^2$ Within",          3,
-  "r2.within.adjusted", "Adj. R$^2$ Within",     3
-)
-chk <- "\\checkmark"; nox <- "$\\times$"
-fe_rows <- data.frame(
-  term = c("Resume (Content) FE", "Display Position FE",
-           "Respondent FE", "Respondent Characteristics"),
-  V1 = c(chk, chk, nox, chk), V2 = c(chk, chk, nox, chk),
-  V3 = c(chk, chk, nox, chk), V4 = c(chk, chk, nox, chk),
-  V5 = c(chk, chk, nox, chk), V6 = c(chk, chk, nox, chk),
   stringsAsFactors = FALSE
 )
 names(fe_rows) <- c("term", names(all_models))
@@ -2454,15 +2287,113 @@ modelsummary(
   kable_styling(latex_options = "HOLD_position", font_size = 8) %>%
   add_header_above(c(" " = 1,
                      "Simple Dir Het." = 2,
-                     "Triple: Dir x Own DEI" = 2,
-                     "Triple: Dir x Coding" = 2)) %>%
+                     "Triple: Dir x Own DEI" = 2)) %>%
+  row_spec(3,  extra_latex_after = "\\hdashline") %>%
+  row_spec(6,  extra_latex_after = "\\hdashline") %>%
+  row_spec(9,  extra_latex_after = "\\hdashline") %>%
+  row_spec(12, extra_latex_after = "\\midrule") %>%
+  row_spec(16, extra_latex_after = "\\midrule") %>%
+  footnote(general = sprintf(
+            "Dir Idx (Z) = signed directional misalignment index. n = %d HR, %d Eng. Coefs flipped post-fit so positive = effect of blinding raises the score. Two-way cluster on responseid and resume index.",
+            n_h_idx, n_e_idx),
+           general_title = "", threeparttable = TRUE,
+           footnote_as_chunk = FALSE, escape = FALSE)
+
+z_grid <- seq(-2, 2, length.out = 41)
+df_dei <- rbind(
+  build_scissors_dt(m3, fcol, "dei_index_A_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m4, fcol, "dei_index_A_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
+                              ncol_panels = 3,
+                              hr_low_label   = "HR perceives Eng overcaring on DEI",
+                              hr_high_label  = "HR perceives Eng undercaring on DEI",
+                              eng_low_label  = "Eng perceives HR underreaching on DEI",
+                              eng_high_label = "Eng perceives HR overreaching on DEI")
+
+fig_dir <- here("2_Reports", "figures")
+plot_file_dei <- file.path(fig_dir, "8B_perception_dir_dei_axis.pdf")
+suppressMessages(suppressWarnings(
+  ggsave(plot_file_dei, plot = fig_dei, width = 11, height = 6.5, device = "pdf")
+))
+
+cat("\\clearpage\n")
+cat("\\begin{center}\\textbf{Dir Idx (signed) $\\times$ Own DEI Index --- URM-Axis Trichotomy}\\par\\vspace{0.1em}\n")
+cat("\\includegraphics[width=0.95\\textwidth]{", plot_file_dei, "}\\par\\vspace{0.1em}\n", sep = "")
+cat("{\\raggedright\\scriptsize Top row: HR (high Dir = compensation conditions). Bottom row: Eng (high Dir = rebellion conditions). Bands = 95\\% CI.\\par}\n")
+cat("\\end{center}\n")
+
+rm(m1, m2, m3, m4, all_models, demos, demo_lbls, fcol,
+   coef_map, gof_custom, chk, nox, fe_rows,
+   z_grid, df_dei, fig_dei,
+   plot_file_dei, fig_dir)
+```
+
+
+\clearpage
+## URM-Tech Dichotomy (Majority in Tech / URM in Tech) --- Signed Directional Index
+
+```{r perception_dir_utech, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+demos     <- c("Nonblind_NonURM", "Nonblind_URM")
+demo_lbls <- c("Majority", "URM in Tech")
+fcol      <- "urm_tech_blind"
+
+m1 <- flip(fit_simple_p (dt_hr,  fcol))
+m2 <- flip(fit_simple_p (dt_eng, fcol))
+m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
+m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
+
+all_models <- list("HR" = m1, "Engineer" = m2,
+                   "HR " = m3, "Engineer " = m4)
+
+coef_map <- c(
+  setNames(demo_lbls, paste0(fcol, "::", demos)),
+  setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z)"),
+           paste0(fcol, "::", demos, ":perc_role")),
+  setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
+           paste0(fcol, "::", demos, ":dei_index_A_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Own DEI Index (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)"))
+)
+
+gof_custom <- tribble(
+  ~raw,                 ~clean,                  ~fmt,
+  "nobs",               "Observations",          0,
+  "r.squared",          "R$^2$",                 3,
+  "adj.r.squared",      "Adj. R$^2$",            3,
+  "r2.within",          "R$^2$ Within",          3,
+  "r2.within.adjusted", "Adj. R$^2$ Within",     3
+)
+chk <- "\\checkmark"; nox <- "$\\times$"
+fe_rows <- data.frame(
+  term = c("Resume (Content) FE", "Display Position FE",
+           "Respondent FE", "Respondent Characteristics"),
+  V1 = c(chk, chk, nox, chk), V2 = c(chk, chk, nox, chk),
+  V3 = c(chk, chk, nox, chk), V4 = c(chk, chk, nox, chk),
+  stringsAsFactors = FALSE
+)
+names(fe_rows) <- c("term", names(all_models))
+attr(fe_rows, "position") <- 9:12
+
+modelsummary(
+  all_models,
+  estimate  = "{estimate}{stars} ({std.error})",
+  statistic = NULL,
+  stars     = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  coef_map  = coef_map,
+  gof_map   = gof_custom,
+  add_rows  = fe_rows,
+  escape    = FALSE,
+  output    = "kableExtra"
+) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 9) %>%
+  add_header_above(c(" " = 1,
+                     "Simple Dir Het." = 2,
+                     "Triple: Dir x Own DEI" = 2)) %>%
   row_spec(2,  extra_latex_after = "\\hdashline") %>%
   row_spec(4,  extra_latex_after = "\\hdashline") %>%
   row_spec(6,  extra_latex_after = "\\hdashline") %>%
-  row_spec(8,  extra_latex_after = "\\hdashline") %>%
-  row_spec(10, extra_latex_after = "\\hdashline") %>%
+  row_spec(8,  extra_latex_after = "\\midrule") %>%
   row_spec(12, extra_latex_after = "\\midrule") %>%
-  row_spec(16, extra_latex_after = "\\midrule") %>%
   footnote(general = sprintf(
             "Dir Idx (Z) = signed directional misalignment index. n = %d HR, %d Eng. Coefs flipped post-fit so positive = effect of blinding raises the score. Two-way cluster on responseid and resume index.",
             n_h_idx, n_e_idx),
@@ -2480,40 +2411,22 @@ fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
                               eng_low_label  = "Eng perceives HR underreaching on DEI",
                               eng_high_label = "Eng perceives HR overreaching on DEI")
 
-df_cod <- rbind(
-  build_scissors_dt(m5, fcol, "true_coding_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
-  build_scissors_dt(m6, fcol, "true_coding_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
-fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Productivity (Z)",
-                              ncol_panels = 2,
-                              hr_low_label   = "HR perceives Eng overcaring on DEI",
-                              hr_high_label  = "HR perceives Eng undercaring on DEI",
-                              eng_low_label  = "Eng perceives HR underreaching on DEI",
-                              eng_high_label = "Eng perceives HR overreaching on DEI")
-
 fig_dir <- here("2_Reports", "figures")
 plot_file_dei <- file.path(fig_dir, "8B_perception_dir_dei_utech.pdf")
-plot_file_cod <- file.path(fig_dir, "8B_perception_dir_coding_utech.pdf")
-suppressMessages(suppressWarnings({
+suppressMessages(suppressWarnings(
   ggsave(plot_file_dei, plot = fig_dei, width = 8, height = 6.5, device = "pdf")
-  ggsave(plot_file_cod, plot = fig_cod, width = 8, height = 6.5, device = "pdf")
-}))
+))
 
 cat("\\clearpage\n")
-cat("\\begin{center}\\textbf{Triple A: Dir Idx (signed) $\\times$ Own DEI Index --- URM-Tech Dichotomy}\\par\\vspace{0.1em}\n")
+cat("\\begin{center}\\textbf{Dir Idx (signed) $\\times$ Own DEI Index --- URM-Tech Dichotomy}\\par\\vspace{0.1em}\n")
 cat("\\includegraphics[width=0.75\\textwidth]{", plot_file_dei, "}\\par\\vspace{0.1em}\n", sep = "")
 cat("{\\raggedright\\scriptsize Top row: HR (high Dir = compensation conditions). Bottom row: Eng (high Dir = rebellion conditions). Bands = 95\\% CI.\\par}\n")
 cat("\\end{center}\n")
 
-cat("\\clearpage\n")
-cat("\\begin{center}\\textbf{Triple B: Dir Idx (signed) $\\times$ Candidate Productivity --- URM-Tech Dichotomy}\\par\\vspace{0.1em}\n")
-cat("\\includegraphics[width=0.75\\textwidth]{", plot_file_cod, "}\\par\\vspace{0.1em}\n", sep = "")
-cat("{\\raggedright\\scriptsize Same layout as Triple A. X-axis: candidate's coding ability (test\\_case z-score).\\par}\n")
-cat("\\end{center}\n")
-
-rm(m1, m2, m3, m4, m5, m6, all_models, demos, demo_lbls, fcol,
+rm(m1, m2, m3, m4, all_models, demos, demo_lbls, fcol,
    coef_map, gof_custom, chk, nox, fe_rows,
-   z_grid, df_dei, df_cod, fig_dei, fig_cod,
-   plot_file_dei, plot_file_cod, fig_dir,
+   z_grid, df_dei, fig_dei,
+   plot_file_dei, fig_dir,
    fld, dt_hr, dt_eng, resp_dt, eng_items, hr_items, extra_perc,
    n_h_idx, n_e_idx, z,
    flip, fit_simple_p, fit_triple_p, build_scissors_dt, make_scissors_grid)
