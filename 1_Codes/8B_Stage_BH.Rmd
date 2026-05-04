@@ -2041,7 +2041,7 @@ rm(fld, e_dt, h_dt,
 \clearpage
 # Inter-Departmental Backlash and Compensation: Triple-Interaction Refinements
 
-\textit{Spec.} Three-way interaction extending §7. Each role is fit on its own sample with the role-specific perception indicator (re-named \texttt{perc\_role} so HR and Eng coefs share a name): \texttt{sc\_overall\_z $\sim$ perc\_role + Z + I(perc\_role $\cdot$ Z) + i(factor, ref='Blind') + i(factor, perc\_role) + i(factor, Z) + i(factor, I(perc\_role $\cdot$ Z)) + resp\_age $|$ resume\_index + r\_do + resp FEs}, two-way cluster on \texttt{responseid + resume\_index}. Factor $\in$ \{\texttt{race\_gender} (6 cells), \texttt{urm\_axis\_blind} (Male NH / Female NH / Hispanic), \texttt{urm\_tech\_blind} (Majority / URM in Tech)\}. Z is alternately the respondent's own DEI Index (\texttt{dei\_index\_A\_z}) or the candidate's coding ability (\texttt{test\_case\_z}). \textbf{All coefficients flipped post-fit so positive = effect of blinding raises that group's score.}
+\textit{Spec.} Three-way interaction extending §7. Each role is fit on its own sample with the role-specific perception indicator (re-named \texttt{perc\_role} so HR and Eng coefs share a name): \texttt{sc\_overall\_z $\sim$ perc\_role + Z + I(perc\_role $\cdot$ Z) + i(factor, ref='Blind') + i(factor, perc\_role) + i(factor, Z) + i(factor, I(perc\_role $\cdot$ Z)) + resp\_age $|$ resume\_index + r\_do + resp FEs}, two-way cluster on \texttt{responseid + resume\_index}. Factor $\in$ \{\texttt{race\_gender} (6 cells), \texttt{urm\_axis\_blind} (Male NH / Female NH / Hispanic), \texttt{urm\_tech\_blind} (Majority / URM in Tech)\}. Z is alternately the respondent's own DEI Index (\texttt{dei\_index\_A\_z}) or the candidate's productivity (\texttt{true\_coding\_z}, the z-scored \texttt{overall\_score} from §5.1). \textbf{All coefficients flipped post-fit so positive = effect of blinding raises that group's score.}
 
 \textit{Reading the table.} For each demographic D, the four blocks are:
 \begin{itemize}\setlength\itemsep{2pt}\setlength\parskip{0pt}\setlength\topsep{0pt}
@@ -2254,7 +2254,6 @@ fld[, race_gender := factor(race_gender,
                   "Asian_Male", "Asian_Female",
                   "Hispanic_Male", "Hispanic_Female"))]
 
-fld[, test_case_z := as.numeric(scale(test_case))]
 
 dt_hr  <- fld[role == "HR"]
 dt_eng <- fld[role == "Eng"]
@@ -2282,8 +2281,8 @@ m1 <- flip(fit_simple_p (dt_hr,  fcol))
 m2 <- flip(fit_simple_p (dt_eng, fcol))
 m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
 m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
-m5 <- flip(fit_triple_p (dt_hr,  fcol, "test_case_z"))
-m6 <- flip(fit_triple_p (dt_eng, fcol, "test_case_z"))
+m5 <- flip(fit_triple_p (dt_hr,  fcol, "true_coding_z"))
+m6 <- flip(fit_triple_p (dt_eng, fcol, "true_coding_z"))
 
 all_models <- list("HR" = m1, "Engineer" = m2,
                    "HR " = m3, "Engineer " = m4,
@@ -2295,12 +2294,12 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":perc_role")),
   setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":dei_index_A_z")),
-  setNames(paste0(demo_lbls, " $\\times$ Candidate Coding (Z)"),
-           paste0(fcol, "::", demos, ":test_case_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Candidate Productivity (Z)"),
+           paste0(fcol, "::", demos, ":true_coding_z")),
   setNames(paste0(demo_lbls, " $\\times$ Misaligned (Perc=1) $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)")),
-  setNames(paste0(demo_lbls, " $\\times$ Misaligned (Perc=1) $\\times$ Candidate Coding (Z)"),
-           paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
+  setNames(paste0(demo_lbls, " $\\times$ Misaligned (Perc=1) $\\times$ Candidate Productivity (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * true_coding_z)"))
 )
 
 gof_custom <- tribble(
@@ -2360,9 +2359,9 @@ df_dei <- rbind(
 fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)", ncol_panels = 6)
 
 df_cod <- rbind(
-  build_scissors_dt(m5, fcol, "test_case_z", demos, demo_lbls, "HR",  z_grid),
-  build_scissors_dt(m6, fcol, "test_case_z", demos, demo_lbls, "Eng", z_grid))
-fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Coding Ability (Z)", ncol_panels = 6)
+  build_scissors_dt(m5, fcol, "true_coding_z", demos, demo_lbls, "HR",  z_grid),
+  build_scissors_dt(m6, fcol, "true_coding_z", demos, demo_lbls, "Eng", z_grid))
+fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Productivity (Z)", ncol_panels = 6)
 
 fig_dir <- here("2_Reports", "figures")
 plot_file_dei <- file.path(fig_dir, "8B_perception_triple_dei_rg.pdf")
@@ -2379,7 +2378,7 @@ cat("{\\raggedright\\scriptsize Top row: HR (Aligned = HR sees Eng cares; Misali
 cat("\\end{center}\n")
 
 cat("\\clearpage\n")
-cat("\\begin{center}\\textbf{Triple B: Perc $\\times$ Candidate Coding Ability --- Per Race-Gender (6 cells)}\\par\\vspace{0.1em}\n")
+cat("\\begin{center}\\textbf{Triple B: Perc $\\times$ Candidate Productivity --- Per Race-Gender (6 cells)}\\par\\vspace{0.1em}\n")
 cat("\\includegraphics[width=\\textwidth]{", plot_file_cod, "}\\par\\vspace{0.1em}\n", sep = "")
 cat("{\\raggedright\\scriptsize Same panel layout as Triple A. X-axis: candidate's coding ability (test\\_case z-score). Same Eng-rebellion caveat applies.\\par}\n")
 cat("\\end{center}\n")
@@ -2403,8 +2402,8 @@ m1 <- flip(fit_simple_p (dt_hr,  fcol))
 m2 <- flip(fit_simple_p (dt_eng, fcol))
 m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
 m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
-m5 <- flip(fit_triple_p (dt_hr,  fcol, "test_case_z"))
-m6 <- flip(fit_triple_p (dt_eng, fcol, "test_case_z"))
+m5 <- flip(fit_triple_p (dt_hr,  fcol, "true_coding_z"))
+m6 <- flip(fit_triple_p (dt_eng, fcol, "true_coding_z"))
 
 all_models <- list("HR" = m1, "Engineer" = m2,
                    "HR " = m3, "Engineer " = m4,
@@ -2416,12 +2415,12 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":perc_role")),
   setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":dei_index_A_z")),
-  setNames(paste0(demo_lbls, " $\\times$ Candidate Coding (Z)"),
-           paste0(fcol, "::", demos, ":test_case_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Candidate Productivity (Z)"),
+           paste0(fcol, "::", demos, ":true_coding_z")),
   setNames(paste0(demo_lbls, " $\\times$ Misaligned (Perc=1) $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)")),
-  setNames(paste0(demo_lbls, " $\\times$ Misaligned (Perc=1) $\\times$ Candidate Coding (Z)"),
-           paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
+  setNames(paste0(demo_lbls, " $\\times$ Misaligned (Perc=1) $\\times$ Candidate Productivity (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * true_coding_z)"))
 )
 
 gof_custom <- tribble(
@@ -2481,9 +2480,9 @@ df_dei <- rbind(
 fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)", ncol_panels = 3)
 
 df_cod <- rbind(
-  build_scissors_dt(m5, fcol, "test_case_z", demos, demo_lbls, "HR",  z_grid),
-  build_scissors_dt(m6, fcol, "test_case_z", demos, demo_lbls, "Eng", z_grid))
-fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Coding Ability (Z)", ncol_panels = 3)
+  build_scissors_dt(m5, fcol, "true_coding_z", demos, demo_lbls, "HR",  z_grid),
+  build_scissors_dt(m6, fcol, "true_coding_z", demos, demo_lbls, "Eng", z_grid))
+fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Productivity (Z)", ncol_panels = 3)
 
 fig_dir <- here("2_Reports", "figures")
 plot_file_dei <- file.path(fig_dir, "8B_perception_triple_dei_axis.pdf")
@@ -2500,7 +2499,7 @@ cat("{\\raggedright\\scriptsize Top row: HR. Bottom row: Engineer. ``Aligned'' =
 cat("\\end{center}\n")
 
 cat("\\clearpage\n")
-cat("\\begin{center}\\textbf{Triple B: Perc $\\times$ Candidate Coding Ability --- URM-Axis Trichotomy}\\par\\vspace{0.1em}\n")
+cat("\\begin{center}\\textbf{Triple B: Perc $\\times$ Candidate Productivity --- URM-Axis Trichotomy}\\par\\vspace{0.1em}\n")
 cat("\\includegraphics[width=0.95\\textwidth]{", plot_file_cod, "}\\par\\vspace{0.1em}\n", sep = "")
 cat("{\\raggedright\\scriptsize Same layout as Triple A. X-axis: candidate's coding ability (test\\_case z-score). Same Eng-rebellion caveat applies.\\par}\n")
 cat("\\end{center}\n")
@@ -2524,8 +2523,8 @@ m1 <- flip(fit_simple_p (dt_hr,  fcol))
 m2 <- flip(fit_simple_p (dt_eng, fcol))
 m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
 m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
-m5 <- flip(fit_triple_p (dt_hr,  fcol, "test_case_z"))
-m6 <- flip(fit_triple_p (dt_eng, fcol, "test_case_z"))
+m5 <- flip(fit_triple_p (dt_hr,  fcol, "true_coding_z"))
+m6 <- flip(fit_triple_p (dt_eng, fcol, "true_coding_z"))
 
 all_models <- list("HR" = m1, "Engineer" = m2,
                    "HR " = m3, "Engineer " = m4,
@@ -2537,12 +2536,12 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":perc_role")),
   setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":dei_index_A_z")),
-  setNames(paste0(demo_lbls, " $\\times$ Candidate Coding (Z)"),
-           paste0(fcol, "::", demos, ":test_case_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Candidate Productivity (Z)"),
+           paste0(fcol, "::", demos, ":true_coding_z")),
   setNames(paste0(demo_lbls, " $\\times$ Misaligned (Perc=1) $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)")),
-  setNames(paste0(demo_lbls, " $\\times$ Misaligned (Perc=1) $\\times$ Candidate Coding (Z)"),
-           paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
+  setNames(paste0(demo_lbls, " $\\times$ Misaligned (Perc=1) $\\times$ Candidate Productivity (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * true_coding_z)"))
 )
 
 gof_custom <- tribble(
@@ -2602,9 +2601,9 @@ df_dei <- rbind(
 fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)", ncol_panels = 2)
 
 df_cod <- rbind(
-  build_scissors_dt(m5, fcol, "test_case_z", demos, demo_lbls, "HR",  z_grid),
-  build_scissors_dt(m6, fcol, "test_case_z", demos, demo_lbls, "Eng", z_grid))
-fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Coding Ability (Z)", ncol_panels = 2)
+  build_scissors_dt(m5, fcol, "true_coding_z", demos, demo_lbls, "HR",  z_grid),
+  build_scissors_dt(m6, fcol, "true_coding_z", demos, demo_lbls, "Eng", z_grid))
+fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Productivity (Z)", ncol_panels = 2)
 
 fig_dir <- here("2_Reports", "figures")
 plot_file_dei <- file.path(fig_dir, "8B_perception_triple_dei_utech.pdf")
@@ -2621,7 +2620,7 @@ cat("{\\raggedright\\scriptsize Top row: HR. Bottom row: Engineer. ``Aligned'' =
 cat("\\end{center}\n")
 
 cat("\\clearpage\n")
-cat("\\begin{center}\\textbf{Triple B: Perc $\\times$ Candidate Coding Ability --- URM-Tech Dichotomy}\\par\\vspace{0.1em}\n")
+cat("\\begin{center}\\textbf{Triple B: Perc $\\times$ Candidate Productivity --- URM-Tech Dichotomy}\\par\\vspace{0.1em}\n")
 cat("\\includegraphics[width=0.75\\textwidth]{", plot_file_cod, "}\\par\\vspace{0.1em}\n", sep = "")
 cat("{\\raggedright\\scriptsize Same layout as Triple A. X-axis: candidate's coding ability (test\\_case z-score). Same Eng-rebellion caveat applies.\\par}\n")
 cat("\\end{center}\n")
@@ -2682,7 +2681,6 @@ fld[, race_gender := factor(race_gender,
        levels = c("Blind", "White_Male", "White_Female",
                   "Asian_Male", "Asian_Female",
                   "Hispanic_Male", "Hispanic_Female"))]
-fld[, test_case_z := as.numeric(scale(test_case))]
 
 ## Compute the misalignment index at respondent level (one row per respondent),
 ## then merge back to fld so the panel structure is preserved.
@@ -2786,8 +2784,8 @@ m1 <- flip(fit_simple_p (dt_hr,  fcol))
 m2 <- flip(fit_simple_p (dt_eng, fcol))
 m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
 m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
-m5 <- flip(fit_triple_p (dt_hr,  fcol, "test_case_z"))
-m6 <- flip(fit_triple_p (dt_eng, fcol, "test_case_z"))
+m5 <- flip(fit_triple_p (dt_hr,  fcol, "true_coding_z"))
+m6 <- flip(fit_triple_p (dt_eng, fcol, "true_coding_z"))
 
 all_models <- list("HR" = m1, "Engineer" = m2,
                    "HR " = m3, "Engineer " = m4,
@@ -2799,12 +2797,12 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":perc_role")),
   setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":dei_index_A_z")),
-  setNames(paste0(demo_lbls, " $\\times$ Candidate Coding (Z)"),
-           paste0(fcol, "::", demos, ":test_case_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Candidate Productivity (Z)"),
+           paste0(fcol, "::", demos, ":true_coding_z")),
   setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z) $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)")),
-  setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z) $\\times$ Candidate Coding (Z)"),
-           paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
+  setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z) $\\times$ Candidate Productivity (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * true_coding_z)"))
 )
 
 gof_custom <- tribble(
@@ -2866,9 +2864,9 @@ fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
                               high_label_template = "%s High Misalign")
 
 df_cod <- rbind(
-  build_scissors_dt(m5, fcol, "test_case_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
-  build_scissors_dt(m6, fcol, "test_case_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
-fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Coding Ability (Z)",
+  build_scissors_dt(m5, fcol, "true_coding_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m6, fcol, "true_coding_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Productivity (Z)",
                               ncol_panels = 6,
                               low_label = "Low Misalign",
                               high_label_template = "%s High Misalign")
@@ -2888,7 +2886,7 @@ cat("{\\raggedright\\scriptsize Top row: HR. Bottom row: Engineer. ``Low Misalig
 cat("\\end{center}\n")
 
 cat("\\clearpage\n")
-cat("\\begin{center}\\textbf{Triple B: Misalign Idx $\\times$ Candidate Coding Ability --- Per Race-Gender (6 cells)}\\par\\vspace{0.1em}\n")
+cat("\\begin{center}\\textbf{Triple B: Misalign Idx $\\times$ Candidate Productivity --- Per Race-Gender (6 cells)}\\par\\vspace{0.1em}\n")
 cat("\\includegraphics[width=\\textwidth]{", plot_file_cod, "}\\par\\vspace{0.1em}\n", sep = "")
 cat("{\\raggedright\\scriptsize Same panel layout as Triple A. X-axis: candidate's coding ability (test\\_case z-score).\\par}\n")
 cat("\\end{center}\n")
@@ -2912,8 +2910,8 @@ m1 <- flip(fit_simple_p (dt_hr,  fcol))
 m2 <- flip(fit_simple_p (dt_eng, fcol))
 m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
 m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
-m5 <- flip(fit_triple_p (dt_hr,  fcol, "test_case_z"))
-m6 <- flip(fit_triple_p (dt_eng, fcol, "test_case_z"))
+m5 <- flip(fit_triple_p (dt_hr,  fcol, "true_coding_z"))
+m6 <- flip(fit_triple_p (dt_eng, fcol, "true_coding_z"))
 
 all_models <- list("HR" = m1, "Engineer" = m2,
                    "HR " = m3, "Engineer " = m4,
@@ -2925,12 +2923,12 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":perc_role")),
   setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":dei_index_A_z")),
-  setNames(paste0(demo_lbls, " $\\times$ Candidate Coding (Z)"),
-           paste0(fcol, "::", demos, ":test_case_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Candidate Productivity (Z)"),
+           paste0(fcol, "::", demos, ":true_coding_z")),
   setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z) $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)")),
-  setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z) $\\times$ Candidate Coding (Z)"),
-           paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
+  setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z) $\\times$ Candidate Productivity (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * true_coding_z)"))
 )
 
 gof_custom <- tribble(
@@ -2992,9 +2990,9 @@ fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
                               high_label_template = "%s High Misalign")
 
 df_cod <- rbind(
-  build_scissors_dt(m5, fcol, "test_case_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
-  build_scissors_dt(m6, fcol, "test_case_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
-fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Coding Ability (Z)",
+  build_scissors_dt(m5, fcol, "true_coding_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m6, fcol, "true_coding_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Productivity (Z)",
                               ncol_panels = 3,
                               low_label = "Low Misalign",
                               high_label_template = "%s High Misalign")
@@ -3014,7 +3012,7 @@ cat("{\\raggedright\\scriptsize Top row: HR. Bottom row: Engineer. ``Low Misalig
 cat("\\end{center}\n")
 
 cat("\\clearpage\n")
-cat("\\begin{center}\\textbf{Triple B: Misalign Idx $\\times$ Candidate Coding Ability --- URM-Axis Trichotomy}\\par\\vspace{0.1em}\n")
+cat("\\begin{center}\\textbf{Triple B: Misalign Idx $\\times$ Candidate Productivity --- URM-Axis Trichotomy}\\par\\vspace{0.1em}\n")
 cat("\\includegraphics[width=0.95\\textwidth]{", plot_file_cod, "}\\par\\vspace{0.1em}\n", sep = "")
 cat("{\\raggedright\\scriptsize Same layout as Triple A. X-axis: candidate's coding ability (test\\_case z-score).\\par}\n")
 cat("\\end{center}\n")
@@ -3038,8 +3036,8 @@ m1 <- flip(fit_simple_p (dt_hr,  fcol))
 m2 <- flip(fit_simple_p (dt_eng, fcol))
 m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
 m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
-m5 <- flip(fit_triple_p (dt_hr,  fcol, "test_case_z"))
-m6 <- flip(fit_triple_p (dt_eng, fcol, "test_case_z"))
+m5 <- flip(fit_triple_p (dt_hr,  fcol, "true_coding_z"))
+m6 <- flip(fit_triple_p (dt_eng, fcol, "true_coding_z"))
 
 all_models <- list("HR" = m1, "Engineer" = m2,
                    "HR " = m3, "Engineer " = m4,
@@ -3051,12 +3049,12 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":perc_role")),
   setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":dei_index_A_z")),
-  setNames(paste0(demo_lbls, " $\\times$ Candidate Coding (Z)"),
-           paste0(fcol, "::", demos, ":test_case_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Candidate Productivity (Z)"),
+           paste0(fcol, "::", demos, ":true_coding_z")),
   setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z) $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)")),
-  setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z) $\\times$ Candidate Coding (Z)"),
-           paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
+  setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z) $\\times$ Candidate Productivity (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * true_coding_z)"))
 )
 
 gof_custom <- tribble(
@@ -3118,9 +3116,9 @@ fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
                               high_label_template = "%s High Misalign")
 
 df_cod <- rbind(
-  build_scissors_dt(m5, fcol, "test_case_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
-  build_scissors_dt(m6, fcol, "test_case_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
-fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Coding Ability (Z)",
+  build_scissors_dt(m5, fcol, "true_coding_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m6, fcol, "true_coding_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Productivity (Z)",
                               ncol_panels = 2,
                               low_label = "Low Misalign",
                               high_label_template = "%s High Misalign")
@@ -3140,7 +3138,7 @@ cat("{\\raggedright\\scriptsize Top row: HR. Bottom row: Engineer. ``Low Misalig
 cat("\\end{center}\n")
 
 cat("\\clearpage\n")
-cat("\\begin{center}\\textbf{Triple B: Misalign Idx $\\times$ Candidate Coding Ability --- URM-Tech Dichotomy}\\par\\vspace{0.1em}\n")
+cat("\\begin{center}\\textbf{Triple B: Misalign Idx $\\times$ Candidate Productivity --- URM-Tech Dichotomy}\\par\\vspace{0.1em}\n")
 cat("\\includegraphics[width=0.75\\textwidth]{", plot_file_cod, "}\\par\\vspace{0.1em}\n", sep = "")
 cat("{\\raggedright\\scriptsize Same layout as Triple A. X-axis: candidate's coding ability (test\\_case z-score).\\par}\n")
 cat("\\end{center}\n")
@@ -3205,7 +3203,6 @@ fld[, race_gender := factor(race_gender,
        levels = c("Blind", "White_Male", "White_Female",
                   "Asian_Male", "Asian_Female",
                   "Hispanic_Male", "Hispanic_Female"))]
-fld[, test_case_z := as.numeric(scale(test_case))]
 
 ## Respondent-level table.
 resp_dt <- unique(fld[, c("responseid", "role", extra_perc), with = FALSE])
@@ -3314,8 +3311,8 @@ m1 <- flip(fit_simple_p (dt_hr,  fcol))
 m2 <- flip(fit_simple_p (dt_eng, fcol))
 m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
 m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
-m5 <- flip(fit_triple_p (dt_hr,  fcol, "test_case_z"))
-m6 <- flip(fit_triple_p (dt_eng, fcol, "test_case_z"))
+m5 <- flip(fit_triple_p (dt_hr,  fcol, "true_coding_z"))
+m6 <- flip(fit_triple_p (dt_eng, fcol, "true_coding_z"))
 
 all_models <- list("HR" = m1, "Engineer" = m2,
                    "HR " = m3, "Engineer " = m4,
@@ -3327,12 +3324,12 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":perc_role")),
   setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":dei_index_A_z")),
-  setNames(paste0(demo_lbls, " $\\times$ Candidate Coding (Z)"),
-           paste0(fcol, "::", demos, ":test_case_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Candidate Productivity (Z)"),
+           paste0(fcol, "::", demos, ":true_coding_z")),
   setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z) $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)")),
-  setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z) $\\times$ Candidate Coding (Z)"),
-           paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
+  setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z) $\\times$ Candidate Productivity (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * true_coding_z)"))
 )
 
 gof_custom <- tribble(
@@ -3394,9 +3391,9 @@ fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
                               high_label_template = "%s High Misalign")
 
 df_cod <- rbind(
-  build_scissors_dt(m5, fcol, "test_case_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
-  build_scissors_dt(m6, fcol, "test_case_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
-fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Coding Ability (Z)",
+  build_scissors_dt(m5, fcol, "true_coding_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m6, fcol, "true_coding_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Productivity (Z)",
                               ncol_panels = 6,
                               low_label = "Low Misalign",
                               high_label_template = "%s High Misalign")
@@ -3416,7 +3413,7 @@ cat("{\\raggedright\\scriptsize Top row: HR. Bottom row: Engineer. Bands = 95\\%
 cat("\\end{center}\n")
 
 cat("\\clearpage\n")
-cat("\\begin{center}\\textbf{Triple B: Misalign Idx (Likert-anchored) $\\times$ Candidate Coding Ability --- Per Race-Gender (6 cells)}\\par\\vspace{0.1em}\n")
+cat("\\begin{center}\\textbf{Triple B: Misalign Idx (Likert-anchored) $\\times$ Candidate Productivity --- Per Race-Gender (6 cells)}\\par\\vspace{0.1em}\n")
 cat("\\includegraphics[width=\\textwidth]{", plot_file_cod, "}\\par\\vspace{0.1em}\n", sep = "")
 cat("{\\raggedright\\scriptsize Same panel layout as Triple A. X-axis: candidate's coding ability (test\\_case z-score).\\par}\n")
 cat("\\end{center}\n")
@@ -3440,8 +3437,8 @@ m1 <- flip(fit_simple_p (dt_hr,  fcol))
 m2 <- flip(fit_simple_p (dt_eng, fcol))
 m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
 m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
-m5 <- flip(fit_triple_p (dt_hr,  fcol, "test_case_z"))
-m6 <- flip(fit_triple_p (dt_eng, fcol, "test_case_z"))
+m5 <- flip(fit_triple_p (dt_hr,  fcol, "true_coding_z"))
+m6 <- flip(fit_triple_p (dt_eng, fcol, "true_coding_z"))
 
 all_models <- list("HR" = m1, "Engineer" = m2,
                    "HR " = m3, "Engineer " = m4,
@@ -3453,12 +3450,12 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":perc_role")),
   setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":dei_index_A_z")),
-  setNames(paste0(demo_lbls, " $\\times$ Candidate Coding (Z)"),
-           paste0(fcol, "::", demos, ":test_case_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Candidate Productivity (Z)"),
+           paste0(fcol, "::", demos, ":true_coding_z")),
   setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z) $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)")),
-  setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z) $\\times$ Candidate Coding (Z)"),
-           paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
+  setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z) $\\times$ Candidate Productivity (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * true_coding_z)"))
 )
 
 gof_custom <- tribble(
@@ -3520,9 +3517,9 @@ fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
                               high_label_template = "%s High Misalign")
 
 df_cod <- rbind(
-  build_scissors_dt(m5, fcol, "test_case_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
-  build_scissors_dt(m6, fcol, "test_case_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
-fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Coding Ability (Z)",
+  build_scissors_dt(m5, fcol, "true_coding_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m6, fcol, "true_coding_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Productivity (Z)",
                               ncol_panels = 3,
                               low_label = "Low Misalign",
                               high_label_template = "%s High Misalign")
@@ -3542,7 +3539,7 @@ cat("{\\raggedright\\scriptsize Top row: HR. Bottom row: Engineer. Bands = 95\\%
 cat("\\end{center}\n")
 
 cat("\\clearpage\n")
-cat("\\begin{center}\\textbf{Triple B: Misalign Idx (Likert-anchored) $\\times$ Candidate Coding Ability --- URM-Axis Trichotomy}\\par\\vspace{0.1em}\n")
+cat("\\begin{center}\\textbf{Triple B: Misalign Idx (Likert-anchored) $\\times$ Candidate Productivity --- URM-Axis Trichotomy}\\par\\vspace{0.1em}\n")
 cat("\\includegraphics[width=0.95\\textwidth]{", plot_file_cod, "}\\par\\vspace{0.1em}\n", sep = "")
 cat("{\\raggedright\\scriptsize Same layout as Triple A. X-axis: candidate's coding ability (test\\_case z-score).\\par}\n")
 cat("\\end{center}\n")
@@ -3566,8 +3563,8 @@ m1 <- flip(fit_simple_p (dt_hr,  fcol))
 m2 <- flip(fit_simple_p (dt_eng, fcol))
 m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
 m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
-m5 <- flip(fit_triple_p (dt_hr,  fcol, "test_case_z"))
-m6 <- flip(fit_triple_p (dt_eng, fcol, "test_case_z"))
+m5 <- flip(fit_triple_p (dt_hr,  fcol, "true_coding_z"))
+m6 <- flip(fit_triple_p (dt_eng, fcol, "true_coding_z"))
 
 all_models <- list("HR" = m1, "Engineer" = m2,
                    "HR " = m3, "Engineer " = m4,
@@ -3579,12 +3576,12 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":perc_role")),
   setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":dei_index_A_z")),
-  setNames(paste0(demo_lbls, " $\\times$ Candidate Coding (Z)"),
-           paste0(fcol, "::", demos, ":test_case_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Candidate Productivity (Z)"),
+           paste0(fcol, "::", demos, ":true_coding_z")),
   setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z) $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)")),
-  setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z) $\\times$ Candidate Coding (Z)"),
-           paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
+  setNames(paste0(demo_lbls, " $\\times$ Misalign Idx (Z) $\\times$ Candidate Productivity (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * true_coding_z)"))
 )
 
 gof_custom <- tribble(
@@ -3646,9 +3643,9 @@ fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
                               high_label_template = "%s High Misalign")
 
 df_cod <- rbind(
-  build_scissors_dt(m5, fcol, "test_case_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
-  build_scissors_dt(m6, fcol, "test_case_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
-fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Coding Ability (Z)",
+  build_scissors_dt(m5, fcol, "true_coding_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m6, fcol, "true_coding_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Productivity (Z)",
                               ncol_panels = 2,
                               low_label = "Low Misalign",
                               high_label_template = "%s High Misalign")
@@ -3668,7 +3665,7 @@ cat("{\\raggedright\\scriptsize Top row: HR. Bottom row: Engineer. Bands = 95\\%
 cat("\\end{center}\n")
 
 cat("\\clearpage\n")
-cat("\\begin{center}\\textbf{Triple B: Misalign Idx (Likert-anchored) $\\times$ Candidate Coding Ability --- URM-Tech Dichotomy}\\par\\vspace{0.1em}\n")
+cat("\\begin{center}\\textbf{Triple B: Misalign Idx (Likert-anchored) $\\times$ Candidate Productivity --- URM-Tech Dichotomy}\\par\\vspace{0.1em}\n")
 cat("\\includegraphics[width=0.75\\textwidth]{", plot_file_cod, "}\\par\\vspace{0.1em}\n", sep = "")
 cat("{\\raggedright\\scriptsize Same layout as Triple A. X-axis: candidate's coding ability (test\\_case z-score).\\par}\n")
 cat("\\end{center}\n")
@@ -3736,7 +3733,6 @@ fld[, race_gender := factor(race_gender,
        levels = c("Blind", "White_Male", "White_Female",
                   "Asian_Male", "Asian_Female",
                   "Hispanic_Male", "Hispanic_Female"))]
-fld[, test_case_z := as.numeric(scale(test_case))]
 
 resp_dt <- unique(fld[, c("responseid", "role", extra_perc), with = FALSE])
 
@@ -3811,8 +3807,8 @@ m1 <- flip(fit_simple_p (dt_hr,  fcol))
 m2 <- flip(fit_simple_p (dt_eng, fcol))
 m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
 m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
-m5 <- flip(fit_triple_p (dt_hr,  fcol, "test_case_z"))
-m6 <- flip(fit_triple_p (dt_eng, fcol, "test_case_z"))
+m5 <- flip(fit_triple_p (dt_hr,  fcol, "true_coding_z"))
+m6 <- flip(fit_triple_p (dt_eng, fcol, "true_coding_z"))
 
 all_models <- list("HR" = m1, "Engineer" = m2,
                    "HR " = m3, "Engineer " = m4,
@@ -3824,12 +3820,12 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":perc_role")),
   setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":dei_index_A_z")),
-  setNames(paste0(demo_lbls, " $\\times$ Candidate Coding (Z)"),
-           paste0(fcol, "::", demos, ":test_case_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Candidate Productivity (Z)"),
+           paste0(fcol, "::", demos, ":true_coding_z")),
   setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)")),
-  setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Candidate Coding (Z)"),
-           paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
+  setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Candidate Productivity (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * true_coding_z)"))
 )
 
 gof_custom <- tribble(
@@ -3891,9 +3887,9 @@ fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
                               high_label_template = "%s High Dir (Overreach/Undercare)")
 
 df_cod <- rbind(
-  build_scissors_dt(m5, fcol, "test_case_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
-  build_scissors_dt(m6, fcol, "test_case_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
-fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Coding Ability (Z)",
+  build_scissors_dt(m5, fcol, "true_coding_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m6, fcol, "true_coding_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Productivity (Z)",
                               ncol_panels = 6,
                               low_label = "Low Dir (counterpart cares less)",
                               high_label_template = "%s High Dir (Overreach/Undercare)")
@@ -3913,7 +3909,7 @@ cat("{\\raggedright\\scriptsize Top row: HR (high Dir = perceives Eng undercare 
 cat("\\end{center}\n")
 
 cat("\\clearpage\n")
-cat("\\begin{center}\\textbf{Triple B: Dir Idx (signed) $\\times$ Candidate Coding Ability --- Per Race-Gender (6 cells)}\\par\\vspace{0.1em}\n")
+cat("\\begin{center}\\textbf{Triple B: Dir Idx (signed) $\\times$ Candidate Productivity --- Per Race-Gender (6 cells)}\\par\\vspace{0.1em}\n")
 cat("\\includegraphics[width=\\textwidth]{", plot_file_cod, "}\\par\\vspace{0.1em}\n", sep = "")
 cat("{\\raggedright\\scriptsize Same panel layout as Triple A. X-axis: candidate's coding ability (test\\_case z-score).\\par}\n")
 cat("\\end{center}\n")
@@ -3937,8 +3933,8 @@ m1 <- flip(fit_simple_p (dt_hr,  fcol))
 m2 <- flip(fit_simple_p (dt_eng, fcol))
 m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
 m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
-m5 <- flip(fit_triple_p (dt_hr,  fcol, "test_case_z"))
-m6 <- flip(fit_triple_p (dt_eng, fcol, "test_case_z"))
+m5 <- flip(fit_triple_p (dt_hr,  fcol, "true_coding_z"))
+m6 <- flip(fit_triple_p (dt_eng, fcol, "true_coding_z"))
 
 all_models <- list("HR" = m1, "Engineer" = m2,
                    "HR " = m3, "Engineer " = m4,
@@ -3950,12 +3946,12 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":perc_role")),
   setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":dei_index_A_z")),
-  setNames(paste0(demo_lbls, " $\\times$ Candidate Coding (Z)"),
-           paste0(fcol, "::", demos, ":test_case_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Candidate Productivity (Z)"),
+           paste0(fcol, "::", demos, ":true_coding_z")),
   setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)")),
-  setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Candidate Coding (Z)"),
-           paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
+  setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Candidate Productivity (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * true_coding_z)"))
 )
 
 gof_custom <- tribble(
@@ -4017,9 +4013,9 @@ fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
                               high_label_template = "%s High Dir (Overreach/Undercare)")
 
 df_cod <- rbind(
-  build_scissors_dt(m5, fcol, "test_case_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
-  build_scissors_dt(m6, fcol, "test_case_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
-fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Coding Ability (Z)",
+  build_scissors_dt(m5, fcol, "true_coding_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m6, fcol, "true_coding_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Productivity (Z)",
                               ncol_panels = 3,
                               low_label = "Low Dir (counterpart cares less)",
                               high_label_template = "%s High Dir (Overreach/Undercare)")
@@ -4039,7 +4035,7 @@ cat("{\\raggedright\\scriptsize Top row: HR (high Dir = compensation conditions)
 cat("\\end{center}\n")
 
 cat("\\clearpage\n")
-cat("\\begin{center}\\textbf{Triple B: Dir Idx (signed) $\\times$ Candidate Coding Ability --- URM-Axis Trichotomy}\\par\\vspace{0.1em}\n")
+cat("\\begin{center}\\textbf{Triple B: Dir Idx (signed) $\\times$ Candidate Productivity --- URM-Axis Trichotomy}\\par\\vspace{0.1em}\n")
 cat("\\includegraphics[width=0.95\\textwidth]{", plot_file_cod, "}\\par\\vspace{0.1em}\n", sep = "")
 cat("{\\raggedright\\scriptsize Same layout as Triple A. X-axis: candidate's coding ability (test\\_case z-score).\\par}\n")
 cat("\\end{center}\n")
@@ -4063,8 +4059,8 @@ m1 <- flip(fit_simple_p (dt_hr,  fcol))
 m2 <- flip(fit_simple_p (dt_eng, fcol))
 m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
 m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
-m5 <- flip(fit_triple_p (dt_hr,  fcol, "test_case_z"))
-m6 <- flip(fit_triple_p (dt_eng, fcol, "test_case_z"))
+m5 <- flip(fit_triple_p (dt_hr,  fcol, "true_coding_z"))
+m6 <- flip(fit_triple_p (dt_eng, fcol, "true_coding_z"))
 
 all_models <- list("HR" = m1, "Engineer" = m2,
                    "HR " = m3, "Engineer " = m4,
@@ -4076,12 +4072,12 @@ coef_map <- c(
            paste0(fcol, "::", demos, ":perc_role")),
   setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":dei_index_A_z")),
-  setNames(paste0(demo_lbls, " $\\times$ Candidate Coding (Z)"),
-           paste0(fcol, "::", demos, ":test_case_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Candidate Productivity (Z)"),
+           paste0(fcol, "::", demos, ":true_coding_z")),
   setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Own DEI Index (Z)"),
            paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)")),
-  setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Candidate Coding (Z)"),
-           paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
+  setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Candidate Productivity (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * true_coding_z)"))
 )
 
 gof_custom <- tribble(
@@ -4143,9 +4139,9 @@ fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
                               high_label_template = "%s High Dir (Overreach/Undercare)")
 
 df_cod <- rbind(
-  build_scissors_dt(m5, fcol, "test_case_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
-  build_scissors_dt(m6, fcol, "test_case_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
-fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Coding Ability (Z)",
+  build_scissors_dt(m5, fcol, "true_coding_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m6, fcol, "true_coding_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Productivity (Z)",
                               ncol_panels = 2,
                               low_label = "Low Dir (counterpart cares less)",
                               high_label_template = "%s High Dir (Overreach/Undercare)")
@@ -4165,7 +4161,7 @@ cat("{\\raggedright\\scriptsize Top row: HR (high Dir = compensation conditions)
 cat("\\end{center}\n")
 
 cat("\\clearpage\n")
-cat("\\begin{center}\\textbf{Triple B: Dir Idx (signed) $\\times$ Candidate Coding Ability --- URM-Tech Dichotomy}\\par\\vspace{0.1em}\n")
+cat("\\begin{center}\\textbf{Triple B: Dir Idx (signed) $\\times$ Candidate Productivity --- URM-Tech Dichotomy}\\par\\vspace{0.1em}\n")
 cat("\\includegraphics[width=0.75\\textwidth]{", plot_file_cod, "}\\par\\vspace{0.1em}\n", sep = "")
 cat("{\\raggedright\\scriptsize Same layout as Triple A. X-axis: candidate's coding ability (test\\_case z-score).\\par}\n")
 cat("\\end{center}\n")
