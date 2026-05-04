@@ -1964,15 +1964,15 @@ rm(dt_hr_nb, dt_eng_nb, proxies, col_labels, fit_one, models_hr, models_eng, all
 \scriptsize Standard errors clustered by respondent. Sample: non-blind arm. \normalsize
 
 \newpage
-\noindent \textbf{Reproduction with three DEI / Diversity Index Options.} The same regression as above, replacing the six individual DEI proxies with three composite indices: \textit{Index A: Stated} --- the four-item average of stated DEI views (existing \texttt{pro\_dei\_index\_z}); \textit{Index B: Stated + Revealed} --- equal-weight composite of Index A and the revealed-priority ranking of ``Diversity and Representation'' from the goals question; \textit{Index C: PC1} --- first principal component of the same five items.
+\noindent \textbf{Reproduction with two DEI / Diversity Index Options.} The same regression as above, replacing the six individual DEI proxies with two composite indices: \textit{Index A: Stated} --- the four-item average of stated DEI views (existing \texttt{pro\_dei\_index\_z}); \textit{Index B: Stated + Revealed} --- equal-weight composite of Index A and the revealed-priority ranking of ``Diversity and Representation'' from the goals question.
 
 ```{r dei_indices_overall, eval = TRUE, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
 
 dt_hr_nb  <- firm_long_dt[treat == "nonblind" & role == "HR"]
 dt_eng_nb <- firm_long_dt[treat == "nonblind" & role == "Eng"]
 
-indices    <- c("dei_index_A_z", "dei_index_B_z", "dei_index_C_z")
-idx_labels <- c("Index A", "Index B", "Index C")
+indices    <- c("dei_index_A_z", "dei_index_B_z")
+idx_labels <- c("Index A", "Index B")
 
 fit_one <- function(d, idx) {
   feols(
@@ -2013,9 +2013,9 @@ tbl <- etable(
   signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
   dict = dict_all,
   extralines = list(
-    "Resume FE"     = rep(chk, 6),
-    "Respondent FE" = rep(chk, 6),
-    "Position FE"   = rep(chk, 6)
+    "Resume FE"     = rep(chk, 4),
+    "Respondent FE" = rep(chk, 4),
+    "Position FE"   = rep(chk, 4)
   )
 )
 
@@ -2023,11 +2023,11 @@ idx_hdr <- paste(idx_labels, collapse = " & ")
 tbl <- sub(
   "\\\\toprule",
   paste0(
-    "\\\\multicolumn{7}{c}{\\\\textbf{Outcome Var: Assigned Overall Score (Z) --- Three DEI / Diversity Index Options}} \\\\\\\\ ",
+    "\\\\multicolumn{5}{c}{\\\\textbf{Outcome Var: Assigned Overall Score (Z) --- Two DEI / Diversity Index Options}} \\\\\\\\ ",
     "\\\\toprule",
-    " & \\\\multicolumn{3}{c}{\\\\textbf{Panel A: HR}}",
-    " & \\\\multicolumn{3}{c}{\\\\textbf{Panel B: Engineer}} \\\\\\\\",
-    " \\\\cmidrule(lr){2-4} \\\\cmidrule(lr){5-7}",
+    " & \\\\multicolumn{2}{c}{\\\\textbf{Panel A: HR}}",
+    " & \\\\multicolumn{2}{c}{\\\\textbf{Panel B: Engineer}} \\\\\\\\",
+    " \\\\cmidrule(lr){2-3} \\\\cmidrule(lr){4-5}",
     " & ", idx_hdr, " & ", idx_hdr, " \\\\\\\\ \\\\addlinespace[2pt]"
   ),
   tbl
@@ -2036,8 +2036,8 @@ tbl <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering \\\\footnotesize",
 ## Force equal-width centered data columns (the 6 model columns); the auto-width
 ## `c` columns can become uneven when a multicolumn spanning header on one panel
 ## is wider than the other.
-tbl <- sub("\\{lcccccc\\}",
-           "{l*{6}{>{\\\\centering\\\\arraybackslash}p{0.7in}}}",
+tbl <- sub("\\{lcccc\\}",
+           "{l*{4}{>{\\\\centering\\\\arraybackslash}p{0.7in}}}",
            tbl)
 tbl <- sub(
   "\\\\begin\\{tabular\\}",
@@ -2052,7 +2052,7 @@ rm(dt_hr_nb, dt_eng_nb, indices, idx_labels, fit_one, models_hr, models_eng, all
    groups, dict_main, dict_inter, dict_all, chk, tbl, idx_hdr)
 ```
 
-\scriptsize Index A is the existing four-item average of stated DEI views. Index B averages Index A with the respondent's revealed-priority ranking of ``Diversity and Representation'' from the seven-goals question. Index C is the first principal component of the same five items, sign-aligned so higher = more pro-DEI. \normalsize
+\scriptsize Index A is the existing four-item average of stated DEI views. Index B averages Index A with the respondent's revealed-priority ranking of ``Diversity and Representation'' from the seven-goals question. \normalsize
 
 ```{r dei_final_urm, eval = FALSE, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
 
@@ -2148,8 +2148,8 @@ rm(dt_hr_nb, dt_eng_nb, zstd, proxies, col_labels, fit_urm,
 dt_hr_nb  <- firm_long_dt[treat == "nonblind" & role == "HR"]
 dt_eng_nb <- firm_long_dt[treat == "nonblind" & role == "Eng"]
 
-indices    <- c("dei_index_A_z", "dei_index_B_z", "dei_index_C_z")
-idx_labels <- c("Index A", "Index B", "Index C")
+indices    <- c("dei_index_A_z", "dei_index_B_z")
+idx_labels <- c("Index A", "Index B")
 
 fit_urm <- function(d, idx) {
   feols(
@@ -2183,9 +2183,9 @@ tbl <- etable(
   signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
   dict = dict_all,
   extralines = list(
-    "Resume FE"     = rep(chk, 6),
-    "Respondent FE" = rep(chk, 6),
-    "Position FE"   = rep(chk, 6)
+    "Resume FE"     = rep(chk, 4),
+    "Respondent FE" = rep(chk, 4),
+    "Position FE"   = rep(chk, 4)
   )
 )
 
@@ -2193,19 +2193,19 @@ idx_hdr <- paste(idx_labels, collapse = " & ")
 tbl <- sub(
   "\\\\toprule",
   paste0(
-    "\\\\multicolumn{7}{c}{\\\\textbf{Outcome Var: Assigned Overall Score (Z) --- URM Cut, Three DEI / Diversity Index Options}} \\\\\\\\ ",
+    "\\\\multicolumn{5}{c}{\\\\textbf{Outcome Var: Assigned Overall Score (Z) --- URM Cut, Two DEI / Diversity Index Options}} \\\\\\\\ ",
     "\\\\toprule",
-    " & \\\\multicolumn{3}{c}{\\\\textbf{Panel A: HR}}",
-    " & \\\\multicolumn{3}{c}{\\\\textbf{Panel B: Engineer}} \\\\\\\\",
-    " \\\\cmidrule(lr){2-4} \\\\cmidrule(lr){5-7}",
+    " & \\\\multicolumn{2}{c}{\\\\textbf{Panel A: HR}}",
+    " & \\\\multicolumn{2}{c}{\\\\textbf{Panel B: Engineer}} \\\\\\\\",
+    " \\\\cmidrule(lr){2-3} \\\\cmidrule(lr){4-5}",
     " & ", idx_hdr, " & ", idx_hdr, " \\\\\\\\ \\\\addlinespace[2pt]"
   ),
   tbl
 )
 tbl <- gsub("\\\\par \\\\raggedright", "\\\\par \\\\centering \\\\footnotesize", tbl)
 ## Force equal-width centered data columns (see note in indices_overall chunk).
-tbl <- sub("\\{lcccccc\\}",
-           "{l*{6}{>{\\\\centering\\\\arraybackslash}p{0.7in}}}",
+tbl <- sub("\\{lcccc\\}",
+           "{l*{4}{>{\\\\centering\\\\arraybackslash}p{0.7in}}}",
            tbl)
 tbl <- sub(
   "\\\\begin\\{tabular\\}",
@@ -2496,8 +2496,8 @@ rm(dt_hr_nb, dt_eng_nb, chk, fit_triple_urm, m_hr_r, m_eng_r, m_hr_g, m_eng_g,
 dt_hr_nb  <- firm_long_dt[treat == "nonblind" & role == "HR"]
 dt_eng_nb <- firm_long_dt[treat == "nonblind" & role == "Eng"]
 
-indices    <- c("dei_index_A_z", "dei_index_B_z", "dei_index_C_z")
-idx_labels <- c("Index A", "Index B", "Index C")
+indices    <- c("dei_index_A_z", "dei_index_B_z")
+idx_labels <- c("Index A", "Index B")
 chk <- "\\checkmark"
 
 fit_triple_urm <- function(d, idx, proxy_b) {
