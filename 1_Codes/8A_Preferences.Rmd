@@ -1971,7 +1971,7 @@ rm(dt_hr_nb, dt_eng_nb, proxies, col_labels, fit_one, models_hr, models_eng, all
 dt_hr_nb  <- firm_long_dt[treat == "nonblind" & role == "HR"]
 dt_eng_nb <- firm_long_dt[treat == "nonblind" & role == "Eng"]
 
-indices    <- c("dei_index_A_z", "dei_index_B_z")
+indices    <- c("dei_index_z", "dei_index_pca_z")
 idx_labels <- c("Index A", "Index B")
 
 fit_one <- function(d, idx) {
@@ -2148,7 +2148,7 @@ rm(dt_hr_nb, dt_eng_nb, zstd, proxies, col_labels, fit_urm,
 dt_hr_nb  <- firm_long_dt[treat == "nonblind" & role == "HR"]
 dt_eng_nb <- firm_long_dt[treat == "nonblind" & role == "Eng"]
 
-indices    <- c("dei_index_A_z", "dei_index_B_z")
+indices    <- c("dei_index_z", "dei_index_pca_z")
 idx_labels <- c("Index A", "Index B")
 
 fit_urm <- function(d, idx) {
@@ -2496,7 +2496,7 @@ rm(dt_hr_nb, dt_eng_nb, chk, fit_triple_urm, m_hr_r, m_eng_r, m_hr_g, m_eng_g,
 dt_hr_nb  <- firm_long_dt[treat == "nonblind" & role == "HR"]
 dt_eng_nb <- firm_long_dt[treat == "nonblind" & role == "Eng"]
 
-indices    <- c("dei_index_A_z", "dei_index_B_z")
+indices    <- c("dei_index_z", "dei_index_pca_z")
 idx_labels <- c("Index A", "Index B")
 chk <- "\\checkmark"
 

@@ -37,10 +37,11 @@ Because majority gatekeepers organically apply an informal ``out-group premium''
 # Overall Treatment Effect on Evaluations (Reshuffling)
 
 \begin{itemize}\setlength\itemsep{2pt}\setlength\parskip{0pt}\setlength\topsep{0pt}\setlength\partopsep{0pt}
-  \item \textbf{The Finding:} Blinding demographic information during candidate evaluation \emph{reshuffles} hiring outcomes by disrupting a pre-existing system of \emph{demographic premiums and penalties}.
-  \item \textbf{The Winners: White Males.} Evaluated by Engineers, White Male overall scores mechanically rise by \textcolor{blue}{+8.5\%} of a SD under blinding.
-  \item \textbf{The Losers: Hispanic candidates.} When stripped of their demographic identity, Hispanic Male scores plunge by \textcolor{blue}{-11.5\%} of a SD (evaluated by HR), and Hispanic Female scores fall by \textcolor{blue}{-6.9\%} of a SD (evaluated by Engineers).
-  \item \textbf{The Takeaway:} Blind hiring removes a \emph{baseline penalty} that White Males were experiencing in the non-blind evaluations, while simultaneously stripping Hispanic candidates of an \emph{(diversity) premium}.
+  \item \textbf{Finding:} Blinding demographic information during candidate evaluation \emph{reshuffles} hiring outcomes by disrupting a pre-existing system of \emph{demographic premiums and penalties}. Blind hiring removes a \emph{baseline penalty} that White Males were experiencing in the non-blind evaluations, while simultaneously stripping Hispanic candidates of an \emph{(diversity) premium}.
+  \begin{itemize}\setlength\itemsep{2pt}\setlength\parskip{0pt}\setlength\topsep{0pt}\setlength\partopsep{0pt}
+    \item \textbf{Winners: White Males.} Evaluated by Engineers, White Male overall scores mechanically rise by \textcolor{blue}{+8.5\%} of a SD under blinding.
+    \item \textbf{Losers: Hispanic candidates.} When stripped of their demographic identity, Hispanic Male scores plunge by \textcolor{blue}{-11.5\%} of a SD (evaluated by HR), and Hispanic Female scores fall by \textcolor{blue}{-6.9\%} of a SD (evaluated by Engineers).
+  \end{itemize}
   \item \textbf{Caveat:} Hiring is often an \emph{ordinal ranking} problem --- one candidate's gain corresponds to another's lost opportunity --- so the absence of statistical significance on a given row does not mean the corresponding group is unaffected by blinding.
 \end{itemize}
 \vspace{-0.9em}
@@ -140,9 +141,8 @@ rm(m_hr_blind, m_eng_blind, all_models, coef_map_blind, gof_custom_blind,
 
 \begingroup\small
 \begin{itemize}\setlength\itemsep{0pt}\setlength\parskip{0pt}\setlength\topsep{0pt}\setlength\partopsep{0pt}\setlength\itemindent{0pt}
-  \item \textbf{The Context:} White Males constitute the overwhelming majority of Software Engineer evaluators in this sample (and the industry at large). \emph{Legacy theories assume this group favors its own.}
-  \item \textbf{The Finding:} Our experiment shows that the modern tech industry actually operates on a preference for the \emph{out-group} (or preference for \emph{under-represented groups}). Because White Males make up the majority of the evaluator pool, their behavior drives the aggregate metrics. When you blind resumes, the scores of concordant (race/gender) applicants evaluated by Engineers actually rise by \textcolor{blue}{+6.9\%} of a SD ($p < 0.05$) while the scores of discordant applicants fall by \textcolor{blue}{-0.9\%} of a SD ($p < 0.05$).
-  \item \textbf{The Takeaway:} This shows that, under non-blinded evaluations, the majority gatekeepers were \emph{actively penalizing} candidates who looked like themselves and assigning a \emph{premium to evaluation scores of minority candidates}. Enforcing blind hiring doesn't stop discrimination against minorities; it stops the White Male majority from systematically boosting them. This explains why, in our experiment, White Male applicants are the primary beneficiaries of blind hiring: they are ``rescued'' from the baseline penalty imposed by their own demographic engineer peers.
+  \item \textbf{Finding:} Our experiment shows that the modern tech industry actually operates on a preference for the \emph{out-group} (or preference for \emph{under-represented groups}). Because White Males make up the majority of the evaluator pool, their behavior drives the aggregate metrics. When you blind resumes, the scores of concordant (race/gender) applicants evaluated by Engineers actually rise by \textcolor{blue}{+6.9\%} of a SD ($p < 0.05$) while the scores of discordant applicants fall by \textcolor{blue}{-0.9\%} of a SD ($p < 0.05$).
+  \item \textbf{Takeaway:} This shows that, under non-blinded evaluations, the majority gatekeepers were \emph{actively penalizing} candidates who looked like themselves and assigning a \emph{premium to evaluation scores of minority candidates}. Enforcing blind hiring doesn't stop discrimination against minorities; it stops the White Male majority from systematically boosting them. This explains why, in our experiment, White Male applicants are the primary beneficiaries of blind hiring: they are ``rescued'' from the baseline penalty imposed by their own demographic engineer peers.
 \end{itemize}
 \endgroup
 \vspace{-1.4em}
@@ -270,7 +270,7 @@ rm(m_hr_race, m_hr_gen, m_hr_rg, m_eng_race, m_eng_gen, m_eng_rg,
 
 \textit{Note on Key Index Creation.}
 \begin{itemize}\setlength\itemsep{2pt}\setlength\parskip{0pt}\setlength\topsep{0pt}\setlength\partopsep{0pt}
-  \item \textit{Individual DEI Index (Z)}: respondent's personal DEI orientation, condensed into a single z-scored score.
+  \item \textit{Individual DEI Index (Z)}: Evaluator's personal DEI orientation, condensed into a single z-scored score. (Low = Anti-DEI, High = Pro-DEI)
   \begin{itemize}\setlength\itemsep{1pt}\setlength\parskip{0pt}\setlength\topsep{0pt}
     \item Mathematical expression: $\text{Index} = z\big(\tfrac{1}{5}\sum_{j=1}^{5} z(x_j)\big)$, z-scored within (\texttt{role}, \texttt{treat}) cells.
     \item \texttt{pro\_dei\_race} --- stated agreement that race DEI is important in hiring (Likert).
@@ -279,13 +279,13 @@ rm(m_hr_race, m_hr_gen, m_hr_rg, m_eng_race, m_eng_gen, m_eng_rg,
     \item \texttt{pro\_hiring\_dei} --- stated belief that DEI initiatives help firms hire better candidates (Likert).
     \item \texttt{div\_priority} --- revealed-priority rank of ``Diversity and Representation'' in the seven-goals question.
   \end{itemize}
-  \item \textit{Firm Targets Fem/His (0/1)}: indicator for whether the respondent's firm formally targets Female or Hispanic candidates in hiring.
+  \item \textit{Firm Targets Fem/His (0/1)}: Indicator for firm policy --- whether the evaluator's firm formally targets Female or Hispanic candidates in hiring.
   \begin{itemize}\setlength\itemsep{1pt}\setlength\parskip{0pt}\setlength\topsep{0pt}
     \item Mathematical expression: $\text{Idx} = \mathbb{1}\{\texttt{firm\_targets\_female} = 1 \;\lor\; \texttt{firm\_targets\_hispanic} = 1\}$.
     \item \texttt{firm\_targets\_female} --- 1 if option 6 (``Female'') was selected on \texttt{s5\_policy\_diversity} (multi-select).
     \item \texttt{firm\_targets\_hispanic} --- 1 if option 3 (``Hispanic or Latino'') was selected on the same multi-select.
   \end{itemize}
-  \item \textit{Firm DEI Attn Index (Z)}: respondent's perception of how much attention their firm currently pays to race and gender DEI in hiring, condensed into a single z-scored score.
+  \item \textit{Firm DEI Attn Index (Z)}: Respondent's perception of how much attention their firm currently pays to race and gender DEI in hiring, condensed into a single z-scored score.
   \begin{itemize}\setlength\itemsep{1pt}\setlength\parskip{0pt}\setlength\topsep{0pt}
     \item Mathematical expression: $\text{Index} = z\big(\tfrac{1}{2}\big(z(\texttt{race\_attn}) + z(\texttt{gender\_attn})\big)\big)$, z-scored within (\texttt{role}, \texttt{treat}) cells.
     \item \texttt{s5\_view\_dei\_race\_f} --- Likert: respondent's perception of firm's current attention to race DEI in hiring.
@@ -314,9 +314,9 @@ dt_eng[, firm_targets_fh := as.integer(firm_targets_female == 1L | firm_targets_
 
 fit_simple <- function(d) {
   suppressMessages(suppressWarnings(feols(
-    sc_overall_z ~ dei_index_A_z +
+    sc_overall_z ~ dei_index_z +
       i(race_gender, ref = "Blind") +
-      i(race_gender, dei_index_A_z, ref = "Blind") +
+      i(race_gender, dei_index_z, ref = "Blind") +
       resp_age + I(resp_age^2) + I(resp_age^3)
     | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income,
     data = d, vcov = ~ responseid
@@ -325,7 +325,7 @@ fit_simple <- function(d) {
 
 fit_triple <- function(d, b) {
   fml <- as.formula(sprintf(
-    "sc_overall_z ~ dei_index_A_z + %s + I(dei_index_A_z * %s) + i(race_gender, ref = 'Blind') + i(race_gender, dei_index_A_z, ref = 'Blind') + i(race_gender, %s, ref = 'Blind') + i(race_gender, I(dei_index_A_z * %s), ref = 'Blind') + resp_age + I(resp_age^2) + I(resp_age^3) | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income",
+    "sc_overall_z ~ dei_index_z + %s + I(dei_index_z * %s) + i(race_gender, ref = 'Blind') + i(race_gender, dei_index_z, ref = 'Blind') + i(race_gender, %s, ref = 'Blind') + i(race_gender, I(dei_index_z * %s), ref = 'Blind') + resp_age + I(resp_age^2) + I(resp_age^3) | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income",
     b, b, b, b))
   suppressMessages(suppressWarnings(feols(fml, data = d, vcov = ~ responseid)))
 }
@@ -355,7 +355,7 @@ coef_map <- c(
   ## --- Block 2: two-way interactions (18 rows) ---
   ## Demo x Individual DEI Index (Z) (fills all 6 cols)
   setNames(paste0(demo_lbls, " $\\times$ Individual DEI Index (Z)"),
-           paste0("race_gender::", demos, ":dei_index_A_z")),
+           paste0("race_gender::", demos, ":dei_index_z")),
   ## Demo x Firm Targets Fem/His (0/1) (cols 3-4 only)
   setNames(paste0(demo_lbls, " $\\times$ Firm Targets Fem/His (0/1)"),
            paste0("race_gender::", demos, ":firm_targets_fh")),
@@ -365,9 +365,9 @@ coef_map <- c(
 
   ## --- Block 3: three-way interactions (12 rows) ---
   setNames(paste0(demo_lbls, " $\\times$ Individual DEI Index (Z) $\\times$ Firm Targets Fem/His (0/1)"),
-           paste0("race_gender::", demos, ":I(dei_index_A_z * firm_targets_fh)")),
+           paste0("race_gender::", demos, ":I(dei_index_z * firm_targets_fh)")),
   setNames(paste0(demo_lbls, " $\\times$ Individual DEI Index (Z) $\\times$ Firm DEI Attn Index (Z)"),
-           paste0("race_gender::", demos, ":I(dei_index_A_z * firm_dei_attention_z)"))
+           paste0("race_gender::", demos, ":I(dei_index_z * firm_dei_attention_z)"))
 )
 
 gof_custom <- tribble(
@@ -432,9 +432,9 @@ cells_44_rg <- list()
 for (i in seq_along(demos)) {
   cells_44_rg[[demo_lbls[i]]] <- c(
     level  = paste0("race_gender::", demos[i]),
-    dei    = paste0("race_gender::", demos[i], ":dei_index_A_z"),
+    dei    = paste0("race_gender::", demos[i], ":dei_index_z"),
     ft     = paste0("race_gender::", demos[i], ":firm_targets_fh"),
-    triple = paste0("race_gender::", demos[i], ":I(dei_index_A_z * firm_targets_fh)")
+    triple = paste0("race_gender::", demos[i], ":I(dei_index_z * firm_targets_fh)")
   )
 }
 
@@ -537,7 +537,7 @@ rm(dt_hr, dt_eng, fit_simple, fit_triple, flip,
 ## Columns 1-2: simple DEI heterogeneity   (HR | Eng).
 ## Columns 3-4: triple with Firm Targets URM (firm_targets_fh).
 ## Columns 5-6: triple with Firm DEI Attn (firm_dei_attention_z).
-## DEI proxy:  Index A only (dei_index_A_z).
+## DEI proxy:  Index A only (dei_index_z).
 ## Coefficients flipped post-fit so positive => effect of blinding.
 
 dt_hr  <- firm_long_dt[role == "HR"]
@@ -562,9 +562,9 @@ dt_eng <- build_axis(dt_eng)
 
 fit_simple <- function(d) {
   suppressMessages(suppressWarnings(feols(
-    sc_overall_z ~ dei_index_A_z +
+    sc_overall_z ~ dei_index_z +
       i(urm_axis_blind, ref = "Blind") +
-      i(urm_axis_blind, dei_index_A_z, ref = "Blind") +
+      i(urm_axis_blind, dei_index_z, ref = "Blind") +
       resp_age + I(resp_age^2) + I(resp_age^3)
     | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income,
     data = d, vcov = ~ responseid
@@ -573,7 +573,7 @@ fit_simple <- function(d) {
 
 fit_triple <- function(d, b) {
   fml <- as.formula(sprintf(
-    "sc_overall_z ~ dei_index_A_z + %s + I(dei_index_A_z * %s) + i(urm_axis_blind, ref = 'Blind') + i(urm_axis_blind, dei_index_A_z, ref = 'Blind') + i(urm_axis_blind, %s, ref = 'Blind') + i(urm_axis_blind, I(dei_index_A_z * %s), ref = 'Blind') + resp_age + I(resp_age^2) + I(resp_age^3) | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income",
+    "sc_overall_z ~ dei_index_z + %s + I(dei_index_z * %s) + i(urm_axis_blind, ref = 'Blind') + i(urm_axis_blind, dei_index_z, ref = 'Blind') + i(urm_axis_blind, %s, ref = 'Blind') + i(urm_axis_blind, I(dei_index_z * %s), ref = 'Blind') + resp_age + I(resp_age^2) + I(resp_age^3) | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income",
     b, b, b, b))
   suppressMessages(suppressWarnings(feols(fml, data = d, vcov = ~ responseid)))
 }
@@ -600,9 +600,9 @@ coef_map <- c(
 
   ## --- Block 2: two-way interactions (9 rows) ---
   ## Axis x Individual DEI Index (Z) (fills all 6 cols)
-  "urm_axis_blind::Nonblind_MaleNonHisp:dei_index_A_z"   = "Male (NH) $\\times$ Individual DEI Index (Z)",
-  "urm_axis_blind::Nonblind_FemaleNonHisp:dei_index_A_z" = "Female (NH) $\\times$ Individual DEI Index (Z)",
-  "urm_axis_blind::Nonblind_Hispanic:dei_index_A_z"      = "Hispanic $\\times$ Individual DEI Index (Z)",
+  "urm_axis_blind::Nonblind_MaleNonHisp:dei_index_z"   = "Male (NH) $\\times$ Individual DEI Index (Z)",
+  "urm_axis_blind::Nonblind_FemaleNonHisp:dei_index_z" = "Female (NH) $\\times$ Individual DEI Index (Z)",
+  "urm_axis_blind::Nonblind_Hispanic:dei_index_z"      = "Hispanic $\\times$ Individual DEI Index (Z)",
   ## Axis x Firm Targets Fem/His (0/1) (cols 3-4 only)
   "urm_axis_blind::Nonblind_MaleNonHisp:firm_targets_fh"   = "Male (NH) $\\times$ Firm Targets Fem/His (0/1)",
   "urm_axis_blind::Nonblind_FemaleNonHisp:firm_targets_fh" = "Female (NH) $\\times$ Firm Targets Fem/His (0/1)",
@@ -613,12 +613,12 @@ coef_map <- c(
   "urm_axis_blind::Nonblind_Hispanic:firm_dei_attention_z"      = "Hispanic $\\times$ Firm DEI Attn Index (Z)",
 
   ## --- Block 3: three-way interactions (6 rows) ---
-  "urm_axis_blind::Nonblind_MaleNonHisp:I(dei_index_A_z * firm_targets_fh)"   = "Male (NH) $\\times$ Individual DEI Index (Z) $\\times$ Firm Targets Fem/His (0/1)",
-  "urm_axis_blind::Nonblind_FemaleNonHisp:I(dei_index_A_z * firm_targets_fh)" = "Female (NH) $\\times$ Individual DEI Index (Z) $\\times$ Firm Targets Fem/His (0/1)",
-  "urm_axis_blind::Nonblind_Hispanic:I(dei_index_A_z * firm_targets_fh)"      = "Hispanic $\\times$ Individual DEI Index (Z) $\\times$ Firm Targets Fem/His (0/1)",
-  "urm_axis_blind::Nonblind_MaleNonHisp:I(dei_index_A_z * firm_dei_attention_z)"   = "Male (NH) $\\times$ Individual DEI Index (Z) $\\times$ Firm DEI Attn Index (Z)",
-  "urm_axis_blind::Nonblind_FemaleNonHisp:I(dei_index_A_z * firm_dei_attention_z)" = "Female (NH) $\\times$ Individual DEI Index (Z) $\\times$ Firm DEI Attn Index (Z)",
-  "urm_axis_blind::Nonblind_Hispanic:I(dei_index_A_z * firm_dei_attention_z)"      = "Hispanic $\\times$ Individual DEI Index (Z) $\\times$ Firm DEI Attn Index (Z)"
+  "urm_axis_blind::Nonblind_MaleNonHisp:I(dei_index_z * firm_targets_fh)"   = "Male (NH) $\\times$ Individual DEI Index (Z) $\\times$ Firm Targets Fem/His (0/1)",
+  "urm_axis_blind::Nonblind_FemaleNonHisp:I(dei_index_z * firm_targets_fh)" = "Female (NH) $\\times$ Individual DEI Index (Z) $\\times$ Firm Targets Fem/His (0/1)",
+  "urm_axis_blind::Nonblind_Hispanic:I(dei_index_z * firm_targets_fh)"      = "Hispanic $\\times$ Individual DEI Index (Z) $\\times$ Firm Targets Fem/His (0/1)",
+  "urm_axis_blind::Nonblind_MaleNonHisp:I(dei_index_z * firm_dei_attention_z)"   = "Male (NH) $\\times$ Individual DEI Index (Z) $\\times$ Firm DEI Attn Index (Z)",
+  "urm_axis_blind::Nonblind_FemaleNonHisp:I(dei_index_z * firm_dei_attention_z)" = "Female (NH) $\\times$ Individual DEI Index (Z) $\\times$ Firm DEI Attn Index (Z)",
+  "urm_axis_blind::Nonblind_Hispanic:I(dei_index_z * firm_dei_attention_z)"      = "Hispanic $\\times$ Individual DEI Index (Z) $\\times$ Firm DEI Attn Index (Z)"
 )
 
 gof_custom <- tribble(
@@ -685,21 +685,21 @@ cf_eng <- coef(m4);  V_eng <- vcov(m4)
 cells_44 <- list(
   "Male (non-hispanic)" = c(
     level  = "urm_axis_blind::Nonblind_MaleNonHisp",
-    dei    = "urm_axis_blind::Nonblind_MaleNonHisp:dei_index_A_z",
+    dei    = "urm_axis_blind::Nonblind_MaleNonHisp:dei_index_z",
     ft     = "urm_axis_blind::Nonblind_MaleNonHisp:firm_targets_fh",
-    triple = "urm_axis_blind::Nonblind_MaleNonHisp:I(dei_index_A_z * firm_targets_fh)"
+    triple = "urm_axis_blind::Nonblind_MaleNonHisp:I(dei_index_z * firm_targets_fh)"
   ),
   "Female (non-hispanic)" = c(
     level  = "urm_axis_blind::Nonblind_FemaleNonHisp",
-    dei    = "urm_axis_blind::Nonblind_FemaleNonHisp:dei_index_A_z",
+    dei    = "urm_axis_blind::Nonblind_FemaleNonHisp:dei_index_z",
     ft     = "urm_axis_blind::Nonblind_FemaleNonHisp:firm_targets_fh",
-    triple = "urm_axis_blind::Nonblind_FemaleNonHisp:I(dei_index_A_z * firm_targets_fh)"
+    triple = "urm_axis_blind::Nonblind_FemaleNonHisp:I(dei_index_z * firm_targets_fh)"
   ),
   "Hispanic" = c(
     level  = "urm_axis_blind::Nonblind_Hispanic",
-    dei    = "urm_axis_blind::Nonblind_Hispanic:dei_index_A_z",
+    dei    = "urm_axis_blind::Nonblind_Hispanic:dei_index_z",
     ft     = "urm_axis_blind::Nonblind_Hispanic:firm_targets_fh",
-    triple = "urm_axis_blind::Nonblind_Hispanic:I(dei_index_A_z * firm_targets_fh)"
+    triple = "urm_axis_blind::Nonblind_Hispanic:I(dei_index_z * firm_targets_fh)"
   )
 )
 
@@ -826,9 +826,9 @@ dt_eng <- build_urm(dt_eng)
 
 fit_simple <- function(d) {
   suppressMessages(suppressWarnings(feols(
-    sc_overall_z ~ dei_index_A_z +
+    sc_overall_z ~ dei_index_z +
       i(urm_tech_blind, ref = "Blind") +
-      i(urm_tech_blind, dei_index_A_z, ref = "Blind") +
+      i(urm_tech_blind, dei_index_z, ref = "Blind") +
       resp_age + I(resp_age^2) + I(resp_age^3)
     | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income,
     data = d, vcov = ~ responseid
@@ -837,7 +837,7 @@ fit_simple <- function(d) {
 
 fit_triple <- function(d, b) {
   fml <- as.formula(sprintf(
-    "sc_overall_z ~ dei_index_A_z + %s + I(dei_index_A_z * %s) + i(urm_tech_blind, ref = 'Blind') + i(urm_tech_blind, dei_index_A_z, ref = 'Blind') + i(urm_tech_blind, %s, ref = 'Blind') + i(urm_tech_blind, I(dei_index_A_z * %s), ref = 'Blind') + resp_age + I(resp_age^2) + I(resp_age^3) | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income",
+    "sc_overall_z ~ dei_index_z + %s + I(dei_index_z * %s) + i(urm_tech_blind, ref = 'Blind') + i(urm_tech_blind, dei_index_z, ref = 'Blind') + i(urm_tech_blind, %s, ref = 'Blind') + i(urm_tech_blind, I(dei_index_z * %s), ref = 'Blind') + resp_age + I(resp_age^2) + I(resp_age^3) | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income",
     b, b, b, b))
   suppressMessages(suppressWarnings(feols(fml, data = d, vcov = ~ responseid)))
 }
@@ -865,8 +865,8 @@ coef_map <- c(
 
   ## --- Block 2: two-way interactions (6 rows) ---
   ## Axis x Individual DEI Index (Z) (fills all 6 cols)
-  "urm_tech_blind::Nonblind_NonURM:dei_index_A_z" = paste0(maj_lbl, " $\\times$ Individual DEI Index (Z)"),
-  "urm_tech_blind::Nonblind_URM:dei_index_A_z"    = paste0(min_lbl, " $\\times$ Individual DEI Index (Z)"),
+  "urm_tech_blind::Nonblind_NonURM:dei_index_z" = paste0(maj_lbl, " $\\times$ Individual DEI Index (Z)"),
+  "urm_tech_blind::Nonblind_URM:dei_index_z"    = paste0(min_lbl, " $\\times$ Individual DEI Index (Z)"),
   ## Axis x Firm Targets Fem/His (0/1) (cols 3-4 only)
   "urm_tech_blind::Nonblind_NonURM:firm_targets_fh" = paste0(maj_lbl, " $\\times$ Firm Targets Fem/His (0/1)"),
   "urm_tech_blind::Nonblind_URM:firm_targets_fh"    = paste0(min_lbl, " $\\times$ Firm Targets Fem/His (0/1)"),
@@ -875,10 +875,10 @@ coef_map <- c(
   "urm_tech_blind::Nonblind_URM:firm_dei_attention_z"    = paste0(min_lbl, " $\\times$ Firm DEI Attn Index (Z)"),
 
   ## --- Block 3: three-way interactions (4 rows) ---
-  "urm_tech_blind::Nonblind_NonURM:I(dei_index_A_z * firm_targets_fh)"      = paste0(maj_lbl, " $\\times$ Individual DEI Index (Z) $\\times$ Firm Targets Fem/His (0/1)"),
-  "urm_tech_blind::Nonblind_URM:I(dei_index_A_z * firm_targets_fh)"         = paste0(min_lbl, " $\\times$ Individual DEI Index (Z) $\\times$ Firm Targets Fem/His (0/1)"),
-  "urm_tech_blind::Nonblind_NonURM:I(dei_index_A_z * firm_dei_attention_z)" = paste0(maj_lbl, " $\\times$ Individual DEI Index (Z) $\\times$ Firm DEI Attn Index (Z)"),
-  "urm_tech_blind::Nonblind_URM:I(dei_index_A_z * firm_dei_attention_z)"    = paste0(min_lbl, " $\\times$ Individual DEI Index (Z) $\\times$ Firm DEI Attn Index (Z)")
+  "urm_tech_blind::Nonblind_NonURM:I(dei_index_z * firm_targets_fh)"      = paste0(maj_lbl, " $\\times$ Individual DEI Index (Z) $\\times$ Firm Targets Fem/His (0/1)"),
+  "urm_tech_blind::Nonblind_URM:I(dei_index_z * firm_targets_fh)"         = paste0(min_lbl, " $\\times$ Individual DEI Index (Z) $\\times$ Firm Targets Fem/His (0/1)"),
+  "urm_tech_blind::Nonblind_NonURM:I(dei_index_z * firm_dei_attention_z)" = paste0(maj_lbl, " $\\times$ Individual DEI Index (Z) $\\times$ Firm DEI Attn Index (Z)"),
+  "urm_tech_blind::Nonblind_URM:I(dei_index_z * firm_dei_attention_z)"    = paste0(min_lbl, " $\\times$ Individual DEI Index (Z) $\\times$ Firm DEI Attn Index (Z)")
 )
 
 gof_custom <- tribble(
@@ -938,15 +938,15 @@ cf_eng <- coef(m4);  V_eng <- vcov(m4)
 cells_45 <- list()
 cells_45[[maj_lbl]] <- c(
   level  = "urm_tech_blind::Nonblind_NonURM",
-  dei    = "urm_tech_blind::Nonblind_NonURM:dei_index_A_z",
+  dei    = "urm_tech_blind::Nonblind_NonURM:dei_index_z",
   ft     = "urm_tech_blind::Nonblind_NonURM:firm_targets_fh",
-  triple = "urm_tech_blind::Nonblind_NonURM:I(dei_index_A_z * firm_targets_fh)"
+  triple = "urm_tech_blind::Nonblind_NonURM:I(dei_index_z * firm_targets_fh)"
 )
 cells_45[[min_lbl]] <- c(
   level  = "urm_tech_blind::Nonblind_URM",
-  dei    = "urm_tech_blind::Nonblind_URM:dei_index_A_z",
+  dei    = "urm_tech_blind::Nonblind_URM:dei_index_z",
   ft     = "urm_tech_blind::Nonblind_URM:firm_targets_fh",
-  triple = "urm_tech_blind::Nonblind_URM:I(dei_index_A_z * firm_targets_fh)"
+  triple = "urm_tech_blind::Nonblind_URM:I(dei_index_z * firm_targets_fh)"
 )
 
 dei_grid <- seq(-2, 2, length.out = 41)
@@ -2159,8 +2159,8 @@ fcol      <- "race_gender"
 
 m1 <- flip(fit_simple_p (dt_hr,  fcol))
 m2 <- flip(fit_simple_p (dt_eng, fcol))
-m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
-m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
+m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_z"))
+m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_z"))
 
 all_models <- list("HR" = m1, "Engineer" = m2,
                    "HR " = m3, "Engineer " = m4)
@@ -2170,9 +2170,9 @@ coef_map <- c(
   setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z)"),
            paste0(fcol, "::", demos, ":perc_role")),
   setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
-           paste0(fcol, "::", demos, ":dei_index_A_z")),
+           paste0(fcol, "::", demos, ":dei_index_z")),
   setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Own DEI Index (Z)"),
-           paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)"))
+           paste0(fcol, "::", demos, ":I(perc_role * dei_index_z)"))
 )
 
 gof_custom <- tribble(
@@ -2222,8 +2222,8 @@ modelsummary(
 
 z_grid <- seq(-2, 2, length.out = 41)
 df_dei <- rbind(
-  build_scissors_dt(m3, fcol, "dei_index_A_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
-  build_scissors_dt(m4, fcol, "dei_index_A_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+  build_scissors_dt(m3, fcol, "dei_index_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m4, fcol, "dei_index_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
 fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
                               ncol_panels = 6,
                               hr_low_label   = "HR perceives Eng overcaring on DEI",
@@ -2260,8 +2260,8 @@ fcol      <- "urm_axis_blind"
 
 m1 <- flip(fit_simple_p (dt_hr,  fcol))
 m2 <- flip(fit_simple_p (dt_eng, fcol))
-m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
-m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
+m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_z"))
+m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_z"))
 
 all_models <- list("HR" = m1, "Engineer" = m2,
                    "HR " = m3, "Engineer " = m4)
@@ -2271,9 +2271,9 @@ coef_map <- c(
   setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z)"),
            paste0(fcol, "::", demos, ":perc_role")),
   setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
-           paste0(fcol, "::", demos, ":dei_index_A_z")),
+           paste0(fcol, "::", demos, ":dei_index_z")),
   setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Own DEI Index (Z)"),
-           paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)"))
+           paste0(fcol, "::", demos, ":I(perc_role * dei_index_z)"))
 )
 
 gof_custom <- tribble(
@@ -2323,8 +2323,8 @@ modelsummary(
 
 z_grid <- seq(-2, 2, length.out = 41)
 df_dei <- rbind(
-  build_scissors_dt(m3, fcol, "dei_index_A_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
-  build_scissors_dt(m4, fcol, "dei_index_A_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+  build_scissors_dt(m3, fcol, "dei_index_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m4, fcol, "dei_index_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
 fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
                               ncol_panels = 3,
                               hr_low_label   = "HR perceives Eng overcaring on DEI",
@@ -2361,8 +2361,8 @@ fcol      <- "urm_tech_blind"
 
 m1 <- flip(fit_simple_p (dt_hr,  fcol))
 m2 <- flip(fit_simple_p (dt_eng, fcol))
-m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
-m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
+m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_z"))
+m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_z"))
 
 all_models <- list("HR" = m1, "Engineer" = m2,
                    "HR " = m3, "Engineer " = m4)
@@ -2372,9 +2372,9 @@ coef_map <- c(
   setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z)"),
            paste0(fcol, "::", demos, ":perc_role")),
   setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
-           paste0(fcol, "::", demos, ":dei_index_A_z")),
+           paste0(fcol, "::", demos, ":dei_index_z")),
   setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Own DEI Index (Z)"),
-           paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)"))
+           paste0(fcol, "::", demos, ":I(perc_role * dei_index_z)"))
 )
 
 gof_custom <- tribble(
@@ -2424,8 +2424,8 @@ modelsummary(
 
 z_grid <- seq(-2, 2, length.out = 41)
 df_dei <- rbind(
-  build_scissors_dt(m3, fcol, "dei_index_A_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
-  build_scissors_dt(m4, fcol, "dei_index_A_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+  build_scissors_dt(m3, fcol, "dei_index_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m4, fcol, "dei_index_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
 fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
                               ncol_panels = 2,
                               hr_low_label   = "HR perceives Eng overcaring on DEI",
