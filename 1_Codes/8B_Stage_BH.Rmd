@@ -3610,11 +3610,487 @@ cat("\\includegraphics[width=0.75\\textwidth]{", plot_file_cod, "}\\par\\vspace{
 cat("{\\raggedright\\scriptsize Same layout as Triple A. X-axis: candidate's coding ability (test\\_case z-score).\\par}\n")
 cat("\\end{center}\n")
 
+## Keep flip / fit_simple_p / fit_triple_p / build_scissors_dt /
+## make_scissors_grid in scope: §11 reuses them with the signed
+## directional index.
 rm(m1, m2, m3, m4, m5, m6, all_models, demos, demo_lbls, fcol,
    coef_map, gof_custom, chk, nox, fe_rows,
    z_grid, df_dei, df_cod, fig_dei, fig_cod,
    plot_file_dei, plot_file_cod, fig_dir,
    fld, dt_hr, dt_eng, resp_dt, eng_items, hr_items, extra_perc,
-   eng_cor, hr_cor, eng_flip, hr_flip, n_h_idx, n_e_idx, z,
+   eng_cor, hr_cor, eng_flip, hr_flip, n_h_idx, n_e_idx, z)
+```
+
+
+\clearpage
+# Inter-Departmental Backlash and Compensation: Signed Directional Index
+
+\textit{Spec.} Same triple-interaction as §8-§10. The perception variable is now a \textbf{signed, DEI-specific, directional} index per role: positive end captures the role-appropriate ``misalignment in the bad direction'' (HR overreach for Eng; Eng undercare for HR); negative end captures the opposite direction. Both directions are continuous, not thresholded.
+
+\textit{Survey directional structure (used directly).} The multi-select options \texttt{aligndiff\{role\}\_1..6} record which DEI dimensions the respondent flagged, and the items themselves are directional:
+\begin{itemize}\setlength\itemsep{1pt}\setlength\parskip{0pt}\setlength\topsep{1pt}\setlength\partopsep{0pt}
+  \item Options 1 / 4: counterpart places \emph{higher} priority on gender / racial diversity (rebellion-relevant for Eng; over-care-relevant for HR).
+  \item Options 2 / 5: counterpart places \emph{lower} priority on gender / racial diversity (under-care-relevant for HR; opposite-direction signal for Eng).
+  \item Options 3 / 6: counterpart places priority on \emph{different} groups (no direction --- ignored here).
+\end{itemize}
+
+\textit{Index construction} (per role; respondent-level then merged back):
+\begin{itemize}\setlength\itemsep{1pt}\setlength\parskip{0pt}\setlength\topsep{1pt}\setlength\partopsep{0pt}
+  \item \textbf{Eng (HR Overreach direction).} Likert: \texttt{s5\_hr\_influence} (1--4, ``to what extent does HR push DEI in hiring''; higher = more push). Directional count: $(\texttt{aligndiffeng}_1 + \texttt{aligndiffeng}_4) - (\texttt{aligndiffeng}_2 + \texttt{aligndiffeng}_5)$ (positive = HR cares more on race/gender DEI; negative = HR cares less). Composite: \texttt{eng\_dir = s5\_hr\_influence + 0.5 $\cdot$ directional\_count}, then z-scored within Eng.
+  \item \textbf{HR (Eng Undercare direction).} Likert: \texttt{-s5\_engineer\_care} (negated 0--4 ``to what extent does Eng prioritize DEI''; higher negated = Eng cares less). Directional count: $(\texttt{aligndiffhr}_2 + \texttt{aligndiffhr}_5) - (\texttt{aligndiffhr}_1 + \texttt{aligndiffhr}_4)$ (positive = Eng cares less on race/gender DEI; negative = Eng cares more). Composite: \texttt{hr\_dir = -s5\_engineer\_care + 0.5 $\cdot$ directional\_count}, then z-scored within HR.
+  \item \texttt{misalign\_z} = \texttt{eng\_dir\_z} for Eng rows / \texttt{hr\_dir\_z} for HR rows, used as \texttt{perc\_role} in the regressions. Sample inclusion: drop only respondents NA on the Likert anchor (\texttt{s5\_hr\_influence} for Eng / \texttt{s5\_engineer\_care} for HR).
+\end{itemize}
+
+\textbf{Substantive interpretation.} \texttt{perc\_role} $> 0$ = ``rebellion conditions'' for Eng / ``compensation conditions'' for HR; \texttt{perc\_role} $< 0$ = the opposite direction (Eng who think HR underreaches; HR who think Eng overcares). Triple-interaction slopes can therefore be read as: \emph{how does the effect of blinding on group X change as the rater moves from ``counterpart cares too little on DEI'' to ``counterpart cares too much on DEI''?}
+
+```{r perception_dir_data, echo = FALSE, warning = FALSE, message = FALSE}
+## §11: signed directional misalignment index.
+extra_perc <- c("s5_view_align", "s5_view_aligndiffeng", "s5_view_aligndiffhr",
+                "s5_hr_influence", "s5_engineer_care",
+                grep("^aligndiff(hr|eng)_", names(firm_dt), value = TRUE))
+extra_perc <- intersect(extra_perc, names(firm_dt))
+
+fld <- merge(firm_long_dt,
+             firm_dt[, c("responseid", extra_perc), with = FALSE],
+             by = "responseid", all.x = TRUE)
+
+fld[, urm_axis_blind := fcase(
+       treat == "blind",                                                            "Blind",
+       treat == "nonblind" & race_gender %in% c("White_Male", "Asian_Male"),         "Nonblind_MaleNonHisp",
+       treat == "nonblind" & race_gender %in% c("White_Female", "Asian_Female"),     "Nonblind_FemaleNonHisp",
+       treat == "nonblind" & race_gender %in% c("Hispanic_Male", "Hispanic_Female"), "Nonblind_Hispanic",
+       default = NA_character_)]
+fld[, urm_axis_blind := factor(urm_axis_blind,
+       levels = c("Blind", "Nonblind_MaleNonHisp", "Nonblind_FemaleNonHisp", "Nonblind_Hispanic"))]
+fld[, urm_tech_blind := fcase(
+       treat == "blind",                    "Blind",
+       treat == "nonblind" & urm_tech == 1, "Nonblind_URM",
+       treat == "nonblind" & urm_tech == 0, "Nonblind_NonURM",
+       default = NA_character_)]
+fld[, urm_tech_blind := factor(urm_tech_blind,
+       levels = c("Blind", "Nonblind_NonURM", "Nonblind_URM"))]
+fld[, race_gender := factor(race_gender,
+       levels = c("Blind", "White_Male", "White_Female",
+                  "Asian_Male", "Asian_Female",
+                  "Hispanic_Male", "Hispanic_Female"))]
+fld[, test_case_z := as.numeric(scale(test_case))]
+
+resp_dt <- unique(fld[, c("responseid", "role", extra_perc), with = FALSE])
+
+## Cast to plain numeric.
+for (col in extra_perc) {
+  if (col %in% names(resp_dt)) {
+    set(resp_dt, j = col, value = suppressWarnings(as.numeric(resp_dt[[col]])))
+  }
+}
+
+## Defensive 99 -> NA on the Likert items used in the index.
+for (col in c("s5_hr_influence", "s5_engineer_care", "s5_view_align")) {
+  if (col %in% names(resp_dt)) {
+    resp_dt[get(col) == 99, (col) := NA_real_]
+  }
+}
+
+z <- function(x) {
+  if (sum(!is.na(x)) < 2) return(rep(NA_real_, length(x)))
+  mu <- mean(x, na.rm = TRUE); sg <- sd(x, na.rm = TRUE)
+  if (!is.finite(sg) || sg == 0) return(rep(0, length(x)))
+  (x - mu) / sg
+}
+
+## Eng HR-Overreach direction:
+##   Likert (s5_hr_influence) + 0.5 * (gender+racial overreach - underreach)
+resp_dt[role == "Eng",
+        eng_dir_count := (aligndiffeng_1 + aligndiffeng_4) -
+                         (aligndiffeng_2 + aligndiffeng_5)]
+resp_dt[role == "Eng",
+        eng_dir_raw := s5_hr_influence + 0.5 * eng_dir_count]
+resp_dt[role == "Eng", eng_dir_z := z(eng_dir_raw)]
+
+## HR Eng-Undercare direction:
+##   negated Likert (-s5_engineer_care) + 0.5 * (gender+racial undercare - overcare)
+resp_dt[role == "HR",
+        hr_dir_count := (aligndiffhr_2 + aligndiffhr_5) -
+                        (aligndiffhr_1 + aligndiffhr_4)]
+resp_dt[role == "HR",
+        hr_dir_raw := -s5_engineer_care + 0.5 * hr_dir_count]
+resp_dt[role == "HR", hr_dir_z := z(hr_dir_raw)]
+
+## Stitch into a single misalign_z column.
+resp_dt[, misalign_z := NA_real_]
+resp_dt[role == "Eng", misalign_z := eng_dir_z]
+resp_dt[role == "HR",  misalign_z := hr_dir_z]
+
+fld <- merge(fld, resp_dt[, .(responseid, misalign_z)],
+             by = "responseid", all.x = TRUE)
+
+dt_hr  <- fld[role == "HR"  & !is.na(misalign_z)]
+dt_eng <- fld[role == "Eng" & !is.na(misalign_z)]
+dt_hr [, perc_role := misalign_z]
+dt_eng[, perc_role := misalign_z]
+
+n_h_idx <- uniqueN(dt_hr$responseid)
+n_e_idx <- uniqueN(dt_eng$responseid)
+```
+
+
+\clearpage
+## Per-Race-Gender (6 cells) --- Signed Directional Index
+
+```{r perception_dir_rg, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+demos     <- c("White_Male", "White_Female", "Asian_Male", "Asian_Female",
+               "Hispanic_Male", "Hispanic_Female")
+demo_lbls <- c("White Male", "White Female", "Asian Male", "Asian Female",
+               "Hispanic Male", "Hispanic Female")
+fcol      <- "race_gender"
+
+m1 <- flip(fit_simple_p (dt_hr,  fcol))
+m2 <- flip(fit_simple_p (dt_eng, fcol))
+m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
+m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
+m5 <- flip(fit_triple_p (dt_hr,  fcol, "test_case_z"))
+m6 <- flip(fit_triple_p (dt_eng, fcol, "test_case_z"))
+
+all_models <- list("HR" = m1, "Engineer" = m2,
+                   "HR " = m3, "Engineer " = m4,
+                   "HR  " = m5, "Engineer  " = m6)
+
+coef_map <- c(
+  setNames(demo_lbls, paste0(fcol, "::", demos)),
+  setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z)"),
+           paste0(fcol, "::", demos, ":perc_role")),
+  setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
+           paste0(fcol, "::", demos, ":dei_index_A_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Candidate Coding (Z)"),
+           paste0(fcol, "::", demos, ":test_case_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Own DEI Index (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)")),
+  setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Candidate Coding (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
+)
+
+gof_custom <- tribble(~raw, ~clean, ~fmt, "nobs", "Observations", 0)
+chk <- "\\checkmark"; nox <- "$\\times$"
+fe_rows <- data.frame(
+  term = c("Resume (Content) FE", "Display Position FE",
+           "Respondent FE", "Respondent Characteristics"),
+  V1 = c(chk, chk, nox, chk), V2 = c(chk, chk, nox, chk),
+  V3 = c(chk, chk, nox, chk), V4 = c(chk, chk, nox, chk),
+  V5 = c(chk, chk, nox, chk), V6 = c(chk, chk, nox, chk),
+  stringsAsFactors = FALSE
+)
+names(fe_rows) <- c("term", names(all_models))
+attr(fe_rows, "position") <- 37:40
+
+modelsummary(
+  all_models,
+  estimate  = "{estimate}{stars} ({std.error})",
+  statistic = NULL,
+  stars     = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  coef_map  = coef_map,
+  gof_map   = gof_custom,
+  add_rows  = fe_rows,
+  escape    = FALSE,
+  output    = "kableExtra"
+) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 6) %>%
+  add_header_above(c(" " = 1,
+                     "Simple Dir Het." = 2,
+                     "Triple: Dir x Own DEI" = 2,
+                     "Triple: Dir x Coding" = 2)) %>%
+  row_spec(6,  extra_latex_after = "\\hdashline") %>%
+  row_spec(12, extra_latex_after = "\\hdashline") %>%
+  row_spec(18, extra_latex_after = "\\hdashline") %>%
+  row_spec(24, extra_latex_after = "\\hdashline") %>%
+  row_spec(30, extra_latex_after = "\\hdashline") %>%
+  row_spec(36, extra_latex_after = "\\midrule") %>%
+  row_spec(40, extra_latex_after = "\\midrule") %>%
+  footnote(general = sprintf(
+            "Dir Idx (Z) = signed directional index (§11): for Eng, HR Overreach direction (Likert + 0.5 times signed multi-select); for HR, Eng Undercare direction. Z-scored within role. Positive = rebellion conditions for Eng / compensation conditions for HR; negative = opposite. n = %d HR, %d Eng. Coefs flipped post-fit so positive = effect of blinding raises the score. Two-way cluster on responseid and resume index.",
+            n_h_idx, n_e_idx),
+           general_title = "", threeparttable = TRUE,
+           footnote_as_chunk = FALSE, escape = FALSE)
+
+z_grid <- seq(-2, 2, length.out = 41)
+df_dei <- rbind(
+  build_scissors_dt(m3, fcol, "dei_index_A_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m4, fcol, "dei_index_A_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
+                              ncol_panels = 6,
+                              low_label = "Low Dir (counterpart cares less)",
+                              high_label_template = "%s High Dir (Overreach/Undercare)")
+
+df_cod <- rbind(
+  build_scissors_dt(m5, fcol, "test_case_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m6, fcol, "test_case_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Coding Ability (Z)",
+                              ncol_panels = 6,
+                              low_label = "Low Dir (counterpart cares less)",
+                              high_label_template = "%s High Dir (Overreach/Undercare)")
+
+fig_dir <- here("2_Reports", "figures")
+plot_file_dei <- file.path(fig_dir, "8B_perception_dir_dei_rg.pdf")
+plot_file_cod <- file.path(fig_dir, "8B_perception_dir_coding_rg.pdf")
+suppressMessages(suppressWarnings({
+  ggsave(plot_file_dei, plot = fig_dei, width = 14, height = 5.5, device = "pdf")
+  ggsave(plot_file_cod, plot = fig_cod, width = 14, height = 5.5, device = "pdf")
+}))
+
+cat("\\clearpage\n")
+cat("\\begin{center}\\textbf{Triple A: Dir Idx (signed) $\\times$ Own DEI Index --- Per Race-Gender (6 cells)}\\par\\vspace{0.1em}\n")
+cat("\\includegraphics[width=\\textwidth]{", plot_file_dei, "}\\par\\vspace{0.1em}\n", sep = "")
+cat("{\\raggedright\\scriptsize Top row: HR (high Dir = perceives Eng undercare = compensation conditions). Bottom row: Eng (high Dir = perceives HR overreach = rebellion conditions). Bands = 95\\% CI.\\par}\n")
+cat("\\end{center}\n")
+
+cat("\\clearpage\n")
+cat("\\begin{center}\\textbf{Triple B: Dir Idx (signed) $\\times$ Candidate Coding Ability --- Per Race-Gender (6 cells)}\\par\\vspace{0.1em}\n")
+cat("\\includegraphics[width=\\textwidth]{", plot_file_cod, "}\\par\\vspace{0.1em}\n", sep = "")
+cat("{\\raggedright\\scriptsize Same panel layout as Triple A. X-axis: candidate's coding ability (test\\_case z-score).\\par}\n")
+cat("\\end{center}\n")
+
+rm(m1, m2, m3, m4, m5, m6, all_models, demos, demo_lbls, fcol,
+   coef_map, gof_custom, chk, nox, fe_rows,
+   z_grid, df_dei, df_cod, fig_dei, fig_cod,
+   plot_file_dei, plot_file_cod, fig_dir)
+```
+
+
+\clearpage
+## URM-Axis Trichotomy --- Signed Directional Index
+
+```{r perception_dir_axis, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+demos     <- c("Nonblind_MaleNonHisp", "Nonblind_FemaleNonHisp", "Nonblind_Hispanic")
+demo_lbls <- c("Male (NH)", "Female (NH)", "Hispanic")
+fcol      <- "urm_axis_blind"
+
+m1 <- flip(fit_simple_p (dt_hr,  fcol))
+m2 <- flip(fit_simple_p (dt_eng, fcol))
+m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
+m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
+m5 <- flip(fit_triple_p (dt_hr,  fcol, "test_case_z"))
+m6 <- flip(fit_triple_p (dt_eng, fcol, "test_case_z"))
+
+all_models <- list("HR" = m1, "Engineer" = m2,
+                   "HR " = m3, "Engineer " = m4,
+                   "HR  " = m5, "Engineer  " = m6)
+
+coef_map <- c(
+  setNames(demo_lbls, paste0(fcol, "::", demos)),
+  setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z)"),
+           paste0(fcol, "::", demos, ":perc_role")),
+  setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
+           paste0(fcol, "::", demos, ":dei_index_A_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Candidate Coding (Z)"),
+           paste0(fcol, "::", demos, ":test_case_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Own DEI Index (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)")),
+  setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Candidate Coding (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
+)
+
+gof_custom <- tribble(~raw, ~clean, ~fmt, "nobs", "Observations", 0)
+chk <- "\\checkmark"; nox <- "$\\times$"
+fe_rows <- data.frame(
+  term = c("Resume (Content) FE", "Display Position FE",
+           "Respondent FE", "Respondent Characteristics"),
+  V1 = c(chk, chk, nox, chk), V2 = c(chk, chk, nox, chk),
+  V3 = c(chk, chk, nox, chk), V4 = c(chk, chk, nox, chk),
+  V5 = c(chk, chk, nox, chk), V6 = c(chk, chk, nox, chk),
+  stringsAsFactors = FALSE
+)
+names(fe_rows) <- c("term", names(all_models))
+attr(fe_rows, "position") <- 19:22
+
+modelsummary(
+  all_models,
+  estimate  = "{estimate}{stars} ({std.error})",
+  statistic = NULL,
+  stars     = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  coef_map  = coef_map,
+  gof_map   = gof_custom,
+  add_rows  = fe_rows,
+  escape    = FALSE,
+  output    = "kableExtra"
+) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 7) %>%
+  add_header_above(c(" " = 1,
+                     "Simple Dir Het." = 2,
+                     "Triple: Dir x Own DEI" = 2,
+                     "Triple: Dir x Coding" = 2)) %>%
+  row_spec(3,  extra_latex_after = "\\hdashline") %>%
+  row_spec(6,  extra_latex_after = "\\hdashline") %>%
+  row_spec(9,  extra_latex_after = "\\hdashline") %>%
+  row_spec(12, extra_latex_after = "\\hdashline") %>%
+  row_spec(15, extra_latex_after = "\\hdashline") %>%
+  row_spec(18, extra_latex_after = "\\midrule") %>%
+  row_spec(22, extra_latex_after = "\\midrule") %>%
+  footnote(general = sprintf(
+            "Dir Idx (Z) = signed directional index (§11). n = %d HR, %d Eng. Coefs flipped post-fit so positive = effect of blinding raises the score. Two-way cluster on responseid and resume index.",
+            n_h_idx, n_e_idx),
+           general_title = "", threeparttable = TRUE,
+           footnote_as_chunk = FALSE, escape = FALSE)
+
+z_grid <- seq(-2, 2, length.out = 41)
+df_dei <- rbind(
+  build_scissors_dt(m3, fcol, "dei_index_A_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m4, fcol, "dei_index_A_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
+                              ncol_panels = 3,
+                              low_label = "Low Dir (counterpart cares less)",
+                              high_label_template = "%s High Dir (Overreach/Undercare)")
+
+df_cod <- rbind(
+  build_scissors_dt(m5, fcol, "test_case_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m6, fcol, "test_case_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Coding Ability (Z)",
+                              ncol_panels = 3,
+                              low_label = "Low Dir (counterpart cares less)",
+                              high_label_template = "%s High Dir (Overreach/Undercare)")
+
+fig_dir <- here("2_Reports", "figures")
+plot_file_dei <- file.path(fig_dir, "8B_perception_dir_dei_axis.pdf")
+plot_file_cod <- file.path(fig_dir, "8B_perception_dir_coding_axis.pdf")
+suppressMessages(suppressWarnings({
+  ggsave(plot_file_dei, plot = fig_dei, width = 11, height = 5.5, device = "pdf")
+  ggsave(plot_file_cod, plot = fig_cod, width = 11, height = 5.5, device = "pdf")
+}))
+
+cat("\\clearpage\n")
+cat("\\begin{center}\\textbf{Triple A: Dir Idx (signed) $\\times$ Own DEI Index --- URM-Axis Trichotomy}\\par\\vspace{0.1em}\n")
+cat("\\includegraphics[width=0.95\\textwidth]{", plot_file_dei, "}\\par\\vspace{0.1em}\n", sep = "")
+cat("{\\raggedright\\scriptsize Top row: HR (high Dir = compensation conditions). Bottom row: Eng (high Dir = rebellion conditions). Bands = 95\\% CI.\\par}\n")
+cat("\\end{center}\n")
+
+cat("\\clearpage\n")
+cat("\\begin{center}\\textbf{Triple B: Dir Idx (signed) $\\times$ Candidate Coding Ability --- URM-Axis Trichotomy}\\par\\vspace{0.1em}\n")
+cat("\\includegraphics[width=0.95\\textwidth]{", plot_file_cod, "}\\par\\vspace{0.1em}\n", sep = "")
+cat("{\\raggedright\\scriptsize Same layout as Triple A. X-axis: candidate's coding ability (test\\_case z-score).\\par}\n")
+cat("\\end{center}\n")
+
+rm(m1, m2, m3, m4, m5, m6, all_models, demos, demo_lbls, fcol,
+   coef_map, gof_custom, chk, nox, fe_rows,
+   z_grid, df_dei, df_cod, fig_dei, fig_cod,
+   plot_file_dei, plot_file_cod, fig_dir)
+```
+
+
+\clearpage
+## URM-Tech Dichotomy (Majority in Tech / URM in Tech) --- Signed Directional Index
+
+```{r perception_dir_utech, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+demos     <- c("Nonblind_NonURM", "Nonblind_URM")
+demo_lbls <- c("Majority", "URM in Tech")
+fcol      <- "urm_tech_blind"
+
+m1 <- flip(fit_simple_p (dt_hr,  fcol))
+m2 <- flip(fit_simple_p (dt_eng, fcol))
+m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_A_z"))
+m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_A_z"))
+m5 <- flip(fit_triple_p (dt_hr,  fcol, "test_case_z"))
+m6 <- flip(fit_triple_p (dt_eng, fcol, "test_case_z"))
+
+all_models <- list("HR" = m1, "Engineer" = m2,
+                   "HR " = m3, "Engineer " = m4,
+                   "HR  " = m5, "Engineer  " = m6)
+
+coef_map <- c(
+  setNames(demo_lbls, paste0(fcol, "::", demos)),
+  setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z)"),
+           paste0(fcol, "::", demos, ":perc_role")),
+  setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
+           paste0(fcol, "::", demos, ":dei_index_A_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Candidate Coding (Z)"),
+           paste0(fcol, "::", demos, ":test_case_z")),
+  setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Own DEI Index (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * dei_index_A_z)")),
+  setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Candidate Coding (Z)"),
+           paste0(fcol, "::", demos, ":I(perc_role * test_case_z)"))
+)
+
+gof_custom <- tribble(~raw, ~clean, ~fmt, "nobs", "Observations", 0)
+chk <- "\\checkmark"; nox <- "$\\times$"
+fe_rows <- data.frame(
+  term = c("Resume (Content) FE", "Display Position FE",
+           "Respondent FE", "Respondent Characteristics"),
+  V1 = c(chk, chk, nox, chk), V2 = c(chk, chk, nox, chk),
+  V3 = c(chk, chk, nox, chk), V4 = c(chk, chk, nox, chk),
+  V5 = c(chk, chk, nox, chk), V6 = c(chk, chk, nox, chk),
+  stringsAsFactors = FALSE
+)
+names(fe_rows) <- c("term", names(all_models))
+attr(fe_rows, "position") <- 13:16
+
+modelsummary(
+  all_models,
+  estimate  = "{estimate}{stars} ({std.error})",
+  statistic = NULL,
+  stars     = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  coef_map  = coef_map,
+  gof_map   = gof_custom,
+  add_rows  = fe_rows,
+  escape    = FALSE,
+  output    = "kableExtra"
+) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 8) %>%
+  add_header_above(c(" " = 1,
+                     "Simple Dir Het." = 2,
+                     "Triple: Dir x Own DEI" = 2,
+                     "Triple: Dir x Coding" = 2)) %>%
+  row_spec(2,  extra_latex_after = "\\hdashline") %>%
+  row_spec(4,  extra_latex_after = "\\hdashline") %>%
+  row_spec(6,  extra_latex_after = "\\hdashline") %>%
+  row_spec(8,  extra_latex_after = "\\hdashline") %>%
+  row_spec(10, extra_latex_after = "\\hdashline") %>%
+  row_spec(12, extra_latex_after = "\\midrule") %>%
+  row_spec(16, extra_latex_after = "\\midrule") %>%
+  footnote(general = sprintf(
+            "Dir Idx (Z) = signed directional index (§11). n = %d HR, %d Eng. Coefs flipped post-fit so positive = effect of blinding raises the score. Two-way cluster on responseid and resume index.",
+            n_h_idx, n_e_idx),
+           general_title = "", threeparttable = TRUE,
+           footnote_as_chunk = FALSE, escape = FALSE)
+
+z_grid <- seq(-2, 2, length.out = 41)
+df_dei <- rbind(
+  build_scissors_dt(m3, fcol, "dei_index_A_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m4, fcol, "dei_index_A_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
+                              ncol_panels = 2,
+                              low_label = "Low Dir (counterpart cares less)",
+                              high_label_template = "%s High Dir (Overreach/Undercare)")
+
+df_cod <- rbind(
+  build_scissors_dt(m5, fcol, "test_case_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
+  build_scissors_dt(m6, fcol, "test_case_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
+fig_cod <- make_scissors_grid(df_cod, demo_lbls, "Candidate Coding Ability (Z)",
+                              ncol_panels = 2,
+                              low_label = "Low Dir (counterpart cares less)",
+                              high_label_template = "%s High Dir (Overreach/Undercare)")
+
+fig_dir <- here("2_Reports", "figures")
+plot_file_dei <- file.path(fig_dir, "8B_perception_dir_dei_utech.pdf")
+plot_file_cod <- file.path(fig_dir, "8B_perception_dir_coding_utech.pdf")
+suppressMessages(suppressWarnings({
+  ggsave(plot_file_dei, plot = fig_dei, width = 8, height = 5.5, device = "pdf")
+  ggsave(plot_file_cod, plot = fig_cod, width = 8, height = 5.5, device = "pdf")
+}))
+
+cat("\\clearpage\n")
+cat("\\begin{center}\\textbf{Triple A: Dir Idx (signed) $\\times$ Own DEI Index --- URM-Tech Dichotomy}\\par\\vspace{0.1em}\n")
+cat("\\includegraphics[width=0.75\\textwidth]{", plot_file_dei, "}\\par\\vspace{0.1em}\n", sep = "")
+cat("{\\raggedright\\scriptsize Top row: HR (high Dir = compensation conditions). Bottom row: Eng (high Dir = rebellion conditions). Bands = 95\\% CI.\\par}\n")
+cat("\\end{center}\n")
+
+cat("\\clearpage\n")
+cat("\\begin{center}\\textbf{Triple B: Dir Idx (signed) $\\times$ Candidate Coding Ability --- URM-Tech Dichotomy}\\par\\vspace{0.1em}\n")
+cat("\\includegraphics[width=0.75\\textwidth]{", plot_file_cod, "}\\par\\vspace{0.1em}\n", sep = "")
+cat("{\\raggedright\\scriptsize Same layout as Triple A. X-axis: candidate's coding ability (test\\_case z-score).\\par}\n")
+cat("\\end{center}\n")
+
+rm(m1, m2, m3, m4, m5, m6, all_models, demos, demo_lbls, fcol,
+   coef_map, gof_custom, chk, nox, fe_rows,
+   z_grid, df_dei, df_cod, fig_dei, fig_cod,
+   plot_file_dei, plot_file_cod, fig_dir,
+   fld, dt_hr, dt_eng, resp_dt, eng_items, hr_items, extra_perc,
+   n_h_idx, n_e_idx, z,
    flip, fit_simple_p, fit_triple_p, build_scissors_dt, make_scissors_grid)
 ```
