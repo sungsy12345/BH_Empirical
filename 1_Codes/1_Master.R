@@ -61,10 +61,10 @@ source(here("1_Codes", "5_Cleaning.R"))
 source(here("1_Codes", "6_Hiring_Simulation.R"))
 
 ## Analysis
-## Output PDFs are named "<Label>_YYYYMMDD.pdf" using today's date so each
-## render produces a date-stamped artifact. Update `today_str` if you want
-## to overwrite a specific historical date.
-today_str <- format(Sys.Date(), "%Y%m%d")
+## Output PDFs are named "<Label>_YYYYMMDD_HHMM.pdf" using the current date
+## and time at render so each run produces a uniquely time-stamped artifact
+## and successive renders within a day stay distinguishable / orderable.
+today_str <- format(Sys.time(), "%Y%m%d_%H%M")
 
 rmarkdown::render(
   here("1_Codes", "7_Descriptive.Rmd"),
