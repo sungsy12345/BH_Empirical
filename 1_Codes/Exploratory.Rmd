@@ -1,0 +1,719 @@
+---
+title: "Blind Hiring -- Exploratory / Robustness Results"
+output:
+  pdf_document:
+    number_sections: true
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{threeparttable}
+  - \usepackage{float}
+  - \usepackage{bbm}
+  - \usepackage{array}
+  - \usepackage{arydshln}
+geometry: margin=0.5in, landscape
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+\setcounter{section}{0}
+
+```{r exploratory_helpers, echo=FALSE}
+## Vectorised cell formatter (mirrors helper in 8B_Stage_BH.Rmd).
+fmt_te_vec <- function(est, se) {
+  out <- rep("---", length(est))
+  ok  <- !is.na(est) & !is.na(se) & se > 0
+  if (any(ok)) {
+    z    <- est[ok] / se[ok]
+    p    <- 2 * pnorm(-abs(z))
+    star <- ifelse(p < 0.01, "***",
+            ifelse(p < 0.05, "**",
+            ifelse(p < 0.10, "*", "")))
+    out[ok] <- sprintf("%.3f%s (%.3f)", est[ok], star, se[ok])
+  }
+  out
+}
+## Build derived columns the cut sections rely on (canonically built in
+## 8B_Stage_BH.Rmd, but this Rmd runs independently).
+firm_long_dt[, true_coding_z := (overall_score - mean(overall_score, na.rm = TRUE)) /
+                                  sd(overall_score, na.rm = TRUE)]
+if (!"resume_id" %in% names(firm_long_dt)) {
+  firm_long_dt[, resume_id := paste(resume_ver, resume_index, sep = "_")]
+}
+if (!"firm_targets_fh" %in% names(firm_long_dt)) {
+  firm_long_dt[, firm_targets_fh := as.integer(
+    firm_targets_female == 1L | firm_targets_hispanic == 1L)]
+}
+
+## Reproduce misalign_z (signed directional misalignment index from §5 of
+## the main Rmd; Alt A.1 / Alt B in this exploratory file use it).
+{
+  extra_perc <- c("s5_view_align", "s5_view_aligndiffeng", "s5_view_aligndiffhr",
+                  "s5_hr_influence", "s5_engineer_care",
+                  grep("^aligndiff(hr|eng)_", names(firm_dt), value = TRUE))
+  extra_perc <- intersect(extra_perc, names(firm_dt))
+  resp_dt <- unique(firm_long_dt[, .(responseid, role)])
+  resp_dt <- merge(resp_dt, firm_dt[, c("responseid", extra_perc), with = FALSE],
+                   by = "responseid", all.x = TRUE)
+  for (col in extra_perc) {
+    set(resp_dt, j = col, value = suppressWarnings(as.numeric(resp_dt[[col]])))
+  }
+  for (col in c("s5_hr_influence", "s5_engineer_care", "s5_view_align")) {
+    if (col %in% names(resp_dt)) resp_dt[get(col) == 99, (col) := NA_real_]
+  }
+  z <- function(x) {
+    if (sum(!is.na(x)) < 2) return(rep(NA_real_, length(x)))
+    mu <- mean(x, na.rm = TRUE); sg <- sd(x, na.rm = TRUE)
+    if (!is.finite(sg) || sg == 0) return(rep(0, length(x)))
+    (x - mu) / sg
+  }
+  resp_dt[role == "Eng",
+          eng_dir_count := (aligndiffeng_1 + aligndiffeng_4) -
+                           (aligndiffeng_2 + aligndiffeng_5)]
+  resp_dt[role == "Eng", eng_dir_raw := s5_hr_influence + 0.5 * eng_dir_count]
+  resp_dt[role == "Eng", eng_dir_z := z(eng_dir_raw)]
+  resp_dt[role == "HR",
+          hr_dir_count := (aligndiffhr_2 + aligndiffhr_5) -
+                          (aligndiffhr_1 + aligndiffhr_4)]
+  resp_dt[role == "HR", hr_dir_raw := -s5_engineer_care + 0.5 * hr_dir_count]
+  resp_dt[role == "HR", hr_dir_z := z(hr_dir_raw)]
+  resp_dt[, misalign_z := NA_real_]
+  resp_dt[role == "Eng", misalign_z := eng_dir_z]
+  resp_dt[role == "HR",  misalign_z := hr_dir_z]
+  if ("misalign_z" %in% names(firm_long_dt)) firm_long_dt[, misalign_z := NULL]
+  firm_long_dt <- merge(firm_long_dt, resp_dt[, .(responseid, misalign_z)],
+                        by = "responseid", all.x = TRUE)
+  rm(resp_dt, extra_perc, z)
+}
+```
+
+\clearpage
+## Alternative A.1 (HR only): Candidate-Level Selection Probability Model with \texttt{sc\_advance}
+
+The per-$k$ loop in §4.2--§4.6 suffers from extreme discrete-sampling variance at the boundaries (at $k{=}1$ a single tie-break injects pure noise into the dependent variable; at $k{=}18$ the pools collapse to identical sets). For HR, we have a natural binary --- \texttt{sc\_advance}, the actual decision to advance a candidate to the engineering stage --- which lets us re-estimate the same selection question on the full candidate-evaluator panel without any $k$ threshold:
+\vspace{-0.7em}
+$$
+\underbrace{\text{sc\_advance}_{ij}}_{\text{HR's advance decision}}
+\;\sim\;
+\text{TrueCoding}_i \times \mathbbm{1}[\text{Blind}]_j \times \text{Moderator}_j
+\;\Big|\;
+\text{Respondent FE},\;
+\text{cluster on Respondent}.
+$$
+
+\vspace{-0.6em}
+\textbf{Why HR only here:} \texttt{sc\_advance} is HR's natural single-decision ``move forward'' binary; engineers do not produce a comparable single-shot binary on the firm side --- they instead deliver an \emph{ordering} over the 18 resumes, from which any binary is necessarily a top-$k$ thresholding (which is exactly the §4.2 design we are trying to escape). For the engineer side we therefore push the analogous ``does blinding strengthen the link between true ability and selection'' question into a $k$-loop variant in §4.8 below.
+
+With respondent FE, all between-respondent terms (\texttt{treat::blind}, the moderator main effect, and their two-way interaction) are absorbed; identification of the within-respondent slopes and their cross-products comes from variation in true coding ability across the 18 resumes a respondent rates. The substantive coefficients of interest are:
+
+\vspace{-0.6em}
+\begin{itemize}\setlength\itemsep{0pt}\setlength\parskip{0pt}\setlength\topsep{0pt}\setlength\partopsep{0pt}
+    \item \textbf{True Coding $\times$ Blind} --- the central efficiency claim. $>0$ means blinding tightens the link between objective ability and being advanced.
+    \item \textbf{True Coding $\times$ Blind $\times$ M} --- whether blinding's tightening of that link itself depends on the moderator (DEI orientation, firm DEI policy, or inter-departmental DEI misalignment).
+\end{itemize}
+
+```{r alt_a_selection_probability_lpm, echo=FALSE, results='asis', warning=FALSE, message=FALSE}
+
+## ---------------------------------------------------------------------------
+## Build firm_targets_fh and resume_id on firm_long_dt if not already
+## present. resume_id = (resume_ver, resume_index) -- the unique stimulus
+## the respondent saw. There are 144 such combos (8 vers x 18 positions),
+## which is enough for CGM two-way clustering on (responseid, resume_id).
+## ---------------------------------------------------------------------------
+if (!"firm_targets_fh" %in% names(firm_long_dt)) {
+  firm_long_dt[, firm_targets_fh := as.integer(
+    firm_targets_female == 1L | firm_targets_hispanic == 1L)]
+}
+if (!"resume_id" %in% names(firm_long_dt)) {
+  firm_long_dt[, resume_id := paste(resume_ver, resume_index, sep = "_")]
+}
+stopifnot("sc_advance" %in% names(firm_long_dt),
+          "true_coding_z" %in% names(firm_long_dt),
+          "dei_index_z" %in% names(firm_long_dt),
+          "misalign_z" %in% names(firm_long_dt))
+
+hr_dt <- firm_long_dt[role == "HR"]
+
+## ---------------------------------------------------------------------------
+## Four LPMs (HR only): pooled + three heterogeneity triples (DEI Index,
+## Firm Targets Fem/His, Misalign). Respondent FE absorbs all between-
+## respondent terms; r_do FE absorbs display-order / fatigue effects on the
+## advance decision; the surviving coefficients are the within-respondent
+## true-coding-z terms (main slope + Blind shift + M shift + triple).
+## Two-way clustered SE on (responseid, resume_id).
+## Resume-content FE (resume_id) is intentionally NOT absorbed: it would
+## kill the True Coding (Z) main-effect row, which is substantive here.
+## ---------------------------------------------------------------------------
+m_hr_pool <- feols(sc_advance ~ true_coding_z * i(treat, ref = "nonblind") | responseid + r_do,
+                   data = hr_dt, vcov = ~ responseid + resume_id)
+m_hr_dei  <- feols(sc_advance ~ true_coding_z * i(treat, ref = "nonblind") * dei_index_z | responseid + r_do,
+                   data = hr_dt[!is.na(dei_index_z)], vcov = ~ responseid + resume_id)
+m_hr_ft   <- feols(sc_advance ~ true_coding_z * i(treat, ref = "nonblind") * firm_targets_fh | responseid + r_do,
+                   data = hr_dt[!is.na(firm_targets_fh)], vcov = ~ responseid + resume_id)
+m_hr_ms   <- feols(sc_advance ~ true_coding_z * i(treat, ref = "nonblind") * misalign_z | responseid + r_do,
+                   data = hr_dt[!is.na(misalign_z)], vcov = ~ responseid + resume_id)
+
+models_list <- list(
+  "(1) Pooled"           = m_hr_pool,
+  "(2) DEI Index"        = m_hr_dei,
+  "(3) Firm Targets F/H" = m_hr_ft,
+  "(4) Misalign (Z)"     = m_hr_ms
+)
+
+## Multiple raw coef names map to the same display label so the four
+## "True Coding x ..." rows align across moderators in the combined table.
+coef_map <- c(
+  "true_coding_z"                              = "True Coding (Z)",
+  "true_coding_z:treat::blind"                 = "True Coding $\\times$ Blind",
+  "true_coding_z:dei_index_z"                  = "True Coding $\\times$ M",
+  "true_coding_z:firm_targets_fh"              = "True Coding $\\times$ M",
+  "true_coding_z:misalign_z"                   = "True Coding $\\times$ M",
+  "true_coding_z:dei_index_z:treat::blind"     = "True Coding $\\times$ Blind $\\times$ M",
+  "true_coding_z:firm_targets_fh:treat::blind" = "True Coding $\\times$ Blind $\\times$ M",
+  "true_coding_z:misalign_z:treat::blind"      = "True Coding $\\times$ Blind $\\times$ M"
+)
+
+## ---------------------------------------------------------------------------
+## FE / GoF scaffolding per project convention: FE rows (incl. intentional
+## X for Resume Content FE), midrule, then Obs / R^2 / Adj R^2.
+## ---------------------------------------------------------------------------
+chk <- "\\checkmark"
+nox <- "$\\times$"
+fe_rows <- data.frame(
+  term = c("Display Position FE",
+           "Resume ID FE",
+           "Resume - Coding Test Version FE",
+           "Respondent ID FE",
+           "Respondent Age (Cont) and Demographic FEs"),
+  V1 = c(chk, nox, nox, chk, nox),
+  V2 = c(chk, nox, nox, chk, nox),
+  V3 = c(chk, nox, nox, chk, nox),
+  V4 = c(chk, nox, nox, chk, nox),
+  stringsAsFactors = FALSE
+)
+names(fe_rows) <- c("term", names(models_list))
+## Coef block: 4 unique display labels x (est+se on separate lines) = 8 rows.
+## Inject 5 FE rows immediately after at positions 9:13.
+attr(fe_rows, "position") <- 9:13
+
+gof_map <- list(
+  list("raw" = "nobs",         "clean" = "Obs.",       "fmt" = function(x) format(x, big.mark = ",")),
+  list("raw" = "r.squared",    "clean" = "$R^2$",      "fmt" = function(x) sprintf("%.3f", x)),
+  list("raw" = "adj.r.squared","clean" = "Adj. $R^2$", "fmt" = function(x) sprintf("%.3f", x))
+)
+
+rm(hr_dt, m_hr_pool, m_hr_dei, m_hr_ft, m_hr_ms,
+   models_list, coef_map, gof_map, fe_rows, chk, nox)
+```
+
+
+\clearpage
+## Alternative A.2 ($k$-loop): Selection Probability for Both Roles, Looping over $k$
+
+\textbf{Relationship to §4.2--§4.6:} Because engineers do not give a single advance/no-advance decision, the analog of §4.7 for engineers requires picking a binary --- and the only natural ones are the $k$-thresholded indicators \texttt{hr\_pass$_k$} / \texttt{eng\_top$_k$}. Doing so produces what is essentially the LHS$\leftrightarrow$RHS \emph{dual} of §4.2: where §4.2 conditions on the selected pool and asks ``\emph{Is the average true coding score of the selected $k$ higher under blinding?},'' §4.8 instead uses the full candidate-evaluator panel and asks ``\emph{Is true coding ability a stronger predictor of being one of the selected $k$ under blinding?}'' Mathematically the two are not identical (different estimands and different units), but they are tightly linked: if blinding raises the average true score of the chosen $k$, it must be (approximately) because blinding has steepened the within-respondent gradient of selection probability on true ability. The advantage of the dual specification is that the panel sample size at every $k$ is the full $N{\approx}5{,}238$ candidate-evaluator observations, which compresses the standard errors that explode in §4.2 at low $k$.
+
+\vspace{-0.5em}
+$$
+\underbrace{\text{Selected}^{(k)}_{ij}}_{\substack{\text{HR: }\texttt{hr\_pass}_k\\\text{Eng: }\texttt{eng\_top}_k}}
+\;\sim\;
+\text{TrueCoding}_i \times \mathbbm{1}[\text{Blind}]_j
+\;\Big|\;
+\text{Respondent FE},\;
+\text{cluster on Respondent},
+\quad k = 1,\dots,18.
+$$
+
+\vspace{-0.6em}
+The plotted quantity is the per-$k$ \texttt{true\_coding\_z}~$\times$~\texttt{treat::blind} coefficient: the change in the within-respondent linear-probability slope of selection on true coding ability when going from non-blind to blind review. Positive means blinding tightens the ability-selection link. Bands are 95\% CIs from clustered SEs on respondent.
+
+```{r alt_a2_selection_prob_kloop, echo=FALSE, results='asis', warning=FALSE, message=FALSE, fig.width=10, fig.height=5}
+
+## Build resume_id (= unique stimulus identity) if not already present
+## from the Alternative A.1 chunk; needed for two-way cluster.
+if (!"resume_id" %in% names(firm_long_dt)) {
+  firm_long_dt[, resume_id := paste(resume_ver, resume_index, sep = "_")]
+}
+
+results_list <- list()
+
+for (k in 1:18) {
+
+  ## --- HR ---
+  hr_col  <- paste0("hr_pass", k)
+  if (hr_col %in% names(firm_long_dt)) {
+    tryCatch({
+      m_hr <- suppressMessages(suppressWarnings(
+        feols(as.formula(paste0(hr_col,
+                " ~ true_coding_z * i(treat, ref = 'nonblind') | responseid + r_do")),
+              data = firm_long_dt[role == "HR"],
+              vcov = ~ responseid + resume_id)
+      ))
+      ct <- coeftable(m_hr)
+      key <- "true_coding_z:treat::blind"
+      if (key %in% rownames(ct)) {
+        est   <- ct[key, "Estimate"]
+        se    <- ct[key, "Std. Error"]
+        p_val <- ct[key, 4]
+        results_list[[length(results_list) + 1L]] <- data.table(
+          Stage = "HR Stage", k = k,
+          estimate = est, se = se,
+          ci_low = est - 1.96 * se, ci_high = est + 1.96 * se,
+          p_val = p_val
+        )
+      }
+    }, error = function(e) {})
+  }
+
+  ## --- Engineer ---
+  eng_col <- paste0("eng_top", k)
+  if (eng_col %in% names(firm_long_dt)) {
+    tryCatch({
+      m_eng <- suppressMessages(suppressWarnings(
+        feols(as.formula(paste0(eng_col,
+                " ~ true_coding_z * i(treat, ref = 'nonblind') | responseid + r_do")),
+              data = firm_long_dt[role == "Eng"],
+              vcov = ~ responseid + resume_id)
+      ))
+      ct <- coeftable(m_eng)
+      key <- "true_coding_z:treat::blind"
+      if (key %in% rownames(ct)) {
+        est   <- ct[key, "Estimate"]
+        se    <- ct[key, "Std. Error"]
+        p_val <- ct[key, 4]
+        results_list[[length(results_list) + 1L]] <- data.table(
+          Stage = "Engineer Stage", k = k,
+          estimate = est, se = se,
+          ci_low = est - 1.96 * se, ci_high = est + 1.96 * se,
+          p_val = p_val
+        )
+      }
+    }, error = function(e) {})
+  }
+}
+
+dt_plot <- rbindlist(results_list)
+dt_plot[, Stage := factor(Stage, levels = c("HR Stage", "Engineer Stage"))]
+dt_plot[, sig_stars := fcase(
+  p_val < 0.01, "***",
+  p_val < 0.05, "**",
+  p_val < 0.10, "*",
+  default = ""
+)]
+
+p_obj <- ggplot(dt_plot, aes(x = k, y = estimate, color = Stage)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.8) +
+  geom_pointrange(aes(ymin = ci_low, ymax = ci_high),
+                  linewidth = 0.8, size = 0.6, fatten = 3) +
+  geom_text(aes(y = ci_high, label = sig_stars),
+            vjust = -0.5, size = 5, color = "black", show.legend = FALSE) +
+  facet_wrap(~ Stage, ncol = 2) +
+  scale_color_manual(values = c("HR Stage" = "#C44E52", "Engineer Stage" = "#4C72B0")) +
+  scale_x_continuous(breaks = 1:18, name = "Selection threshold $k$") +
+  labs(
+    subtitle = "Per-k change in the within-respondent LPM slope of selection on true coding ability under blinding (treat::blind x true_coding_z coefficient)",
+    y       = "Slope shift in P(selected at top-k) per 1 SD true coding (blind - nonblind)",
+    caption = "LPM with respondent FE + display-order (r_do) FE; two-way clustered SE on (respondent, resume). Resume-content FE intentionally not absorbed (would kill the true_coding_z slope). Positive: blinding tightens the link between true coding ability and being selected at top-k. Significance: * p<0.10, ** p<0.05, *** p<0.01."
+  ) +
+  theme_bw() +
+  theme(
+    legend.position    = "none",
+    plot.subtitle      = element_text(size = 9, color = "gray30"),
+    strip.text         = element_text(face = "bold", size = 12),
+    panel.grid.minor.x = element_blank(),
+    axis.title.x       = element_text(margin = margin(t = 10)),
+    axis.title.y       = element_text(margin = margin(r = 10)),
+    plot.caption       = element_text(size = 8, hjust = 0)
+  )
+print(p_obj)
+
+## ---------------------------------------------------------------------------
+## Underlying per-k coefficient table.
+## ---------------------------------------------------------------------------
+dt_plot[, cell := fmt_te_vec(estimate, se)]
+tbl <- dcast(dt_plot, k ~ Stage, value.var = "cell")
+setnames(tbl, "k", "$k$")
+
+rm(results_list, dt_plot, tbl, p_obj, k,
+   hr_col, eng_col, m_hr, m_eng, ct, key, est, se, p_val)
+```
+
+
+\clearpage
+## Alternative B: Evaluator-Level Rank Correlation (``Accuracy Score'')
+
+Both prior alternatives still operate on the resume-evaluator long panel. Alternative B collapses that panel to one number per evaluator and asks a different but complementary question: across the 18 resumes a single evaluator rated, \emph{how well does their overall ranking of those 18 resumes line up with the objective ranking by lab coding score?} For each respondent $r$ we compute
+\vspace{-0.7em}
+$$
+\rho_r \;=\; \mathrm{cor}\!\Big(\,\mathrm{rank}\big(\widehat{\text{sc\_overall}}_{r,\cdot}\big),\;\mathrm{rank}(\text{overall\_score}_{\cdot})\,\Big)\;\in\;[-1,+1],
+$$
+
+\vspace{-0.6em}
+the Spearman rank correlation between the evaluator's overall ratings (\texttt{sc\_overall\_z}) and the resumes' objective lab coding scores (\texttt{overall\_score}). $\rho_r{=}{+}1$ means the evaluator's ranking is identical to the objective ranking; $\rho_r{=}0$ means pure noise; $\rho_r{=}{-}1$ means perfectly inverted. Spearman is rank-based, so the choice between raw and standardized versions of either input is irrelevant. We then regress the Fisher-$z$ transform $\tilde\rho_r = \tanh^{-1}(\rho_r)$ (variance-stabilized, unbounded) on treatment and a moderator:
+
+\vspace{-0.5em}
+$$
+\tilde\rho_r \;\sim\; \mathbbm{1}[\text{Blind}]_r \times \text{Moderator}_r + \text{controls},\qquad \text{HC1 robust SEs.}
+$$
+
+\vspace{-0.6em}
+Each observation is one evaluator (one row), so no clustering is needed --- independence is by design. \texttt{Blind} positive $\Rightarrow$ blinding raises rank-alignment with truth on average; \texttt{Blind}~$\times$~M nonzero $\Rightarrow$ that improvement varies with the moderator.
+
+```{r alt_b_evaluator_accuracy, echo=FALSE, results='asis', warning=FALSE, message=FALSE, fig.width=10, fig.height=4.2}
+
+if (!"firm_targets_fh" %in% names(firm_long_dt)) {
+  firm_long_dt[, firm_targets_fh := as.integer(
+    firm_targets_female == 1L | firm_targets_hispanic == 1L)]
+}
+
+## ---------------------------------------------------------------------------
+## Step 1: One Spearman accuracy score per (responseid, role).
+## Drop respondents with too few non-missing rating-truth pairs to compute a
+## stable correlation (need at least 5 paired observations).
+## ---------------------------------------------------------------------------
+acc_dt <- firm_long_dt[
+  !is.na(sc_overall_z) & !is.na(overall_score),
+  .(accuracy = suppressWarnings(cor(sc_overall_z, overall_score, method = "spearman")),
+    n_resumes = .N),
+  by = .(responseid, role)
+]
+acc_dt <- acc_dt[n_resumes >= 5 & !is.na(accuracy)]
+
+## Fisher z-transform (clip to +/-0.999 so atanh stays finite). At 18 paired
+## resumes per evaluator, ties are rare and rho almost never hits the bounds,
+## but the clip is the safe default.
+acc_dt[, accuracy_fz := atanh(pmax(pmin(accuracy, 0.999), -0.999))]
+
+## ---------------------------------------------------------------------------
+## Step 2: Merge respondent-level moderators / controls. Each responseid
+## maps to exactly one role, so unique() collapses cleanly.
+## ---------------------------------------------------------------------------
+resp_attrs <- unique(firm_long_dt[, .(responseid, treat, dei_index_z, firm_targets_fh,
+                                       misalign_z, resp_age, resp_gender, resp_race,
+                                       s2_educ, s2_income, q_version,
+                                       resp_python, resp_java)])
+acc_dt <- acc_dt[resp_attrs, on = "responseid", nomatch = NULL]
+
+acc_hr  <- acc_dt[role == "HR"]
+acc_eng <- acc_dt[role == "Eng"]
+
+## ---------------------------------------------------------------------------
+## Step 3: Eight respondent-level OLS models (HR/Eng x Pooled+3 het). Light
+## FE structure (q_version + resp_python/java for Eng) given the small per-
+## role sample (~137 HR / ~154 Eng). HC1 robust SE, no clustering.
+## ---------------------------------------------------------------------------
+## Standard demographic Respondent Characteristics (resp_gender + resp_race
+## + s2_educ + s2_income) absorbed in BOTH HR and Eng specs for parallelism
+## with §1, §2, §3, §5 conventions. Eng additionally absorbs the coding-
+## language FEs (resp_python, resp_java), which are Eng-only survey items
+## and don't exist for HR respondents.
+m_hr_pool <- feols(accuracy_fz ~ i(treat, ref = "nonblind") + resp_age
+                   | q_version + resp_gender + resp_race + s2_educ + s2_income,
+                   data = acc_hr, vcov = "hetero")
+m_hr_dei  <- feols(accuracy_fz ~ i(treat, ref = "nonblind") * dei_index_z + resp_age
+                   | q_version + resp_gender + resp_race + s2_educ + s2_income,
+                   data = acc_hr[!is.na(dei_index_z)], vcov = "hetero")
+m_hr_ft   <- feols(accuracy_fz ~ i(treat, ref = "nonblind") * firm_targets_fh + resp_age
+                   | q_version + resp_gender + resp_race + s2_educ + s2_income,
+                   data = acc_hr[!is.na(firm_targets_fh)], vcov = "hetero")
+m_hr_ms   <- feols(accuracy_fz ~ i(treat, ref = "nonblind") * misalign_z + resp_age
+                   | q_version + resp_gender + resp_race + s2_educ + s2_income,
+                   data = acc_hr[!is.na(misalign_z)], vcov = "hetero")
+
+m_eng_pool <- feols(accuracy_fz ~ i(treat, ref = "nonblind") + resp_age
+                    | q_version + resp_gender + resp_race + s2_educ + s2_income + resp_python + resp_java,
+                    data = acc_eng, vcov = "hetero")
+m_eng_dei  <- feols(accuracy_fz ~ i(treat, ref = "nonblind") * dei_index_z + resp_age
+                    | q_version + resp_gender + resp_race + s2_educ + s2_income + resp_python + resp_java,
+                    data = acc_eng[!is.na(dei_index_z)], vcov = "hetero")
+m_eng_ft   <- feols(accuracy_fz ~ i(treat, ref = "nonblind") * firm_targets_fh + resp_age
+                    | q_version + resp_gender + resp_race + s2_educ + s2_income + resp_python + resp_java,
+                    data = acc_eng[!is.na(firm_targets_fh)], vcov = "hetero")
+m_eng_ms   <- feols(accuracy_fz ~ i(treat, ref = "nonblind") * misalign_z + resp_age
+                    | q_version + resp_gender + resp_race + s2_educ + s2_income + resp_python + resp_java,
+                    data = acc_eng[!is.na(misalign_z)], vcov = "hetero")
+
+## ---------------------------------------------------------------------------
+## Step 4a: Distribution plot of raw rho by treat x role
+## ---------------------------------------------------------------------------
+acc_plot <- copy(acc_dt)
+acc_plot[, role_lab := factor(role, levels = c("HR", "Eng"),
+                              labels = c("HR Stage", "Engineer Stage"))]
+acc_means <- acc_plot[, .(mean_acc = mean(accuracy)), by = .(role_lab, treat)]
+
+p_obj <- ggplot(acc_plot, aes(x = accuracy, fill = treat, color = treat)) +
+  geom_density(alpha = 0.35, linewidth = 0.6) +
+  geom_vline(data = acc_means,
+             aes(xintercept = mean_acc, color = treat),
+             linetype = "dashed", linewidth = 0.6) +
+  facet_wrap(~ role_lab, ncol = 2) +
+  scale_color_manual(values = c("nonblind" = "#C44E52", "blind" = "#4C72B0"),
+                     name = "Treatment") +
+  scale_fill_manual( values = c("nonblind" = "#C44E52", "blind" = "#4C72B0"),
+                     name = "Treatment") +
+  scale_x_continuous(limits = c(-1, 1), breaks = seq(-1, 1, 0.25)) +
+  labs(
+    subtitle = "Distribution of evaluator-level Accuracy Score (Spearman rho between sc_overall_z and overall_score across 18 resumes)",
+    x = "Accuracy Score (Spearman rho)",
+    y = "Density",
+    caption = "Dashed lines: arm-specific means. rho > 0 = evaluator's overall ranking aligns with objective coding ability; rho < 0 = anti-aligned."
+  ) +
+  theme_bw() +
+  theme(
+    legend.position    = "bottom",
+    plot.subtitle      = element_text(size = 9, color = "gray30"),
+    strip.text         = element_text(face = "bold", size = 11),
+    panel.grid.minor   = element_blank(),
+    plot.caption       = element_text(size = 8, hjust = 0)
+  )
+print(p_obj)
+
+## ---------------------------------------------------------------------------
+## Step 4b: Combined modelsummary table (8 columns)
+## ---------------------------------------------------------------------------
+models_list <- list(
+  "(1) Pool"     = m_hr_pool,
+  "(2) DEI"      = m_hr_dei,
+  "(3) FirmTgt"  = m_hr_ft,
+  "(4) Misalign" = m_hr_ms,
+  "(5) Pool"     = m_eng_pool,
+  "(6) DEI"      = m_eng_dei,
+  "(7) FirmTgt"  = m_eng_ft,
+  "(8) Misalign" = m_eng_ms
+)
+
+## Multiple raw moderator names share display rows so DEI/FT/Misalign
+## triples line up.
+coef_map <- c(
+  "treat::blind"                  = "Blind",
+  "dei_index_z"                   = "M (moderator)",
+  "firm_targets_fh"               = "M (moderator)",
+  "misalign_z"                    = "M (moderator)",
+  "dei_index_z:treat::blind"      = "Blind $\\times$ M",
+  "firm_targets_fh:treat::blind"  = "Blind $\\times$ M",
+  "misalign_z:treat::blind"       = "Blind $\\times$ M",
+  "resp_age"                      = "Resp. age"
+)
+
+## ---------------------------------------------------------------------------
+## FE / GoF scaffolding per project convention. Alt B is respondent-level
+## (one obs per evaluator), so r_do (display-order) and resume_id (resume
+## content) FEs are not applicable -- still listed with X for transparency.
+## ---------------------------------------------------------------------------
+chk <- "\\checkmark"
+nox <- "$\\times$"
+## Standard unified 5-row FE block. Eng coding-language FEs (resp_python,
+## resp_java) are bundled INTO row 5 ("Respondent Age + Demographic FEs")
+## per project convention, since they are respondent-level traits absorbed
+## together with gender/race/education/income.
+fe_rows <- data.frame(
+  term = c("Display Position FE",
+           "Resume ID FE",
+           "Resume - Coding Test Version FE",
+           "Respondent ID FE",
+           "Respondent Age (Cont) and Demographic FEs"),
+  V1 = c(nox, nox, chk, nox, chk),
+  V2 = c(nox, nox, chk, nox, chk),
+  V3 = c(nox, nox, chk, nox, chk),
+  V4 = c(nox, nox, chk, nox, chk),
+  V5 = c(nox, nox, chk, nox, chk),
+  V6 = c(nox, nox, chk, nox, chk),
+  V7 = c(nox, nox, chk, nox, chk),
+  V8 = c(nox, nox, chk, nox, chk),
+  stringsAsFactors = FALSE
+)
+names(fe_rows) <- c("term", names(models_list))
+## Coef block: 4 unique display labels x (est+se separate lines) = 8 rows.
+## Inject 5 FE rows immediately after at positions 9:13.
+attr(fe_rows, "position") <- 9:13
+
+gof_map <- list(
+  list("raw" = "nobs",         "clean" = "Obs.",       "fmt" = function(x) format(x, big.mark = ",")),
+  list("raw" = "r.squared",    "clean" = "$R^2$",      "fmt" = function(x) sprintf("%.3f", x)),
+  list("raw" = "adj.r.squared","clean" = "Adj. $R^2$", "fmt" = function(x) sprintf("%.3f", x))
+)
+
+ms_tex <- modelsummary(
+  models_list,
+  output   = "kableExtra",
+  coef_map = coef_map,
+  gof_map  = gof_map,
+  add_rows = fe_rows,
+  stars    = c("*" = 0.10, "**" = 0.05, "***" = 0.01),
+  escape   = FALSE,
+  align    = paste0("l", strrep("c", length(models_list))),
+  title    = "Alternative B --- Evaluator-Level Accuracy Score: Fisher-z transformed Spearman rank correlation between the evaluator's overall ratings and resumes' objective lab coding scores across the 18 resumes they rated. OLS with HC1 robust SEs in parentheses; one observation per evaluator (no clustering). Resume-content / Display Position / Respondent FEs not applicable (respondent-level regression). Standard demographic Respondent Characteristics (resp\\_gender, resp\\_race, s2\\_educ, s2\\_income) absorbed in both HR and Eng specs. Eng additionally absorbs coding-language FEs (resp\\_python, resp\\_java), which are Eng-only survey items."
+) |> kableExtra::kable_styling(
+       latex_options = c("HOLD_position", "scale_down"),
+       font_size = 7
+     ) |> kableExtra::add_header_above(
+       c(" " = 1, "HR" = 4, "Engineer" = 4)
+     ) |> kableExtra::row_spec(8,  extra_latex_after = "\\midrule") |>
+        kableExtra::row_spec(13, extra_latex_after = "\\midrule")
+print(ms_tex)
+
+rm(acc_dt, acc_hr, acc_eng, acc_plot, acc_means, resp_attrs,
+   m_hr_pool, m_hr_dei, m_hr_ft, m_hr_ms,
+   m_eng_pool, m_eng_dei, m_eng_ft, m_eng_ms,
+   models_list, coef_map, gof_map, fe_rows, chk, nox, ms_tex, p_obj)
+```
+
+
+\clearpage
+# Within-Session Demographic Calibration (Robustness)
+
+```{r anchoring_setup, echo=FALSE, results='asis', warning=FALSE, message=FALSE}
+## Build running same-demo and other-demo means of objective overall_score
+## (using TRUE assigned race-gender, so the variable is well-defined under
+## both arms). lag_*_z are z-scored within sample.
+firm_long_dt[, true_rg_anchor := factor(as.character(true_race_gender),
+  levels = c("White_Male","White_Female","Asian_Male","Asian_Female",
+             "Hispanic_Male","Hispanic_Female"))]
+setorder(firm_long_dt, responseid, r_do)
+
+firm_long_dt[, lag_same_sum   := 0]
+firm_long_dt[, lag_same_count := 0L]
+firm_long_dt[, lag_diff_sum   := 0]
+firm_long_dt[, lag_diff_count := 0L]
+for (rid in unique(firm_long_dt$responseid)) {
+  idx <- which(firm_long_dt$responseid == rid)
+  if (length(idx) < 2) next
+  rg <- as.character(firm_long_dt$true_rg_anchor[idx])
+  sc <- firm_long_dt$overall_score[idx]
+  for (j in 2:length(idx)) {
+    prev <- seq_len(j - 1)
+    same <- which(rg[prev] == rg[j])
+    diff <- which(rg[prev] != rg[j])
+    firm_long_dt$lag_same_sum  [idx[j]] <- sum(sc[prev[same]], na.rm = TRUE)
+    firm_long_dt$lag_same_count[idx[j]] <- sum(!is.na(sc[prev[same]]))
+    firm_long_dt$lag_diff_sum  [idx[j]] <- sum(sc[prev[diff]], na.rm = TRUE)
+    firm_long_dt$lag_diff_count[idx[j]] <- sum(!is.na(sc[prev[diff]]))
+  }
+}
+firm_long_dt[, lag_same_avg := fifelse(lag_same_count > 0, lag_same_sum / lag_same_count, NA_real_)]
+firm_long_dt[, lag_diff_avg := fifelse(lag_diff_count > 0, lag_diff_sum / lag_diff_count, NA_real_)]
+firm_long_dt[, lag_same_z   := as.numeric(scale(lag_same_avg))]
+firm_long_dt[, lag_diff_z   := as.numeric(scale(lag_diff_avg))]
+firm_long_dt[, blind        := as.integer(treat == "blind")]
+```
+
+\vspace{-0.5em}
+
+## Spec 1: Does Demographic-Conditional Anchoring Exist?
+
+\textbf{Question:} Does the running mean of objective coding ability among \emph{same-demographic} candidates seen earlier in the session predict the current candidate's evaluation score? `lag_diff_z' (other-demographic running mean) is the placebo.
+
+```{r anchoring_spec1, echo=FALSE, results='asis', warning=FALSE, message=FALSE}
+fit_spec1 <- function(role_lab, sample_label) {
+  d <- if (sample_label == "nonblind") {
+         firm_long_dt[role == role_lab & treat == "nonblind" & !is.na(lag_same_z) & !is.na(lag_diff_z)]
+       } else {
+         firm_long_dt[role == role_lab & treat == "blind" & !is.na(lag_same_z) & !is.na(lag_diff_z)]
+       }
+  fe_extra <- if (role_lab == "Eng") " + resp_python + resp_java" else ""
+  fml <- if (sample_label == "nonblind") {
+    sprintf("sc_overall_z ~ lag_same_z + lag_diff_z + i(true_rg_anchor, ref='White_Male') + resp_age | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income%s", fe_extra)
+  } else {
+    sprintf("sc_overall_z ~ lag_same_z + lag_diff_z + resp_age | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income%s", fe_extra)
+  }
+  feols(as.formula(fml), data = d, vcov = ~ responseid)
+}
+
+m1_hr_nb  <- fit_spec1("HR",  "nonblind")
+m1_eng_nb <- fit_spec1("Eng", "nonblind")
+m1_hr_b   <- fit_spec1("HR",  "blind")
+m1_eng_b  <- fit_spec1("Eng", "blind")
+
+models_s1 <- list("HR (nonblind)" = m1_hr_nb, "Eng (nonblind)" = m1_eng_nb,
+                  "HR (blind, placebo)" = m1_hr_b, "Eng (blind, placebo)" = m1_eng_b)
+
+coef_map_s1 <- c("lag_same_z" = "Same-Demo Prior Mean (Z)",
+                 "lag_diff_z" = "Other-Demo Prior Mean (Z, placebo)")
+
+gof_s1 <- tribble(~raw, ~clean, ~fmt,
+  "nobs",          "Observations", 0,
+  "r.squared",     "R$^2$",        3,
+  "adj.r.squared", "Adj. R$^2$",   3)
+
+modelsummary(models_s1,
+  stars    = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  coef_map = coef_map_s1,
+  gof_map  = gof_s1,
+  escape   = FALSE,
+  output   = "kableExtra"
+) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 8) %>%
+  footnote(general = "Standard errors clustered by respondent. Sample: rows with $r\\_do \\geq 2$ and at least one prior of the indicated demographic class.",
+           general_title = "", threeparttable = TRUE,
+           footnote_as_chunk = FALSE, escape = FALSE)
+
+rm(m1_hr_nb, m1_eng_nb, m1_hr_b, m1_eng_b, models_s1, coef_map_s1, gof_s1, fit_spec1)
+```
+
+\vspace{0.3em}
+
+## Spec 3: Are the §1.1 ATEs Robust to Lag Controls?
+
+\textbf{Question:} If we add the Spec-1 lag controls to the §1.1 race-gender regression (full sample), do the demographic ATEs shrink? Both columns per role run on the same restricted sample (rows with both lags non-NA) so the comparison is purely about specification.
+
+```{r anchoring_spec3, echo=FALSE, results='asis', warning=FALSE, message=FALSE}
+flip <- function(m) { m$coefficients <- -1 * m$coefficients; m }
+
+fit_base <- function(role_lab) {
+  fe_extra <- if (role_lab == "Eng") " + resp_python + resp_java" else ""
+  feols(as.formula(sprintf(
+    "sc_overall_z ~ i(race_gender, ref='Blind') + resp_age | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income%s",
+    fe_extra)),
+    data = firm_long_dt[role == role_lab & !is.na(lag_same_z) & !is.na(lag_diff_z)],
+    vcov = ~ responseid)
+}
+fit_lag <- function(role_lab) {
+  fe_extra <- if (role_lab == "Eng") " + resp_python + resp_java" else ""
+  feols(as.formula(sprintf(
+    "sc_overall_z ~ i(race_gender, ref='Blind') + lag_same_z + lag_diff_z + resp_age | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income%s",
+    fe_extra)),
+    data = firm_long_dt[role == role_lab & !is.na(lag_same_z) & !is.na(lag_diff_z)],
+    vcov = ~ responseid)
+}
+
+m3_hr_base  <- flip(fit_base("HR"));  m3_hr_lag  <- flip(fit_lag("HR"))
+m3_eng_base <- flip(fit_base("Eng")); m3_eng_lag <- flip(fit_lag("Eng"))
+
+models_s3 <- list("HR (base)" = m3_hr_base, "HR (with lag)" = m3_hr_lag,
+                  "Eng (base)" = m3_eng_base, "Eng (with lag)" = m3_eng_lag)
+
+coef_map_s3 <- c(
+  "race_gender::White_Male"      = "White Male",
+  "race_gender::White_Female"    = "White Female",
+  "race_gender::Asian_Male"      = "Asian Male",
+  "race_gender::Asian_Female"    = "Asian Female",
+  "race_gender::Hispanic_Male"   = "Hispanic Male",
+  "race_gender::Hispanic_Female" = "Hispanic Female",
+  "lag_same_z"                   = "Same-Demo Prior Mean (Z)",
+  "lag_diff_z"                   = "Other-Demo Prior Mean (Z)"
+)
+
+gof_s3 <- tribble(~raw, ~clean, ~fmt,
+  "nobs",          "Observations", 0,
+  "r.squared",     "R$^2$",        3,
+  "adj.r.squared", "Adj. R$^2$",   3)
+
+modelsummary(models_s3,
+  stars    = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  coef_map = coef_map_s3,
+  gof_map  = gof_s3,
+  escape   = FALSE,
+  output   = "kableExtra"
+) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 8) %>%
+  add_header_above(c(" " = 1,
+                     "Resume-Screening Phase" = 2,
+                     "Technical-Evaluation Phase" = 2)) %>%
+  footnote(general = "Coefficients sign-flipped post-fit so positive = effect of blinding raises the score for that demographic. Standard errors clustered by respondent. Same restricted sample for base and lag-controlled columns within each role.",
+           general_title = "", threeparttable = TRUE,
+           footnote_as_chunk = FALSE, escape = FALSE)
+
+rm(m3_hr_base, m3_hr_lag, m3_eng_base, m3_eng_lag,
+   models_s3, coef_map_s3, gof_s3, fit_base, fit_lag, flip)
+```
+

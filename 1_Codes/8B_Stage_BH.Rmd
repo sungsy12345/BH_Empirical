@@ -617,15 +617,13 @@ run_section_cont <- function(age_terms, pos_fe, file_suffix, header_label) {
   ## plot region (not the data panel), so titles in the left column are not
   ## pushed off-center by the y-axis text/title that occupies ax_gpa.
   fig_hr <- (panels_hr$rg_gpa + panels_hr$rg_cod) /
-            (panels_hr$ax_gpa + panels_hr$ax_cod) /
-            (panels_hr$ut_gpa + panels_hr$ut_cod) +
+            (panels_hr$ax_gpa + panels_hr$ax_cod) +
             plot_layout(guides = "collect") &
             theme(legend.position    = "top",
                   plot.title.position = "plot",
                   plot.title          = element_text(face = "bold", size = 9, hjust = 0.5))
   fig_eng <- (panels_eng$rg_gpa + panels_eng$rg_cod) /
-             (panels_eng$ax_gpa + panels_eng$ax_cod) /
-             (panels_eng$ut_gpa + panels_eng$ut_cod) +
+             (panels_eng$ax_gpa + panels_eng$ax_cod) +
              plot_layout(guides = "collect") &
              theme(legend.position    = "top",
                    plot.title.position = "plot",
@@ -989,7 +987,7 @@ $$
 \end{aligned}
 $$
 \vspace{-1em}
-\enlargethispage{1in}
+\enlargethispage{2.5in}
 
 ```{r signal_substitution_pooled, echo=FALSE, results='asis', warning=FALSE, message=FALSE}
 
@@ -1109,7 +1107,7 @@ ms_tex <- modelsummary(
   align     = "lcc"
 ) |> kableExtra::kable_styling(
        latex_options = c("HOLD_position"),
-       font_size = 7, full_width = FALSE
+       font_size = 6, full_width = FALSE
      ) |> kableExtra::pack_rows("Academic",                  1,  1,  hline_after = FALSE) |>
         kableExtra::pack_rows("Resume Counts",             2,  5,  hline_after = FALSE) |>
         kableExtra::pack_rows("Job Prestige",              6, 10,  hline_after = FALSE) |>
@@ -1177,7 +1175,7 @@ fig_dir <- here("2_Reports", "figures")
 if (!dir.exists(fig_dir)) dir.create(fig_dir, recursive = TRUE)
 plot_file <- file.path(fig_dir, "8B_signal_substitution_sidebyside.pdf")
 suppressMessages(suppressWarnings({
-  ggsave(plot_file, plot = p_obj, width = 4, height = 5.2, device = "pdf")
+  ggsave(plot_file, plot = p_obj, width = 4, height = 4.2, device = "pdf")
 }))
 
 ms_str <- paste(as.character(ms_tex), collapse = "\n")
@@ -1192,6 +1190,8 @@ cat("{\\small \\textit{Blinding: Change in Signal Weights on Evaluator-Assigned 
 cat(ms_str, "\n", sep = "")
 cat("\\end{minipage}\\hfill\n")
 cat("\\begin{minipage}[t]{0.46\\textwidth}\\centering\n")
+cat("\\refstepcounter{figure}\\textbf{Figure~\\thefigure: Signal Substitution}\\par\n")
+cat("{\\small \\textit{Blinding: Change in Signal Weights on Evaluator-Assigned Overall Scores}}\\par\\smallskip\n")
 cat("\\includegraphics[width=\\textwidth]{", plot_file, "}\n", sep = "")
 cat("\\end{minipage}\n")
 cat("```\n")
@@ -1279,12 +1279,7 @@ ms_tex <- modelsummary(
   stars     = c("*" = 0.10, "**" = 0.05, "***" = 0.01),
   escape    = FALSE,
   align     = "lcc",
-  title     = paste(
-    "Internal Rubric Shift --- decomposition of Overall Evaluation Score (Z) into Coding Skill, Fit, and Stay sub-dimension scores and their interactions with Blind.",
-    "Resume\\_ID, Display\\_Order, and Respondent\\_ID FEs absorb all main effects (including the Blind treatment indicator).",
-    "Level coefficients = nonblind weight on each sub-dimension; $\\times$ Blind coefficients = how blinding shifts those weights.",
-    "Two-way clustered SEs on (Respondent\\_ID, Resume\\_ID) in parentheses.",
-    sep = " \\\\ ")
+  title     = "Internal Rubric Shift"
 ) |> kableExtra::kable_styling(
        latex_options = c("HOLD_position"),
        font_size = 8, full_width = FALSE
@@ -2049,244 +2044,6 @@ rm(dt_hr, dt_eng, build_axis, fit_simple, fit_triple, flip,
 
 
 \clearpage
-## By Dichotomy (Majority vs Minority)
-
-```{r bh_dei_combined_urm, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
-## Replicates §4.4 but using the URM-Tech dichotomy (Majority = WM+AM vs.
-## Minority in Tech = WF+AF+HM+HF). Same six specs as §4.4: simple DEI het,
-## triple with Firm Targets Fem/His, and triple with Firm DEI Attn Index (Z).
-## DEI proxy: Index A only. Coefficients flipped post-fit so positive =>
-## effect of blinding raises the score for that group.
-
-dt_hr  <- firm_long_dt[role == "HR"]
-dt_eng <- firm_long_dt[role == "Eng"]
-
-dt_hr [, firm_targets_fh := as.integer(firm_targets_female == 1L | firm_targets_hispanic == 1L)]
-dt_eng[, firm_targets_fh := as.integer(firm_targets_female == 1L | firm_targets_hispanic == 1L)]
-
-build_urm <- function(d) {
-  d[, urm_tech_blind := fcase(
-    treat == "blind",                    "Blind",
-    treat == "nonblind" & urm_tech == 1, "Nonblind_URM",
-    treat == "nonblind" & urm_tech == 0, "Nonblind_NonURM",
-    default = NA_character_)]
-  d[, urm_tech_blind := factor(urm_tech_blind,
-    levels = c("Blind", "Nonblind_NonURM", "Nonblind_URM"))]
-  d
-}
-dt_hr  <- build_urm(dt_hr)
-dt_eng <- build_urm(dt_eng)
-
-fit_simple <- function(d) {
-  extra_fe <- if (any(d$role == "Eng")) " + resp_python + resp_java" else ""
-  fml <- as.formula(paste0(
-    "sc_overall_z ~ dei_index_z + i(urm_tech_blind, ref = 'Blind') + i(urm_tech_blind, dei_index_z, ref = 'Blind') + resp_age | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income",
-    extra_fe))
-  suppressMessages(suppressWarnings(feols(fml, data = d, vcov = ~ responseid)))
-}
-
-fit_triple <- function(d, b) {
-  extra_fe <- if (any(d$role == "Eng")) " + resp_python + resp_java" else ""
-  fml <- as.formula(sprintf(
-    "sc_overall_z ~ dei_index_z + %s + I(dei_index_z * %s) + i(urm_tech_blind, ref = 'Blind') + i(urm_tech_blind, dei_index_z, ref = 'Blind') + i(urm_tech_blind, %s, ref = 'Blind') + i(urm_tech_blind, I(dei_index_z * %s), ref = 'Blind') + resp_age | resume_index + r_do + resp_gender + resp_race + s2_educ + s2_income%s",
-    b, b, b, b, extra_fe))
-  suppressMessages(suppressWarnings(feols(fml, data = d, vcov = ~ responseid)))
-}
-
-flip <- function(m) { m$coefficients <- -1 * m$coefficients; m }
-
-m1 <- flip(fit_simple(dt_hr))
-m2 <- flip(fit_simple(dt_eng))
-m3 <- flip(fit_triple(dt_hr,  "firm_targets_fh"))
-m4 <- flip(fit_triple(dt_eng, "firm_targets_fh"))
-m5 <- flip(fit_triple(dt_hr,  "firm_dei_attention_z"))
-m6 <- flip(fit_triple(dt_eng, "firm_dei_attention_z"))
-
-all_models <- list("HR" = m1, "Engineer" = m2,
-                   "HR " = m3, "Engineer " = m4,
-                   "HR  " = m5, "Engineer  " = m6)
-
-maj_lbl <- "Majority (WM+AM)"
-min_lbl <- "Minority in Tech (WF+AF+HM+HF)"
-
-coef_map <- c(
-  ## --- Block 1: single (level) terms (2 rows) ---
-  "urm_tech_blind::Nonblind_NonURM" = maj_lbl,
-  "urm_tech_blind::Nonblind_URM"    = min_lbl,
-
-  ## --- Block 2: two-way interactions (6 rows) ---
-  ## Axis x Individual DEI Index (Z) (fills all 6 cols)
-  "urm_tech_blind::Nonblind_NonURM:dei_index_z" = paste0(maj_lbl, " $\\times$ Individual DEI Index (Z)"),
-  "urm_tech_blind::Nonblind_URM:dei_index_z"    = paste0(min_lbl, " $\\times$ Individual DEI Index (Z)"),
-  ## Axis x Firm Targets Fem/His (0/1) (cols 3-4 only)
-  "urm_tech_blind::Nonblind_NonURM:firm_targets_fh" = paste0(maj_lbl, " $\\times$ Firm Targets Fem/His (0/1)"),
-  "urm_tech_blind::Nonblind_URM:firm_targets_fh"    = paste0(min_lbl, " $\\times$ Firm Targets Fem/His (0/1)"),
-  ## Axis x Firm DEI Attn Index (Z) (cols 5-6 only)
-  "urm_tech_blind::Nonblind_NonURM:firm_dei_attention_z" = paste0(maj_lbl, " $\\times$ Firm DEI Attn Index (Z)"),
-  "urm_tech_blind::Nonblind_URM:firm_dei_attention_z"    = paste0(min_lbl, " $\\times$ Firm DEI Attn Index (Z)"),
-
-  ## --- Block 3: three-way interactions (4 rows) ---
-  "urm_tech_blind::Nonblind_NonURM:I(dei_index_z * firm_targets_fh)"      = paste0(maj_lbl, " $\\times$ Individual DEI Index (Z) $\\times$ Firm Targets Fem/His (0/1)"),
-  "urm_tech_blind::Nonblind_URM:I(dei_index_z * firm_targets_fh)"         = paste0(min_lbl, " $\\times$ Individual DEI Index (Z) $\\times$ Firm Targets Fem/His (0/1)"),
-  "urm_tech_blind::Nonblind_NonURM:I(dei_index_z * firm_dei_attention_z)" = paste0(maj_lbl, " $\\times$ Individual DEI Index (Z) $\\times$ Firm DEI Attn Index (Z)"),
-  "urm_tech_blind::Nonblind_URM:I(dei_index_z * firm_dei_attention_z)"    = paste0(min_lbl, " $\\times$ Individual DEI Index (Z) $\\times$ Firm DEI Attn Index (Z)")
-)
-
-gof_custom <- tribble(
-  ~raw,            ~clean,        ~fmt,
-  "nobs",          "Observations", 0
-)
-
-chk <- "\\checkmark"
-nox <- "$\\times$"
-fe_rows <- data.frame(
-  term = c("Display Position FE",
-           "Resume ID FE",
-           "Resume - Coding Test Version FE",
-           "Respondent ID FE",
-           "Respondent Age (Cont) and Demographic FEs"),
-  V1 = c(chk, chk, nox, nox, chk), V2 = c(chk, chk, nox, nox, chk),
-  V3 = c(chk, chk, nox, nox, chk), V4 = c(chk, chk, nox, nox, chk),
-  V5 = c(chk, chk, nox, nox, chk), V6 = c(chk, chk, nox, nox, chk),
-  stringsAsFactors = FALSE
-)
-names(fe_rows) <- c("term", names(all_models))
-## 12 coefs * 2 (est+se) = 24 rows; FE rows (5) sit at 25:29.
-attr(fe_rows, "position") <- 25:29
-
-modelsummary(
-  all_models,
-  stars    = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
-  coef_map = coef_map,
-  gof_map  = gof_custom,
-  add_rows = fe_rows,
-  escape   = FALSE,
-  output   = "kableExtra"
-) %>%
-  kable_styling(latex_options = "HOLD_position", font_size = 7) %>%
-  add_header_above(c(" " = 1,
-                     "Simple DEI Heterogeneity" = 2,
-                     "Triple: Firm Targets URM" = 2,
-                     "Triple: Firm Pays DEI Attention" = 2)) %>%
-  ## Block boundaries (dashed) and FE / fitstat boundaries (solid).
-  ## Two-way block: 4 (after single) | 8 (after Axis x DEI) | 12 (after Axis x FT) | 16 (end of two-way).
-  ## Three-way block: 20 (after Axis x DEI x FT) | 24 (end of three-way / before FE).
-  row_spec(4,  extra_latex_after = "\\hdashline") %>%
-  row_spec(8,  extra_latex_after = "\\hdashline") %>%
-  row_spec(12, extra_latex_after = "\\hdashline") %>%
-  row_spec(16, extra_latex_after = "\\hdashline") %>%
-  row_spec(20, extra_latex_after = "\\hdashline") %>%
-  row_spec(24, extra_latex_after = "\\midrule") %>%
-  row_spec(29, extra_latex_after = "\\midrule") %>%
-  footnote(general = "Standard errors clustered by respondent.",
-           general_title = "", threeparttable = TRUE,
-           footnote_as_chunk = FALSE, escape = FALSE)
-
-## ---------------------------------------------------------------------------
-## Scissors plot for cols 3-4 of the §4.5 table (HR & Eng triple with Firm
-## Targets URM), 2x2 grid: Majority / Minority in Tech, by HR / Eng.
-## ---------------------------------------------------------------------------
-cf_hr  <- coef(m3);  V_hr  <- vcov(m3)
-cf_eng <- coef(m4);  V_eng <- vcov(m4)
-
-cells_45 <- list()
-cells_45[[maj_lbl]] <- c(
-  level  = "urm_tech_blind::Nonblind_NonURM",
-  dei    = "urm_tech_blind::Nonblind_NonURM:dei_index_z",
-  ft     = "urm_tech_blind::Nonblind_NonURM:firm_targets_fh",
-  triple = "urm_tech_blind::Nonblind_NonURM:I(dei_index_z * firm_targets_fh)"
-)
-cells_45[[min_lbl]] <- c(
-  level  = "urm_tech_blind::Nonblind_URM",
-  dei    = "urm_tech_blind::Nonblind_URM:dei_index_z",
-  ft     = "urm_tech_blind::Nonblind_URM:firm_targets_fh",
-  triple = "urm_tech_blind::Nonblind_URM:I(dei_index_z * firm_targets_fh)"
-)
-
-dei_grid <- seq(-2, 2, length.out = 41)
-plot_dt <- as.data.table(expand.grid(role  = c("HR", "Eng"),
-                                     group = names(cells_45),
-                                     DEI   = dei_grid,
-                                     FT    = c(0, 1),
-                                     stringsAsFactors = FALSE))
-plot_dt[, c("est", "se") := {
-  ix <- unname(cells_45[[group]])
-  v  <- c(1, DEI, FT, DEI * FT)
-  cf <- if (role == "HR") cf_hr else cf_eng
-  V  <- if (role == "HR") V_hr  else V_eng
-  list(sum(cf[ix] * v),
-       sqrt(c(v %*% V[ix, ix] %*% v)))
-}, by = .(role, group, DEI, FT)]
-plot_dt[, ':='(lwr = est - 1.96 * se, upr = est + 1.96 * se)]
-plot_dt[, FT_label := factor(FT, levels = c(0, 1),
-                              labels = c("Firm does NOT target URM",
-                                         "Firm targets URM"))]
-plot_dt[, group := factor(group, levels = c(maj_lbl, min_lbl))]
-plot_dt[, role := factor(role, levels = c("HR", "Eng"))]
-
-y_lim <- range(c(plot_dt$lwr, plot_dt$upr)) * 1.05
-panel_letters <- setNames(c("A", "B"), c(maj_lbl, min_lbl))
-
-scissors_panel <- function(rl, grp) {
-  d <- plot_dt[role == rl & group == grp]
-  ggplot(d, aes(x = DEI, y = est, color = FT_label, fill = FT_label, linetype = FT_label)) +
-    annotate("rect", xmin = -2, xmax = 2, ymin = 0,        ymax = y_lim[2], fill = "#e8f4ea", alpha = 0.4) +
-    annotate("rect", xmin = -2, xmax = 2, ymin = y_lim[1], ymax = 0,        fill = "#fbeaea", alpha = 0.4) +
-    geom_hline(yintercept = 0, linetype = "dashed", color = "gray30", linewidth = 0.4) +
-    geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.15, color = NA) +
-    geom_line(linewidth = 1) +
-    annotate("text", x = 0, y = y_lim[2] * 0.93, label = "Blinding helps",
-             hjust = 0.5, vjust = 1, size = 2.4, fontface = "italic", color = "darkgreen") +
-    annotate("text", x = 0, y = y_lim[1] * 0.93, label = "Blinding hurts",
-             hjust = 0.5, vjust = 0, size = 2.4, fontface = "italic", color = "darkred") +
-    scale_color_manual(values = c("Firm does NOT target URM" = "firebrick",
-                                  "Firm targets URM"        = "steelblue")) +
-    scale_fill_manual(values  = c("Firm does NOT target URM" = "firebrick",
-                                  "Firm targets URM"        = "steelblue")) +
-    scale_linetype_manual(values = c("Firm does NOT target URM" = "dashed",
-                                     "Firm targets URM"        = "solid")) +
-    coord_cartesian(xlim = c(-2, 2), ylim = y_lim) +
-    labs(title = paste0("Panel ", panel_letters[grp],
-                        ifelse(rl == "HR", "1", "2"), ": ",
-                        rl, " --- ", grp),
-         x = paste0(rl, " Evaluator's Individual DEI Index (Z)"),
-         y = "Effect of Blinding (Δ Overall Z-Score)",
-         color = NULL, fill = NULL, linetype = NULL) +
-    theme_bw(base_size = 8) +
-    theme(legend.position = "bottom",
-          plot.title       = element_text(size = 9, face = "bold"),
-          axis.title       = element_text(size = 8),
-          panel.grid.minor = element_blank())
-}
-
-scissors <- (scissors_panel("HR",  maj_lbl) | scissors_panel("HR",  min_lbl)) /
-            (scissors_panel("Eng", maj_lbl) | scissors_panel("Eng", min_lbl)) +
-  plot_layout(guides = "collect") &
-  theme(legend.position = "bottom")
-
-fig_dir <- here("2_Reports", "figures")
-if (!dir.exists(fig_dir)) dir.create(fig_dir, recursive = TRUE)
-plot_file_45 <- file.path(fig_dir, "8B_45_scissors.pdf")
-suppressMessages(suppressWarnings(
-  ggsave(plot_file_45, plot = scissors, width = 8, height = 4.5, device = "pdf")
-))
-
-cat("\\clearpage\n")
-cat("\\begin{center}\n")
-cat("\\includegraphics[width=0.85\\textwidth]{", plot_file_45, "}\n", sep = "")
-cat("\\par\\vspace{0.1em}\n")
-cat("{\\raggedright\\scriptsize Marginal-effects ``scissors'' plot built from the §2.3 columns 3-4 (HR \\& Engineer triple with Firm Targets Fem/His) under the URM-Tech dichotomy. Top row: HR evaluators (Panels A1, B1). Bottom row: Engineer evaluators (Panels A2, B2). Lines: predicted effect of blinding on each group's overall score as a function of the rater's Individual DEI Index (Z); shaded bands are 95\\% CIs (SE clustered by respondent).\\par}\n")
-cat("\\end{center}\n")
-
-rm(dt_hr, dt_eng, build_urm, fit_simple, fit_triple, flip,
-   m1, m2, m3, m4, m5, m6, all_models, coef_map, gof_custom,
-   chk, nox, fe_rows, maj_lbl, min_lbl,
-   cf_hr, V_hr, cf_eng, V_eng, cells_45, dei_grid, plot_dt, y_lim,
-   panel_letters, scissors_panel, scissors, fig_dir, plot_file_45)
-```
-
-
-\clearpage
 ```{r perception_triple_helpers, echo = FALSE, warning = FALSE, message = FALSE}
 ## Shared §8 helpers: fit + flip + scissors-data + scissors-plot.
 
@@ -2765,123 +2522,12 @@ rm(m1, m2, m3, m4, all_models, demos, demo_lbls, fcol,
 ```
 
 
-\clearpage
-## By Dichotomy (Majority vs Minority)
-
-```{r perception_dir_utech, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
-demos     <- c("Nonblind_NonURM", "Nonblind_URM")
-demo_lbls <- c("Majority", "URM in Tech")
-fcol      <- "urm_tech_blind"
-
-m1 <- flip(fit_simple_p (dt_hr,  fcol))
-m2 <- flip(fit_simple_p (dt_eng, fcol))
-m3 <- flip(fit_triple_p (dt_hr,  fcol, "dei_index_z"))
-m4 <- flip(fit_triple_p (dt_eng, fcol, "dei_index_z"))
-
-all_models <- list("HR" = m1, "Engineer" = m2,
-                   "HR " = m3, "Engineer " = m4)
-
-coef_map <- c(
-  setNames(demo_lbls, paste0(fcol, "::", demos)),
-  setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z)"),
-           paste0(fcol, "::", demos, ":perc_role")),
-  setNames(paste0(demo_lbls, " $\\times$ Own DEI Index (Z)"),
-           paste0(fcol, "::", demos, ":dei_index_z")),
-  setNames(paste0(demo_lbls, " $\\times$ Dir Idx (Z) $\\times$ Own DEI Index (Z)"),
-           paste0(fcol, "::", demos, ":I(perc_role * dei_index_z)"))
-)
-
-gof_custom <- tribble(
-  ~raw,                 ~clean,                  ~fmt,
-  "nobs",               "Observations",          0,
-  "r.squared",          "R$^2$",                 3,
-  "adj.r.squared",      "Adj. R$^2$",            3,
-  "r2.within",          "R$^2$ Within",          3,
-  "r2.within.adjusted", "Adj. R$^2$ Within",     3
-)
-chk <- "\\checkmark"; nox <- "$\\times$"
-fe_rows <- data.frame(
-  term = c("Display Position FE",
-           "Resume ID FE",
-           "Resume - Coding Test Version FE",
-           "Respondent ID FE",
-           "Respondent Age (Cont) and Demographic FEs"),
-  V1 = c(chk, chk, nox, nox, chk), V2 = c(chk, chk, nox, nox, chk),
-  V3 = c(chk, chk, nox, nox, chk), V4 = c(chk, chk, nox, nox, chk),
-  stringsAsFactors = FALSE
-)
-names(fe_rows) <- c("term", names(all_models))
-attr(fe_rows, "position") <- 9:13
-
-modelsummary(
-  all_models,
-  estimate  = "{estimate}{stars} ({std.error})",
-  statistic = NULL,
-  stars     = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
-  coef_map  = coef_map,
-  gof_map   = gof_custom,
-  add_rows  = fe_rows,
-  escape    = FALSE,
-  output    = "kableExtra"
-) %>%
-  kable_styling(latex_options = "HOLD_position", font_size = 9) %>%
-  add_header_above(c(" " = 1,
-                     "Simple Dir Het." = 2,
-                     "Triple: Dir x Own DEI" = 2)) %>%
-  row_spec(2,  extra_latex_after = "\\hdashline") %>%
-  row_spec(4,  extra_latex_after = "\\hdashline") %>%
-  row_spec(6,  extra_latex_after = "\\hdashline") %>%
-  row_spec(8,  extra_latex_after = "\\midrule") %>%
-  row_spec(13, extra_latex_after = "\\midrule") %>%
-  footnote(general = sprintf(
-            "Dir Idx (Z) = signed directional misalignment index. n = %d HR, %d Eng. Coefs flipped post-fit so positive = effect of blinding raises the score. Two-way cluster on responseid and resume index.",
-            n_h_idx, n_e_idx),
-           general_title = "", threeparttable = TRUE,
-           footnote_as_chunk = FALSE, escape = FALSE)
-
-z_grid <- seq(-2, 2, length.out = 41)
-df_dei <- rbind(
-  build_scissors_dt(m3, fcol, "dei_index_z", demos, demo_lbls, "HR",  z_grid, perc_grid = c(-1, 1)),
-  build_scissors_dt(m4, fcol, "dei_index_z", demos, demo_lbls, "Eng", z_grid, perc_grid = c(-1, 1)))
-fig_dei <- make_scissors_grid(df_dei, demo_lbls, "Own DEI Index (Z)",
-                              ncol_panels = 2,
-                              hr_low_label   = "HR perceives Eng overcaring on DEI",
-                              hr_high_label  = "HR perceives Eng undercaring on DEI",
-                              eng_low_label  = "Eng perceives HR underreaching on DEI",
-                              eng_high_label = "Eng perceives HR overreaching on DEI")
-
-fig_dir <- here("2_Reports", "figures")
-plot_file_dei <- file.path(fig_dir, "8B_perception_dir_dei_utech.pdf")
-suppressMessages(suppressWarnings(
-  ggsave(plot_file_dei, plot = fig_dei, width = 8, height = 6.5, device = "pdf")
-))
-
-cat("\\clearpage\n")
-cat("\\begin{center}\\textbf{Dir Idx (signed) $\\times$ Own DEI Index --- URM-Tech Dichotomy}\\par\\vspace{0.1em}\n")
-cat("\\includegraphics[width=0.75\\textwidth]{", plot_file_dei, "}\\par\\vspace{0.1em}\n", sep = "")
-cat("{\\raggedright\\scriptsize Top row: HR (high Dir = compensation conditions). Bottom row: Eng (high Dir = rebellion conditions). Bands = 95\\% CI.\\par}\n")
-cat("\\end{center}\n")
-
-rm(m1, m2, m3, m4, all_models, demos, demo_lbls, fcol,
-   coef_map, gof_custom, chk, nox, fe_rows,
-   z_grid, df_dei, fig_dei,
-   plot_file_dei, fig_dir,
-   fld, dt_hr, dt_eng, resp_dt, eng_items, hr_items, extra_perc,
-   n_h_idx, n_e_idx, z,
-   flip, fit_simple_p, fit_triple_p, build_scissors_dt, make_scissors_grid)
-```
-
 \newpage
 # Treatment Effect on Productivity of Hired (The Efficiency Myth)
 
-\vspace{-0.4em}
-
-\textbf{Signal Extraction Remains Flat (S5.1.):} Removing demographic information (or noise) does \emph{not} meaningfully improve their ability to identify top ability candidates.
-
-\textbf{Quality of Hires Does Not Improve (S5.2.):} Blind hiring has a \emph{null} effect on the actual coding quality of the hired cohort.
-\vspace{-1em}
-
 ## Does Blinding Lead to More Accurate Coding Skill Evaluations?
+
+\textbf{Takeaway:} Removing demographic information (or noise) does \emph{not} meaningfully improve evaluators' ability to identify top-ability candidates --- signal extraction remains flat.
 
 \textcolor{blue}{\textbf{Specification}}:
 \vspace{-0.7em}
@@ -3094,8 +2740,10 @@ fmt_te_vec <- function(est, se) {
 }
 ```
 
+\clearpage
 ## Does Blinding Lead to Selection of More Productive Coders?
 
+\textbf{Takeaway:} Blind hiring has a \emph{null} effect on the actual coding quality of the hired cohort.
 
 ```{r blind_hiring_coding_quality, echo=FALSE, results='asis', warning=FALSE, message=FALSE, fig.width=10, fig.height=5}
 
@@ -3235,13 +2883,6 @@ dt_plot[, cell := fmt_te_vec(estimate, se)]
 tbl <- dcast(dt_plot, k ~ Stage, value.var = "cell")
 setnames(tbl, "k", "$k$")
 
-print(
-  kable(tbl, format = "latex", booktabs = TRUE, escape = FALSE,
-        align = c("c", "c", "c")) %>%
-    kable_styling(latex_options = "HOLD_position",
-                  font_size = 9, full_width = FALSE)
-)
-
 rm(results_list, dt_plot, tbl, p_obj, k,
    hr_col, hr_data, ctrl_mean_hr, ctrl_sd_hr, m_hr, ct,
    eng_col, eng_data, ctrl_mean_eng, ctrl_sd_eng, m_eng,
@@ -3360,15 +3001,6 @@ col_order <- intersect(col_order, names(tbl))
 setcolorder(tbl, col_order)
 disp <- c("$k$", rep(c("HR", "Eng"), times = length(components)))
 setnames(tbl, col_order, disp[seq_along(col_order)])
-
-print(
-  kable(tbl, format = "latex", booktabs = TRUE, escape = FALSE,
-        align = c("c", rep("c", ncol(tbl) - 1L))) %>%
-    kable_styling(latex_options = c("HOLD_position", "scale_down"),
-                  font_size = 7, full_width = FALSE) %>%
-    add_header_above(c(" " = 1, "Test Cases" = 2, "Readability" = 2,
-                       "Time Eff." = 2, "Space Eff." = 2, "Runtime" = 2))
-)
 
 rm(results_list, dt_plot, tbl, p_obj, components, component_lbls, col_order, disp,
    cmp, k, hr_col, hr_data, ctrl_mean_hr, ctrl_sd_hr, m_hr, ct,
@@ -3511,14 +3143,6 @@ disp <- c("$k$",
   "Low (-1 SD)", "Mid (0)", "High (+1 SD)",
   "Low (-1 SD)", "Mid (0)", "High (+1 SD)")
 setnames(tbl, col_order, disp[seq_along(col_order)])
-
-print(
-  kable(tbl, format = "latex", booktabs = TRUE, escape = FALSE,
-        align = c("c", rep("c", ncol(tbl) - 1L))) %>%
-    kable_styling(latex_options = "HOLD_position",
-                  font_size = 8, full_width = FALSE) %>%
-    add_header_above(c(" " = 1, "HR Stage" = 3, "Engineer Stage" = 3))
-)
 
 rm(results_list, dt_plot, tbl, p_obj, dei_pts, dei_lbl, col_order, disp, k,
    hr_col, hr_data, ctrl_mean_hr, ctrl_sd_hr, m_hr,
@@ -3663,14 +3287,6 @@ disp <- c("$k$",
   "Does NOT target", "DOES target")
 setnames(tbl, col_order, disp[seq_along(col_order)])
 
-print(
-  kable(tbl, format = "latex", booktabs = TRUE, escape = FALSE,
-        align = c("c", rep("c", ncol(tbl) - 1L))) %>%
-    kable_styling(latex_options = "HOLD_position",
-                  font_size = 9, full_width = FALSE) %>%
-    add_header_above(c(" " = 1, "HR Stage" = 2, "Engineer Stage" = 2))
-)
-
 rm(results_list, dt_plot, tbl, p_obj, ft_pts, ft_lbl, col_order, disp, k,
    hr_col, hr_data, ctrl_mean_hr, ctrl_sd_hr, m_hr,
    eng_col, eng_data, ctrl_mean_eng, ctrl_sd_eng, m_eng,
@@ -3809,14 +3425,6 @@ disp <- c("$k$",
   "Low (-1 SD)", "Mid (0)", "High (+1 SD)",
   "Low (-1 SD)", "Mid (0)", "High (+1 SD)")
 setnames(tbl, col_order, disp[seq_along(col_order)])
-
-print(
-  kable(tbl, format = "latex", booktabs = TRUE, escape = FALSE,
-        align = c("c", rep("c", ncol(tbl) - 1L))) %>%
-    kable_styling(latex_options = "HOLD_position",
-                  font_size = 8, full_width = FALSE) %>%
-    add_header_above(c(" " = 1, "HR Stage" = 3, "Engineer Stage" = 3))
-)
 
 rm(results_list, dt_plot, tbl, p_obj, ms_pts, ms_lbl, col_order, disp, k,
    hr_col, hr_data, ctrl_mean_hr, ctrl_sd_hr, m_hr,
@@ -3987,18 +3595,6 @@ setcolorder(tbl, col_order)
 disp <- c("$k$", rep(c("L", "M", "H"), times = 6))
 setnames(tbl, col_order, disp[seq_along(col_order)])
 
-print(
-  kable(tbl, format = "latex", booktabs = TRUE, escape = FALSE,
-        align = c("c", rep("c", ncol(tbl) - 1L)),
-        caption = NULL) %>%
-    kable_styling(latex_options = c("HOLD_position", "scale_down"),
-                  font_size = 6, full_width = FALSE) %>%
-    add_header_above(c(" " = 1,
-                       "Low Misalign" = 3, "Mid Misalign" = 3, "High Misalign" = 3,
-                       "Low Misalign" = 3, "Mid Misalign" = 3, "High Misalign" = 3)) %>%
-    add_header_above(c(" " = 1, "HR Stage" = 9, "Engineer Stage" = 9))
-)
-
 rm(results_list, dt_plot, tbl, p_obj,
    dei_pts, dei_lbl, ms_pts, ms_lbl,
    stages_order, ms_order, dei_order, col_order, disp, k,
@@ -4008,656 +3604,4 @@ rm(results_list, dt_plot, tbl, p_obj,
    est, se, d, mm, v, jd, jm)
 ```
 
-
-### Decomposition of Treatment Effect on Productivity
-
-Triple interaction (\texttt{treat} $\times$ \texttt{dei\_index\_z} $\times$ \texttt{misalign\_z}) re-estimated separately for each lab subscore. Each component is plotted on its own page (3-by-2 facet: rows = misalign at $-1/0/+1$ SD, cols = role; within-panel color = DEI level), matching the §4.6 layout exactly.
-
-```{r blind_hiring_coding_quality_by_dei_x_misalign_components, echo=FALSE, results='asis', warning=FALSE, message=FALSE, fig.width=10, fig.height=8}
-
-components     <- c("test_case", "readability", "time_efficiency", "space_efficiency", "runtime")
-component_lbls <- c(test_case        = "Test Cases",
-                    readability      = "Readability",
-                    time_efficiency  = "Time Efficiency",
-                    space_efficiency = "Space Efficiency",
-                    runtime          = "Runtime")
-dei_pts <- c(-1, 0, 1)
-dei_lbl <- c("Low DEI (-1 SD)", "Mid DEI (0)", "High DEI (+1 SD)")
-ms_pts  <- c(-1, 0, 1)
-ms_lbl  <- c("Low Misalign (-1 SD)", "Mid Misalign (0)", "High Misalign (+1 SD)")
-
-results_list <- list()
-
-for (cmp in components) {
-  for (k in 1:18) {
-
-    ## --- HR ---
-    hr_col  <- paste0("hr_pass", k)
-    hr_data <- firm_long_dt[role == "HR" & get(hr_col) == 1 &
-                            !is.na(get(cmp)) & !is.na(dei_index_z) & !is.na(misalign_z)]
-    ctrl_mean_hr <- hr_data[treat == "nonblind", mean(get(cmp), na.rm = TRUE)]
-    ctrl_sd_hr   <- hr_data[treat == "nonblind", sd(get(cmp),   na.rm = TRUE)]
-    if (!is.na(ctrl_sd_hr) && ctrl_sd_hr > 0) {
-      hr_data[, std_outcome := (get(cmp) - ctrl_mean_hr) / ctrl_sd_hr]
-      tryCatch({
-        m_hr <- suppressMessages(suppressWarnings(
-          feols(std_outcome ~ i(treat, ref = "nonblind") * dei_index_z * misalign_z + resp_age |
-                  q_version + resp_gender + resp_race + s2_educ + s2_income,
-                data = hr_data, vcov = ~ responseid)
-        ))
-        cf <- coef(m_hr); V <- vcov(m_hr)
-        idx_main <- match("treat::blind",                        names(cf))
-        idx_dei  <- match("dei_index_z:treat::blind",            names(cf))
-        idx_ms   <- match("misalign_z:treat::blind",             names(cf))
-        idx_dms  <- match("dei_index_z:misalign_z:treat::blind", names(cf))
-        if (!is.na(idx_main)) {
-          for (jd in seq_along(dei_pts)) {
-            for (jm in seq_along(ms_pts)) {
-              d <- dei_pts[jd]; mm <- ms_pts[jm]
-              v <- numeric(length(cf)); v[idx_main] <- 1
-              if (!is.na(idx_dei)) v[idx_dei] <- d
-              if (!is.na(idx_ms))  v[idx_ms]  <- mm
-              if (!is.na(idx_dms)) v[idx_dms] <- d * mm
-              est <- sum(v * cf); se <- sqrt(c(v %*% V %*% v))
-              results_list[[length(results_list) + 1L]] <- data.table(
-                component = component_lbls[cmp], Stage = "HR Stage", k = k,
-                dei_level = dei_lbl[jd], ms_level = ms_lbl[jm],
-                estimate = est, ci_low = est - 1.96 * se, ci_high = est + 1.96 * se
-              )
-            }
-          }
-        }
-      }, error = function(e) {})
-    }
-
-    ## --- Engineer ---
-    eng_col  <- paste0("eng_top", k)
-    eng_data <- firm_long_dt[role == "Eng" & get(eng_col) == 1 &
-                             !is.na(get(cmp)) & !is.na(dei_index_z) & !is.na(misalign_z)]
-    ctrl_mean_eng <- eng_data[treat == "nonblind", mean(get(cmp), na.rm = TRUE)]
-    ctrl_sd_eng   <- eng_data[treat == "nonblind", sd(get(cmp),   na.rm = TRUE)]
-    if (!is.na(ctrl_sd_eng) && ctrl_sd_eng > 0) {
-      eng_data[, std_outcome := (get(cmp) - ctrl_mean_eng) / ctrl_sd_eng]
-      tryCatch({
-        m_eng <- suppressMessages(suppressWarnings(
-          feols(std_outcome ~ i(treat, ref = "nonblind") * dei_index_z * misalign_z + resp_age |
-                  q_version + resp_gender + resp_race + s2_educ + s2_income +
-                  resp_python + resp_java,
-                data = eng_data, vcov = ~ responseid)
-        ))
-        cf <- coef(m_eng); V <- vcov(m_eng)
-        idx_main <- match("treat::blind",                        names(cf))
-        idx_dei  <- match("dei_index_z:treat::blind",            names(cf))
-        idx_ms   <- match("misalign_z:treat::blind",             names(cf))
-        idx_dms  <- match("dei_index_z:misalign_z:treat::blind", names(cf))
-        if (!is.na(idx_main)) {
-          for (jd in seq_along(dei_pts)) {
-            for (jm in seq_along(ms_pts)) {
-              d <- dei_pts[jd]; mm <- ms_pts[jm]
-              v <- numeric(length(cf)); v[idx_main] <- 1
-              if (!is.na(idx_dei)) v[idx_dei] <- d
-              if (!is.na(idx_ms))  v[idx_ms]  <- mm
-              if (!is.na(idx_dms)) v[idx_dms] <- d * mm
-              est <- sum(v * cf); se <- sqrt(c(v %*% V %*% v))
-              results_list[[length(results_list) + 1L]] <- data.table(
-                component = component_lbls[cmp], Stage = "Engineer Stage", k = k,
-                dei_level = dei_lbl[jd], ms_level = ms_lbl[jm],
-                estimate = est, ci_low = est - 1.96 * se, ci_high = est + 1.96 * se
-              )
-            }
-          }
-        }
-      }, error = function(e) {})
-    }
-  }
-}
-
-dt_plot_all <- rbindlist(results_list)
-dt_plot_all[, Stage     := factor(Stage,     levels = c("HR Stage", "Engineer Stage"))]
-dt_plot_all[, component := factor(component, levels = unname(component_lbls))]
-dt_plot_all[, dei_level := factor(dei_level, levels = dei_lbl)]
-dt_plot_all[, ms_level  := factor(ms_level,  levels = ms_lbl)]
-
-## Build a 6-level column factor (Stage x dei_level) so each cell on a page
-## is its own non-overlapping panel; rows are misalign levels. One page per
-## component as before.
-dt_plot_all[, panel_col := factor(
-  paste(Stage, dei_level, sep = " | "),
-  levels = paste(rep(c("HR Stage", "Engineer Stage"), each = length(dei_lbl)),
-                 rep(dei_lbl, 2), sep = " | "))]
-
-for (cmp_lbl in unname(component_lbls)) {
-  dt_p <- dt_plot_all[component == cmp_lbl]
-  p_obj <- ggplot(dt_p, aes(x = k, y = estimate, color = Stage)) +
-    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.5) +
-    geom_pointrange(aes(ymin = ci_low, ymax = ci_high),
-                    linewidth = 0.4, size = 0.18, fatten = 1.5) +
-    facet_grid(ms_level ~ panel_col) +
-    scale_color_manual(values = c("HR Stage" = "#C44E52", "Engineer Stage" = "#4C72B0"),
-                       guide = "none") +
-    scale_x_continuous(breaks = c(1, 6, 12, 18), name = "k") +
-    coord_cartesian(ylim = c(-0.6, 0.6)) +
-    labs(
-      subtitle = sprintf("Triple interaction --- TE on %s by DEI x signed directional misalignment (component standardized per k relative to nonblind). Columns: Stage x DEI level; Rows: Misalign level.", cmp_lbl),
-      y       = sprintf("Effect on %s (SD, relative to nonblind)", cmp_lbl),
-      caption = "Y-cap +/-0.6 SD."
-    ) +
-    theme_bw(base_size = 8) +
-    theme(
-      plot.subtitle      = element_text(size = 8, color = "gray30"),
-      strip.text         = element_text(face = "bold", size = 7),
-      panel.grid.minor.x = element_blank(),
-      axis.title.x       = element_text(margin = margin(t = 6)),
-      axis.title.y       = element_text(margin = margin(r = 6)),
-      axis.text.x        = element_text(size = 6),
-      axis.text.y        = element_text(size = 6),
-      plot.caption       = element_text(size = 8, hjust = 0)
-    )
-  print(p_obj)
-  cat("\n\n\\clearpage\n")
-}
-
-rm(results_list, dt_plot_all, dt_p, p_obj, components, component_lbls,
-   dei_pts, dei_lbl, ms_pts, ms_lbl, cmp, cmp_lbl, k,
-   hr_col, hr_data, ctrl_mean_hr, ctrl_sd_hr, m_hr,
-   eng_col, eng_data, ctrl_mean_eng, ctrl_sd_eng, m_eng,
-   cf, V, idx_main, idx_dei, idx_ms, idx_dms,
-   est, se, d, mm, v, jd, jm)
-```
-
-
-\clearpage
-## Alternative A.1 (HR only): Candidate-Level Selection Probability Model with \texttt{sc\_advance}
-
-The per-$k$ loop in §4.2--§4.6 suffers from extreme discrete-sampling variance at the boundaries (at $k{=}1$ a single tie-break injects pure noise into the dependent variable; at $k{=}18$ the pools collapse to identical sets). For HR, we have a natural binary --- \texttt{sc\_advance}, the actual decision to advance a candidate to the engineering stage --- which lets us re-estimate the same selection question on the full candidate-evaluator panel without any $k$ threshold:
-\vspace{-0.7em}
-$$
-\underbrace{\text{sc\_advance}_{ij}}_{\text{HR's advance decision}}
-\;\sim\;
-\text{TrueCoding}_i \times \mathbbm{1}[\text{Blind}]_j \times \text{Moderator}_j
-\;\Big|\;
-\text{Respondent FE},\;
-\text{cluster on Respondent}.
-$$
-
-\vspace{-0.6em}
-\textbf{Why HR only here:} \texttt{sc\_advance} is HR's natural single-decision ``move forward'' binary; engineers do not produce a comparable single-shot binary on the firm side --- they instead deliver an \emph{ordering} over the 18 resumes, from which any binary is necessarily a top-$k$ thresholding (which is exactly the §4.2 design we are trying to escape). For the engineer side we therefore push the analogous ``does blinding strengthen the link between true ability and selection'' question into a $k$-loop variant in §4.8 below.
-
-With respondent FE, all between-respondent terms (\texttt{treat::blind}, the moderator main effect, and their two-way interaction) are absorbed; identification of the within-respondent slopes and their cross-products comes from variation in true coding ability across the 18 resumes a respondent rates. The substantive coefficients of interest are:
-
-\vspace{-0.6em}
-\begin{itemize}\setlength\itemsep{0pt}\setlength\parskip{0pt}\setlength\topsep{0pt}\setlength\partopsep{0pt}
-    \item \textbf{True Coding $\times$ Blind} --- the central efficiency claim. $>0$ means blinding tightens the link between objective ability and being advanced.
-    \item \textbf{True Coding $\times$ Blind $\times$ M} --- whether blinding's tightening of that link itself depends on the moderator (DEI orientation, firm DEI policy, or inter-departmental DEI misalignment).
-\end{itemize}
-
-```{r alt_a_selection_probability_lpm, echo=FALSE, results='asis', warning=FALSE, message=FALSE}
-
-## ---------------------------------------------------------------------------
-## Build firm_targets_fh and resume_id on firm_long_dt if not already
-## present. resume_id = (resume_ver, resume_index) -- the unique stimulus
-## the respondent saw. There are 144 such combos (8 vers x 18 positions),
-## which is enough for CGM two-way clustering on (responseid, resume_id).
-## ---------------------------------------------------------------------------
-if (!"firm_targets_fh" %in% names(firm_long_dt)) {
-  firm_long_dt[, firm_targets_fh := as.integer(
-    firm_targets_female == 1L | firm_targets_hispanic == 1L)]
-}
-if (!"resume_id" %in% names(firm_long_dt)) {
-  firm_long_dt[, resume_id := paste(resume_ver, resume_index, sep = "_")]
-}
-stopifnot("sc_advance" %in% names(firm_long_dt),
-          "true_coding_z" %in% names(firm_long_dt),
-          "dei_index_z" %in% names(firm_long_dt),
-          "misalign_z" %in% names(firm_long_dt))
-
-hr_dt <- firm_long_dt[role == "HR"]
-
-## ---------------------------------------------------------------------------
-## Four LPMs (HR only): pooled + three heterogeneity triples (DEI Index,
-## Firm Targets Fem/His, Misalign). Respondent FE absorbs all between-
-## respondent terms; r_do FE absorbs display-order / fatigue effects on the
-## advance decision; the surviving coefficients are the within-respondent
-## true-coding-z terms (main slope + Blind shift + M shift + triple).
-## Two-way clustered SE on (responseid, resume_id).
-## Resume-content FE (resume_id) is intentionally NOT absorbed: it would
-## kill the True Coding (Z) main-effect row, which is substantive here.
-## ---------------------------------------------------------------------------
-m_hr_pool <- feols(sc_advance ~ true_coding_z * i(treat, ref = "nonblind") | responseid + r_do,
-                   data = hr_dt, vcov = ~ responseid + resume_id)
-m_hr_dei  <- feols(sc_advance ~ true_coding_z * i(treat, ref = "nonblind") * dei_index_z | responseid + r_do,
-                   data = hr_dt[!is.na(dei_index_z)], vcov = ~ responseid + resume_id)
-m_hr_ft   <- feols(sc_advance ~ true_coding_z * i(treat, ref = "nonblind") * firm_targets_fh | responseid + r_do,
-                   data = hr_dt[!is.na(firm_targets_fh)], vcov = ~ responseid + resume_id)
-m_hr_ms   <- feols(sc_advance ~ true_coding_z * i(treat, ref = "nonblind") * misalign_z | responseid + r_do,
-                   data = hr_dt[!is.na(misalign_z)], vcov = ~ responseid + resume_id)
-
-models_list <- list(
-  "(1) Pooled"           = m_hr_pool,
-  "(2) DEI Index"        = m_hr_dei,
-  "(3) Firm Targets F/H" = m_hr_ft,
-  "(4) Misalign (Z)"     = m_hr_ms
-)
-
-## Multiple raw coef names map to the same display label so the four
-## "True Coding x ..." rows align across moderators in the combined table.
-coef_map <- c(
-  "true_coding_z"                              = "True Coding (Z)",
-  "true_coding_z:treat::blind"                 = "True Coding $\\times$ Blind",
-  "true_coding_z:dei_index_z"                  = "True Coding $\\times$ M",
-  "true_coding_z:firm_targets_fh"              = "True Coding $\\times$ M",
-  "true_coding_z:misalign_z"                   = "True Coding $\\times$ M",
-  "true_coding_z:dei_index_z:treat::blind"     = "True Coding $\\times$ Blind $\\times$ M",
-  "true_coding_z:firm_targets_fh:treat::blind" = "True Coding $\\times$ Blind $\\times$ M",
-  "true_coding_z:misalign_z:treat::blind"      = "True Coding $\\times$ Blind $\\times$ M"
-)
-
-## ---------------------------------------------------------------------------
-## FE / GoF scaffolding per project convention: FE rows (incl. intentional
-## X for Resume Content FE), midrule, then Obs / R^2 / Adj R^2.
-## ---------------------------------------------------------------------------
-chk <- "\\checkmark"
-nox <- "$\\times$"
-fe_rows <- data.frame(
-  term = c("Display Position FE",
-           "Resume ID FE",
-           "Resume - Coding Test Version FE",
-           "Respondent ID FE",
-           "Respondent Age (Cont) and Demographic FEs"),
-  V1 = c(chk, nox, nox, chk, nox),
-  V2 = c(chk, nox, nox, chk, nox),
-  V3 = c(chk, nox, nox, chk, nox),
-  V4 = c(chk, nox, nox, chk, nox),
-  stringsAsFactors = FALSE
-)
-names(fe_rows) <- c("term", names(models_list))
-## Coef block: 4 unique display labels x (est+se on separate lines) = 8 rows.
-## Inject 5 FE rows immediately after at positions 9:13.
-attr(fe_rows, "position") <- 9:13
-
-gof_map <- list(
-  list("raw" = "nobs",         "clean" = "Obs.",       "fmt" = function(x) format(x, big.mark = ",")),
-  list("raw" = "r.squared",    "clean" = "$R^2$",      "fmt" = function(x) sprintf("%.3f", x)),
-  list("raw" = "adj.r.squared","clean" = "Adj. $R^2$", "fmt" = function(x) sprintf("%.3f", x))
-)
-
-ms_tex <- modelsummary(
-  models_list,
-  output   = "kableExtra",
-  coef_map = coef_map,
-  gof_map  = gof_map,
-  add_rows = fe_rows,
-  stars    = c("*" = 0.10, "**" = 0.05, "***" = 0.01),
-  escape   = FALSE,
-  align    = paste0("l", strrep("c", length(models_list))),
-  title    = "Alternative A.1 --- HR Candidate-Level Selection Probability Model (LHS: \\texttt{sc\\_advance}). LPM with respondent FE and display-order (\\texttt{r\\_do}) FE; two-way clustered SEs on (respondent, resume) in parentheses. Col (1): pooled (no moderator). Cols (2)--(4): triple interactions with respondent DEI Index ($z$), firm DEI-targeting policy (binary, Female/Hispanic), and signed directional misalignment ($z$). Resume-content FE intentionally not absorbed (would kill the True Coding main-effect row); Respondent Characteristics and Q-version FE absorbed by Respondent FE so not separately included."
-) |> kableExtra::kable_styling(
-       latex_options = c("HOLD_position"),
-       font_size = 8, full_width = FALSE
-     ) |> kableExtra::row_spec(8,  extra_latex_after = "\\midrule") |>
-        kableExtra::row_spec(13, extra_latex_after = "\\midrule")
-print(ms_tex)
-
-rm(hr_dt, m_hr_pool, m_hr_dei, m_hr_ft, m_hr_ms,
-   models_list, coef_map, gof_map, fe_rows, chk, nox, ms_tex)
-```
-
-
-\clearpage
-## Alternative A.2 ($k$-loop): Selection Probability for Both Roles, Looping over $k$
-
-\textbf{Relationship to §4.2--§4.6:} Because engineers do not give a single advance/no-advance decision, the analog of §4.7 for engineers requires picking a binary --- and the only natural ones are the $k$-thresholded indicators \texttt{hr\_pass$_k$} / \texttt{eng\_top$_k$}. Doing so produces what is essentially the LHS$\leftrightarrow$RHS \emph{dual} of §4.2: where §4.2 conditions on the selected pool and asks ``\emph{Is the average true coding score of the selected $k$ higher under blinding?},'' §4.8 instead uses the full candidate-evaluator panel and asks ``\emph{Is true coding ability a stronger predictor of being one of the selected $k$ under blinding?}'' Mathematically the two are not identical (different estimands and different units), but they are tightly linked: if blinding raises the average true score of the chosen $k$, it must be (approximately) because blinding has steepened the within-respondent gradient of selection probability on true ability. The advantage of the dual specification is that the panel sample size at every $k$ is the full $N{\approx}5{,}238$ candidate-evaluator observations, which compresses the standard errors that explode in §4.2 at low $k$.
-
-\vspace{-0.5em}
-$$
-\underbrace{\text{Selected}^{(k)}_{ij}}_{\substack{\text{HR: }\texttt{hr\_pass}_k\\\text{Eng: }\texttt{eng\_top}_k}}
-\;\sim\;
-\text{TrueCoding}_i \times \mathbbm{1}[\text{Blind}]_j
-\;\Big|\;
-\text{Respondent FE},\;
-\text{cluster on Respondent},
-\quad k = 1,\dots,18.
-$$
-
-\vspace{-0.6em}
-The plotted quantity is the per-$k$ \texttt{true\_coding\_z}~$\times$~\texttt{treat::blind} coefficient: the change in the within-respondent linear-probability slope of selection on true coding ability when going from non-blind to blind review. Positive means blinding tightens the ability-selection link. Bands are 95\% CIs from clustered SEs on respondent.
-
-```{r alt_a2_selection_prob_kloop, echo=FALSE, results='asis', warning=FALSE, message=FALSE, fig.width=10, fig.height=5}
-
-## Build resume_id (= unique stimulus identity) if not already present
-## from the Alternative A.1 chunk; needed for two-way cluster.
-if (!"resume_id" %in% names(firm_long_dt)) {
-  firm_long_dt[, resume_id := paste(resume_ver, resume_index, sep = "_")]
-}
-
-results_list <- list()
-
-for (k in 1:18) {
-
-  ## --- HR ---
-  hr_col  <- paste0("hr_pass", k)
-  if (hr_col %in% names(firm_long_dt)) {
-    tryCatch({
-      m_hr <- suppressMessages(suppressWarnings(
-        feols(as.formula(paste0(hr_col,
-                " ~ true_coding_z * i(treat, ref = 'nonblind') | responseid + r_do")),
-              data = firm_long_dt[role == "HR"],
-              vcov = ~ responseid + resume_id)
-      ))
-      ct <- coeftable(m_hr)
-      key <- "true_coding_z:treat::blind"
-      if (key %in% rownames(ct)) {
-        est   <- ct[key, "Estimate"]
-        se    <- ct[key, "Std. Error"]
-        p_val <- ct[key, 4]
-        results_list[[length(results_list) + 1L]] <- data.table(
-          Stage = "HR Stage", k = k,
-          estimate = est, se = se,
-          ci_low = est - 1.96 * se, ci_high = est + 1.96 * se,
-          p_val = p_val
-        )
-      }
-    }, error = function(e) {})
-  }
-
-  ## --- Engineer ---
-  eng_col <- paste0("eng_top", k)
-  if (eng_col %in% names(firm_long_dt)) {
-    tryCatch({
-      m_eng <- suppressMessages(suppressWarnings(
-        feols(as.formula(paste0(eng_col,
-                " ~ true_coding_z * i(treat, ref = 'nonblind') | responseid + r_do")),
-              data = firm_long_dt[role == "Eng"],
-              vcov = ~ responseid + resume_id)
-      ))
-      ct <- coeftable(m_eng)
-      key <- "true_coding_z:treat::blind"
-      if (key %in% rownames(ct)) {
-        est   <- ct[key, "Estimate"]
-        se    <- ct[key, "Std. Error"]
-        p_val <- ct[key, 4]
-        results_list[[length(results_list) + 1L]] <- data.table(
-          Stage = "Engineer Stage", k = k,
-          estimate = est, se = se,
-          ci_low = est - 1.96 * se, ci_high = est + 1.96 * se,
-          p_val = p_val
-        )
-      }
-    }, error = function(e) {})
-  }
-}
-
-dt_plot <- rbindlist(results_list)
-dt_plot[, Stage := factor(Stage, levels = c("HR Stage", "Engineer Stage"))]
-dt_plot[, sig_stars := fcase(
-  p_val < 0.01, "***",
-  p_val < 0.05, "**",
-  p_val < 0.10, "*",
-  default = ""
-)]
-
-p_obj <- ggplot(dt_plot, aes(x = k, y = estimate, color = Stage)) +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.8) +
-  geom_pointrange(aes(ymin = ci_low, ymax = ci_high),
-                  linewidth = 0.8, size = 0.6, fatten = 3) +
-  geom_text(aes(y = ci_high, label = sig_stars),
-            vjust = -0.5, size = 5, color = "black", show.legend = FALSE) +
-  facet_wrap(~ Stage, ncol = 2) +
-  scale_color_manual(values = c("HR Stage" = "#C44E52", "Engineer Stage" = "#4C72B0")) +
-  scale_x_continuous(breaks = 1:18, name = "Selection threshold $k$") +
-  labs(
-    subtitle = "Per-k change in the within-respondent LPM slope of selection on true coding ability under blinding (treat::blind x true_coding_z coefficient)",
-    y       = "Slope shift in P(selected at top-k) per 1 SD true coding (blind - nonblind)",
-    caption = "LPM with respondent FE + display-order (r_do) FE; two-way clustered SE on (respondent, resume). Resume-content FE intentionally not absorbed (would kill the true_coding_z slope). Positive: blinding tightens the link between true coding ability and being selected at top-k. Significance: * p<0.10, ** p<0.05, *** p<0.01."
-  ) +
-  theme_bw() +
-  theme(
-    legend.position    = "none",
-    plot.subtitle      = element_text(size = 9, color = "gray30"),
-    strip.text         = element_text(face = "bold", size = 12),
-    panel.grid.minor.x = element_blank(),
-    axis.title.x       = element_text(margin = margin(t = 10)),
-    axis.title.y       = element_text(margin = margin(r = 10)),
-    plot.caption       = element_text(size = 8, hjust = 0)
-  )
-print(p_obj)
-
-## ---------------------------------------------------------------------------
-## Underlying per-k coefficient table.
-## ---------------------------------------------------------------------------
-dt_plot[, cell := fmt_te_vec(estimate, se)]
-tbl <- dcast(dt_plot, k ~ Stage, value.var = "cell")
-setnames(tbl, "k", "$k$")
-
-print(
-  kable(tbl, format = "latex", booktabs = TRUE, escape = FALSE,
-        align = c("c", "c", "c"),
-        caption = NULL) %>%
-    kable_styling(latex_options = "HOLD_position",
-                  font_size = 9, full_width = FALSE)
-)
-
-rm(results_list, dt_plot, tbl, p_obj, k,
-   hr_col, eng_col, m_hr, m_eng, ct, key, est, se, p_val)
-```
-
-
-\clearpage
-## Alternative B: Evaluator-Level Rank Correlation (``Accuracy Score'')
-
-Both prior alternatives still operate on the resume-evaluator long panel. Alternative B collapses that panel to one number per evaluator and asks a different but complementary question: across the 18 resumes a single evaluator rated, \emph{how well does their overall ranking of those 18 resumes line up with the objective ranking by lab coding score?} For each respondent $r$ we compute
-\vspace{-0.7em}
-$$
-\rho_r \;=\; \mathrm{cor}\!\Big(\,\mathrm{rank}\big(\widehat{\text{sc\_overall}}_{r,\cdot}\big),\;\mathrm{rank}(\text{overall\_score}_{\cdot})\,\Big)\;\in\;[-1,+1],
-$$
-
-\vspace{-0.6em}
-the Spearman rank correlation between the evaluator's overall ratings (\texttt{sc\_overall\_z}) and the resumes' objective lab coding scores (\texttt{overall\_score}). $\rho_r{=}{+}1$ means the evaluator's ranking is identical to the objective ranking; $\rho_r{=}0$ means pure noise; $\rho_r{=}{-}1$ means perfectly inverted. Spearman is rank-based, so the choice between raw and standardized versions of either input is irrelevant. We then regress the Fisher-$z$ transform $\tilde\rho_r = \tanh^{-1}(\rho_r)$ (variance-stabilized, unbounded) on treatment and a moderator:
-
-\vspace{-0.5em}
-$$
-\tilde\rho_r \;\sim\; \mathbbm{1}[\text{Blind}]_r \times \text{Moderator}_r + \text{controls},\qquad \text{HC1 robust SEs.}
-$$
-
-\vspace{-0.6em}
-Each observation is one evaluator (one row), so no clustering is needed --- independence is by design. \texttt{Blind} positive $\Rightarrow$ blinding raises rank-alignment with truth on average; \texttt{Blind}~$\times$~M nonzero $\Rightarrow$ that improvement varies with the moderator.
-
-```{r alt_b_evaluator_accuracy, echo=FALSE, results='asis', warning=FALSE, message=FALSE, fig.width=10, fig.height=4.2}
-
-if (!"firm_targets_fh" %in% names(firm_long_dt)) {
-  firm_long_dt[, firm_targets_fh := as.integer(
-    firm_targets_female == 1L | firm_targets_hispanic == 1L)]
-}
-
-## ---------------------------------------------------------------------------
-## Step 1: One Spearman accuracy score per (responseid, role).
-## Drop respondents with too few non-missing rating-truth pairs to compute a
-## stable correlation (need at least 5 paired observations).
-## ---------------------------------------------------------------------------
-acc_dt <- firm_long_dt[
-  !is.na(sc_overall_z) & !is.na(overall_score),
-  .(accuracy = suppressWarnings(cor(sc_overall_z, overall_score, method = "spearman")),
-    n_resumes = .N),
-  by = .(responseid, role)
-]
-acc_dt <- acc_dt[n_resumes >= 5 & !is.na(accuracy)]
-
-## Fisher z-transform (clip to +/-0.999 so atanh stays finite). At 18 paired
-## resumes per evaluator, ties are rare and rho almost never hits the bounds,
-## but the clip is the safe default.
-acc_dt[, accuracy_fz := atanh(pmax(pmin(accuracy, 0.999), -0.999))]
-
-## ---------------------------------------------------------------------------
-## Step 2: Merge respondent-level moderators / controls. Each responseid
-## maps to exactly one role, so unique() collapses cleanly.
-## ---------------------------------------------------------------------------
-resp_attrs <- unique(firm_long_dt[, .(responseid, treat, dei_index_z, firm_targets_fh,
-                                       misalign_z, resp_age, resp_gender, resp_race,
-                                       s2_educ, s2_income, q_version,
-                                       resp_python, resp_java)])
-acc_dt <- acc_dt[resp_attrs, on = "responseid", nomatch = NULL]
-
-acc_hr  <- acc_dt[role == "HR"]
-acc_eng <- acc_dt[role == "Eng"]
-
-## ---------------------------------------------------------------------------
-## Step 3: Eight respondent-level OLS models (HR/Eng x Pooled+3 het). Light
-## FE structure (q_version + resp_python/java for Eng) given the small per-
-## role sample (~137 HR / ~154 Eng). HC1 robust SE, no clustering.
-## ---------------------------------------------------------------------------
-## Standard demographic Respondent Characteristics (resp_gender + resp_race
-## + s2_educ + s2_income) absorbed in BOTH HR and Eng specs for parallelism
-## with §1, §2, §3, §5 conventions. Eng additionally absorbs the coding-
-## language FEs (resp_python, resp_java), which are Eng-only survey items
-## and don't exist for HR respondents.
-m_hr_pool <- feols(accuracy_fz ~ i(treat, ref = "nonblind") + resp_age
-                   | q_version + resp_gender + resp_race + s2_educ + s2_income,
-                   data = acc_hr, vcov = "hetero")
-m_hr_dei  <- feols(accuracy_fz ~ i(treat, ref = "nonblind") * dei_index_z + resp_age
-                   | q_version + resp_gender + resp_race + s2_educ + s2_income,
-                   data = acc_hr[!is.na(dei_index_z)], vcov = "hetero")
-m_hr_ft   <- feols(accuracy_fz ~ i(treat, ref = "nonblind") * firm_targets_fh + resp_age
-                   | q_version + resp_gender + resp_race + s2_educ + s2_income,
-                   data = acc_hr[!is.na(firm_targets_fh)], vcov = "hetero")
-m_hr_ms   <- feols(accuracy_fz ~ i(treat, ref = "nonblind") * misalign_z + resp_age
-                   | q_version + resp_gender + resp_race + s2_educ + s2_income,
-                   data = acc_hr[!is.na(misalign_z)], vcov = "hetero")
-
-m_eng_pool <- feols(accuracy_fz ~ i(treat, ref = "nonblind") + resp_age
-                    | q_version + resp_gender + resp_race + s2_educ + s2_income + resp_python + resp_java,
-                    data = acc_eng, vcov = "hetero")
-m_eng_dei  <- feols(accuracy_fz ~ i(treat, ref = "nonblind") * dei_index_z + resp_age
-                    | q_version + resp_gender + resp_race + s2_educ + s2_income + resp_python + resp_java,
-                    data = acc_eng[!is.na(dei_index_z)], vcov = "hetero")
-m_eng_ft   <- feols(accuracy_fz ~ i(treat, ref = "nonblind") * firm_targets_fh + resp_age
-                    | q_version + resp_gender + resp_race + s2_educ + s2_income + resp_python + resp_java,
-                    data = acc_eng[!is.na(firm_targets_fh)], vcov = "hetero")
-m_eng_ms   <- feols(accuracy_fz ~ i(treat, ref = "nonblind") * misalign_z + resp_age
-                    | q_version + resp_gender + resp_race + s2_educ + s2_income + resp_python + resp_java,
-                    data = acc_eng[!is.na(misalign_z)], vcov = "hetero")
-
-## ---------------------------------------------------------------------------
-## Step 4a: Distribution plot of raw rho by treat x role
-## ---------------------------------------------------------------------------
-acc_plot <- copy(acc_dt)
-acc_plot[, role_lab := factor(role, levels = c("HR", "Eng"),
-                              labels = c("HR Stage", "Engineer Stage"))]
-acc_means <- acc_plot[, .(mean_acc = mean(accuracy)), by = .(role_lab, treat)]
-
-p_obj <- ggplot(acc_plot, aes(x = accuracy, fill = treat, color = treat)) +
-  geom_density(alpha = 0.35, linewidth = 0.6) +
-  geom_vline(data = acc_means,
-             aes(xintercept = mean_acc, color = treat),
-             linetype = "dashed", linewidth = 0.6) +
-  facet_wrap(~ role_lab, ncol = 2) +
-  scale_color_manual(values = c("nonblind" = "#C44E52", "blind" = "#4C72B0"),
-                     name = "Treatment") +
-  scale_fill_manual( values = c("nonblind" = "#C44E52", "blind" = "#4C72B0"),
-                     name = "Treatment") +
-  scale_x_continuous(limits = c(-1, 1), breaks = seq(-1, 1, 0.25)) +
-  labs(
-    subtitle = "Distribution of evaluator-level Accuracy Score (Spearman rho between sc_overall_z and overall_score across 18 resumes)",
-    x = "Accuracy Score (Spearman rho)",
-    y = "Density",
-    caption = "Dashed lines: arm-specific means. rho > 0 = evaluator's overall ranking aligns with objective coding ability; rho < 0 = anti-aligned."
-  ) +
-  theme_bw() +
-  theme(
-    legend.position    = "bottom",
-    plot.subtitle      = element_text(size = 9, color = "gray30"),
-    strip.text         = element_text(face = "bold", size = 11),
-    panel.grid.minor   = element_blank(),
-    plot.caption       = element_text(size = 8, hjust = 0)
-  )
-print(p_obj)
-
-## ---------------------------------------------------------------------------
-## Step 4b: Combined modelsummary table (8 columns)
-## ---------------------------------------------------------------------------
-models_list <- list(
-  "(1) Pool"     = m_hr_pool,
-  "(2) DEI"      = m_hr_dei,
-  "(3) FirmTgt"  = m_hr_ft,
-  "(4) Misalign" = m_hr_ms,
-  "(5) Pool"     = m_eng_pool,
-  "(6) DEI"      = m_eng_dei,
-  "(7) FirmTgt"  = m_eng_ft,
-  "(8) Misalign" = m_eng_ms
-)
-
-## Multiple raw moderator names share display rows so DEI/FT/Misalign
-## triples line up.
-coef_map <- c(
-  "treat::blind"                  = "Blind",
-  "dei_index_z"                   = "M (moderator)",
-  "firm_targets_fh"               = "M (moderator)",
-  "misalign_z"                    = "M (moderator)",
-  "dei_index_z:treat::blind"      = "Blind $\\times$ M",
-  "firm_targets_fh:treat::blind"  = "Blind $\\times$ M",
-  "misalign_z:treat::blind"       = "Blind $\\times$ M",
-  "resp_age"                      = "Resp. age"
-)
-
-## ---------------------------------------------------------------------------
-## FE / GoF scaffolding per project convention. Alt B is respondent-level
-## (one obs per evaluator), so r_do (display-order) and resume_id (resume
-## content) FEs are not applicable -- still listed with X for transparency.
-## ---------------------------------------------------------------------------
-chk <- "\\checkmark"
-nox <- "$\\times$"
-## Standard unified 5-row FE block. Eng coding-language FEs (resp_python,
-## resp_java) are bundled INTO row 5 ("Respondent Age + Demographic FEs")
-## per project convention, since they are respondent-level traits absorbed
-## together with gender/race/education/income.
-fe_rows <- data.frame(
-  term = c("Display Position FE",
-           "Resume ID FE",
-           "Resume - Coding Test Version FE",
-           "Respondent ID FE",
-           "Respondent Age (Cont) and Demographic FEs"),
-  V1 = c(nox, nox, chk, nox, chk),
-  V2 = c(nox, nox, chk, nox, chk),
-  V3 = c(nox, nox, chk, nox, chk),
-  V4 = c(nox, nox, chk, nox, chk),
-  V5 = c(nox, nox, chk, nox, chk),
-  V6 = c(nox, nox, chk, nox, chk),
-  V7 = c(nox, nox, chk, nox, chk),
-  V8 = c(nox, nox, chk, nox, chk),
-  stringsAsFactors = FALSE
-)
-names(fe_rows) <- c("term", names(models_list))
-## Coef block: 4 unique display labels x (est+se separate lines) = 8 rows.
-## Inject 5 FE rows immediately after at positions 9:13.
-attr(fe_rows, "position") <- 9:13
-
-gof_map <- list(
-  list("raw" = "nobs",         "clean" = "Obs.",       "fmt" = function(x) format(x, big.mark = ",")),
-  list("raw" = "r.squared",    "clean" = "$R^2$",      "fmt" = function(x) sprintf("%.3f", x)),
-  list("raw" = "adj.r.squared","clean" = "Adj. $R^2$", "fmt" = function(x) sprintf("%.3f", x))
-)
-
-ms_tex <- modelsummary(
-  models_list,
-  output   = "kableExtra",
-  coef_map = coef_map,
-  gof_map  = gof_map,
-  add_rows = fe_rows,
-  stars    = c("*" = 0.10, "**" = 0.05, "***" = 0.01),
-  escape   = FALSE,
-  align    = paste0("l", strrep("c", length(models_list))),
-  title    = "Alternative B --- Evaluator-Level Accuracy Score: Fisher-z transformed Spearman rank correlation between the evaluator's overall ratings and resumes' objective lab coding scores across the 18 resumes they rated. OLS with HC1 robust SEs in parentheses; one observation per evaluator (no clustering). Resume-content / Display Position / Respondent FEs not applicable (respondent-level regression). Standard demographic Respondent Characteristics (resp\\_gender, resp\\_race, s2\\_educ, s2\\_income) absorbed in both HR and Eng specs. Eng additionally absorbs coding-language FEs (resp\\_python, resp\\_java), which are Eng-only survey items."
-) |> kableExtra::kable_styling(
-       latex_options = c("HOLD_position", "scale_down"),
-       font_size = 7
-     ) |> kableExtra::add_header_above(
-       c(" " = 1, "HR" = 4, "Engineer" = 4)
-     ) |> kableExtra::row_spec(8,  extra_latex_after = "\\midrule") |>
-        kableExtra::row_spec(13, extra_latex_after = "\\midrule")
-print(ms_tex)
-
-rm(acc_dt, acc_hr, acc_eng, acc_plot, acc_means, resp_attrs,
-   m_hr_pool, m_hr_dei, m_hr_ft, m_hr_ms,
-   m_eng_pool, m_eng_dei, m_eng_ft, m_eng_ms,
-   models_list, coef_map, gof_map, fe_rows, chk, nox, ms_tex, p_obj)
-```
 
