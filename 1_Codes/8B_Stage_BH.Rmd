@@ -10,6 +10,7 @@ header-includes:
   - \usepackage{bbm}
   - \usepackage{array}
   - \usepackage{arydshln}
+  - \usepackage{enumitem}
 geometry: margin=0.5in, landscape
 ---
 
@@ -23,6 +24,149 @@ knitr::opts_chunk$set(echo = TRUE)
 \setcounter{section}{-1}
 
 # Summary
+
+\noindent\textbf{Non-Technical Summary:} Blind hiring is often justified as a way to remove demographic bias and improve meritocratic selection. In a field experiment with HR professionals and software engineers evaluating early-career software candidates, I find a different pattern. Revealing demographic information generates a system of stage-specific demographic premiums and penalties. Among engineers, visible identity does not produce traditional in-group favoritism; instead, engineers assign higher scores to nonconcordant and underrepresented candidates, a pattern driven largely by majority evaluators. Blinding removes these compensatory adjustments, raising White Male candidates' scores and selection probabilities in the technical-evaluation stage while lowering selection probabilities for some female and Hispanic candidates. In the HR resume-screening stage, the effects differ, with Hispanic Female candidates gaining and Hispanic Male candidates losing under blinding. Despite these compositional shifts, blinding does not improve evaluators' ability to identify objectively stronger coders and does not increase the productivity of selected candidates. The results suggest that blind hiring is best understood not as a generic efficiency-enhancing debiasing tool, but as an institutional constraint on identity-contingent discretion.
+
+\vspace{0.75em}
+
+\subsection*{Main Pitch}
+
+\begin{itemize}[leftmargin=1.35em, itemsep=0.45em]
+    \item \textbf{Blind hiring is not simply a ``bias removal'' intervention.}
+    \textit{It removes identity-contingent discretion.} In this experiment, that discretion includes \textbf{compensatory demographic premiums}, especially among engineers, rather than only anti-minority discrimination.
+
+    \item \textbf{The key empirical object is stage-specific.}
+    HR professionals and engineers respond differently to the same blinding intervention. The result is not ``blinding helps minorities'' or ``blinding hurts minorities,'' but rather: \textbf{blinding reshuffles who benefits depending on the stage and evaluator type.}
+\end{itemize}
+
+\subsection*{Core Results}
+
+\noindent
+\textbf{1. Blinding disrupts demographic premiums and penalties.}
+Coefficients are in SD units of overall evaluation score.
+
+\vspace{0.5em}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Stage} & \textbf{Groups helped by blinding} & \textbf{Groups hurt by blinding} \\
+\midrule
+HR resume screening
+    & Hispanic Female: $\mathbf{+0.087}$
+    & Hispanic Male: $\mathbf{-0.115}$ \\
+Engineer technical evaluation
+    & White Male: $\mathbf{+0.086}$
+    & Hispanic Female: $\mathbf{-0.069}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{itemize}[leftmargin=1.35em, itemsep=0.35em]
+    \item \textit{Interpretation:} blinding removes whatever visible-identity adjustment existed under nonblind review.
+    \item In engineering, blinding particularly helps White Male candidates because visible identity had generated a relative penalty for them under nonblind evaluation.
+\end{itemize}
+
+\vspace{0.5em}
+
+\noindent
+\textbf{2. Engineers reject the standard in-group favoritism or out-group animus discrimination story.}
+
+\begin{itemize}[leftmargin=1.35em, itemsep=0.35em]
+    \item Engineers, with White-Males being the largest majority group, give an \textbf{out-group / underrepresented-group premium} of $\mathbf{+0.096}$ to $\mathbf{+0.165}$ over White-Males when identity is visible.
+    \item When identity is blinded in the engineer stage, race+gender concordant applicants gain $\mathbf{+0.069}$ SD; Nonconcordant applicants fall slightly, about $\mathbf{-0.009}$ SD.
+    \item \textit{Clean takeaway:} \textbf{blinding removes compensatory adjustment.} That is why White Male candidates gain in the technical-evaluation stage.
+\end{itemize}
+
+\vspace{0.5em}
+
+\noindent
+\textbf{3. Blind Hiring's score changes translate into selection changes.}
+
+\begin{itemize}[leftmargin=1.35em, itemsep=0.35em]
+    \item \textbf{HR stage:} Hispanic Female candidates gain in selection probability; Hispanic Male candidates lose.
+    \item \textbf{Engineer stage:} White Male candidates gain; Asian Female and Hispanic Female candidates lose.
+    \item \textit{Important language:} hiring is an \textbf{ordinal ranking problem}, so even modest score changes can matter near the margin.
+\end{itemize}
+
+\vspace{0.5em}
+
+\noindent
+\textbf{4. Blinding changes attention, not time spent.}
+
+\begin{itemize}[leftmargin=1.35em, itemsep=0.35em]
+    \item Blinding does \textbf{not} meaningfully increase time spent per resume.
+    \item But engineers are about $\mathbf{+10.6}$ percentage points more likely to open code files under blinding.
+    \item Blinding leads to signal substitution; blinded engineers lean more prestige / type of experiences the job applicant holds.
+    \item \textit{Interpretation:} blinding does not make evaluators broadly more careful; it changes what engineers inspect.
+\end{itemize}
+
+\vspace{0.5em}
+
+\noindent
+\textbf{5. Blinding does not improve hiring quality.}
+
+\vspace{0.5em}
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Evaluator} & \textbf{Nonblind slope} & \textbf{Blind slope} \\
+\midrule
+HR & $\mathbf{0.378}$ & $\mathbf{0.356}$ \\
+Engineer & $\mathbf{0.885}$ & $\mathbf{0.855}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{itemize}[leftmargin=1.35em, itemsep=0.35em]
+    \item These slopes measure how strongly evaluator ratings track true coding ability.
+    \item \textit{Interpretation:} blind review does not make ratings more aligned with objective productivity score.
+    \item The selected-candidate productivity results also show essentially \textbf{null effects} on actual coding quality.
+\end{itemize}
+
+\noindent
+\textbf{6. Evaluators respond to institutional DEI/Diversity Policy and Perceptions of Counterparts.}
+
+\vspace{0.5em}
+
+\begin{itemize}[leftmargin=1.35em, itemsep=0.35em]
+    \item \textbf{Compensatory Behavior}: When firm does not have diversity mandate / under-represented minority targeting policies or when one perceives its counterpart to care too little about DEI, highly pro-DEI evaluators engage in \textit{compensatory bias} -- inflating minority candidates' scores when nonblind.
+    \item \textbf{Crowding Out}: Conversely, when the firm explicitly mandates under-represented minority targeting or when one perceives its counterpart to care too much about DEI, highly pro-DEI evaluators mute their premium to under-represented minority scores.
+\end{itemize}
+
+\subsection*{One-Sentence Takeaway}
+
+\noindent\textbf{Blind hiring creates formal neutrality, but in this setting it mostly removes compensatory demographic adjustments rather than improving evaluator accuracy or selected-candidate productivity.}
+
+\vspace{0.75em}
+
+\noindent\footnotesize\textit{Notes: Main coefficients come from the main results tables and figures: treatment effects by race-gender, concordance heterogeneity, selection-probability plots, behavior tables, and productivity/accuracy results.}
+
+
+\subsection*{Currently Working On:}
+
+
+\begin{itemize}[leftmargin=1.35em, itemsep=0.35em]
+    \item Out-of-Sample-Simulation
+    \begin{itemize}
+        \item How does the results change under true world setting, where different demographic groups hold different distribution of productivity?
+    \end{itemize}
+    \item What does previous literature miss by not distinguishing two-phases of hiring.
+    \begin{itemize}
+        \item Discrimination can be muted or amplified through two-stages.
+        \item Evaluators at different points of the hiring funnel respond to their counterparts initiatives.
+    \end{itemize}
+    \item Policy Implications for Firms
+    \begin{itemize}
+        \item Blind hiring creates procedural neutrality, not necessarily diversity or efficiency.
+        \item Need to audit each hiring stage separately.
+        \item If the goal is productivity, blinding is not enough. Productivity gains require better measurement of skills, not just removal of demographic cues. Validate which signals actually predict job-relevant performance.
+        \item Separate DEI goals from individual evaluator discretion. (Institutional crowd-out.)
+    \end{itemize}
+    \item Statistical vs Animus Discrimination
+\end{itemize}
+
 
 \newpage
 
