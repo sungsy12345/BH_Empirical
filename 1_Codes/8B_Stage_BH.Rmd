@@ -1157,7 +1157,8 @@ if (!"resume_id" %in% names(firm_long_dt)) {
 ## ---------------------------------------------------------------------------
 hr_signals <- c("gpa_z",
                 "num_proj", "num_exp", "num_lead", "num_awards",
-                "work_1000", "work_1000_twice", "work_newstartup",
+                "tier_ordinary", "tier_top",
+                "repeated_top_signal_corporate",
                 "work_research", "work_teaching",
                 "javascript", "c_base", "cplusplus", "csharp", "sql")
 
@@ -1192,7 +1193,8 @@ signal_meta <- data.table(
   raw     = c(hr_signals, eng_only),
   display = c("GPA (Z)",
               "\\# Projects", "\\# Experiences", "\\# Leadership", "\\# Awards",
-              "Top-1000 Firm", "Top-1000 Firm (2x)", "New Startup",
+              "Firm Tier: Ord/Growth", "Firm Tier: Top",
+              "Repeated Top-Signal Firm",
               "Research Position", "Teaching Position",
               "JavaScript (listed)",
               "C (listed)", "C++ (listed)", "C\\# (listed)", "SQL (listed)",
@@ -1475,7 +1477,8 @@ if (!"true_coding_z" %in% names(firm_long_dt)) {
 ## ---------------------------------------------------------------------------
 hr_signals <- c("gpa_z",
                 "num_proj", "num_exp", "num_lead", "num_awards",
-                "work_1000", "work_1000_twice", "work_newstartup",
+                "tier_ordinary", "tier_top",
+                "repeated_top_signal_corporate",
                 "work_research", "work_teaching",
                 "javascript", "c_base", "cplusplus", "csharp", "sql")
 
@@ -1486,7 +1489,8 @@ signal_meta <- data.table(
   raw     = all_signals,
   display = c("GPA (Z)",
               "\\# Projects", "\\# Experiences", "\\# Leadership", "\\# Awards",
-              "Top-1000 Firm", "Top-1000 Firm (2x)", "New Startup",
+              "Firm Tier: Ord/Growth", "Firm Tier: Top",
+              "Repeated Top-Signal Firm",
               "Research Position", "Teaching Position",
               "JavaScript (listed)",
               "C (listed)", "C++ (listed)", "C\\# (listed)", "SQL (listed)",

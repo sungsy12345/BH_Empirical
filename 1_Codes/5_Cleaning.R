@@ -828,6 +828,47 @@ firm_long_dt[, `:=` (
 
 #### Manipulate student_dt
 
+  ###### [all69 migration] Restrict to the 18 evaluated candidates and map the
+  ###### richer main_all69_student_sys.csv schema onto the analysis names. The
+  ###### employer survey only rated resume_index 1:18 (verified identical gpa /
+  ###### test_case / demo_group to the legacy 18-candidate file), so filtering
+  ###### here (a) keeps every within-18 statistic -- medians, _z standardization
+  ###### -- defined over exactly the evaluated set, as before, and (b) prevents
+  ###### the student join below from injecting 51 unmatched (NA-firm) rows.
+  student_dt <- student_dt[resume_index %in% 1:18]
+
+  ###### Count signals: count_* -> num_* (totals, not CS-only)
+  student_dt[, `:=`(
+    num_proj   = count_projects,
+    num_exp    = count_work_experience,
+    num_lead   = count_leadership,
+    num_awards = count_award
+  )]
+
+  ###### Position indicators: ind_cs_* -> work_*
+  student_dt[, `:=`(
+    work_research = ind_cs_research,
+    work_teaching = ind_cs_teaching
+  )]
+
+  ###### Firm prestige (Option B): adopt the all69 tier + repeat-flag design,
+  ###### with Growth collapsed into Ordinary. max_firm_signal_tier is
+  ###### {None, Ordinary, Growth, Top}, but Growth is a single candidate among
+  ###### the 18 evaluated, so a standalone Growth dummy is identified off one
+  ###### resume (its signal x Blind coef is unstable). Folding Growth into
+  ###### Ordinary yields a stable, precise mid-tier effect. Two binary dummies
+  ###### (None = omitted reference; Top kept separate), so the downstream
+  ###### signal x Blind coefficients keep the plain "<name>:treat::blind"
+  ###### naming the tables expect. Of the all69 repeat flags, only
+  ###### repeated_top_signal_corporate (0/1) is used downstream as a signal;
+  ###### repeated_high_signal_corporate is dropped (it nests repeated_top,
+  ###### corr ~0.76, and overlaps tier_top, so the pair is not jointly
+  ###### identified at N=18). Kept tier_ordinary, tier_top, repeated_top.
+  student_dt[, `:=`(
+    tier_ordinary = as.integer(max_firm_signal_tier %in% c("Ordinary", "Growth")),
+    tier_top      = as.integer(max_firm_signal_tier == "Top")
+  )]
+
   ###### Actual Coding Overall Score / Test Case Bin (Top Half)
   student_dt[, top_half_coder := fifelse(test_case >= median(test_case), 1, 0)]
   student_dt[, bottom_half_coder := fifelse(test_case < median(test_case), 1, 0)]

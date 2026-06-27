@@ -171,7 +171,9 @@
                                "test_case", "readability", "time_efficiency", "space_efficiency", "runtime",
                                "gpa", "num_proj", "num_exp", "num_lead", "num_awards",
                                "code_opt_out", "q_version", "overall_score", "overall_score_z", "readability", "readability_score_z",
-                               "work_1000", "work_1000_twice", "work_newstartup", "work_research", "work_teaching")
+                               "tier_ordinary", "tier_top",
+                               "repeated_top_signal_corporate",
+                               "work_research", "work_teaching")
     
     vars_to_subscript <- setdiff(names(hr_long_dt), vars_to_not_subscript)
     
@@ -185,7 +187,8 @@
                                  "true_race_gender", "demo_group", "demo_group_asian",
                                  "test_case", "readability", "time_efficiency", "space_efficiency", "runtime",
                                  "gpa", "num_proj", "num_exp", "num_lead", "num_awards",
-                                 "code_opt_out", "q_version", "work_1000", "work_1000_twice", "work_newstartup", "work_research", "work_teaching")]
+                                 "code_opt_out", "q_version", "tier_ordinary", "tier_top",
+                                 "repeated_top_signal_corporate", "work_research", "work_teaching")]
 
     ###### Subscript Eng Data
     vars_to_not_subscript <- c("resume_index", "eng_rank")
@@ -210,8 +213,9 @@
                        'responseid_eng', 'treat_eng', 'resume_ver_eng',
                        'true_race_gender', 'demo_group', 'demo_group_asian',
                        'test_case', 'overall_score', 'overall_score_z', 'readability', 'readability_score_z', 'runtime',
-                       'num_exp', 'code_opt_out', 'work_1000',
-                       'work_1000_twice', 'work_newstartup', 'work_research', 'work_teaching')
+                       'num_exp', 'code_opt_out', 'tier_ordinary',
+                       'tier_top', 'repeated_top_signal_corporate',
+                       'work_research', 'work_teaching')
   setcolorder(firm_twostage_long_dt, new_order_names)
   rm(new_order_names)  
   

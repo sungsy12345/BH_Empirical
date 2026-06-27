@@ -11,7 +11,7 @@
 
 ## Import Survey Data
 firm_dt <- as.data.table(
-  read_dta(paste0(data_root, "3output_data/main_empsurvey_cleaned_", date, ".dta")))
+  read_dta(paste0(data_root, "3output_data/Main/emp_survey/main_empsurvey_cleaned_", date, ".dta")))
 
   #### Drop Incomplete
   firm_dt <- firm_dt[D_mainsample == 1]
@@ -44,14 +44,14 @@ firm_dt <- as.data.table(
   
 ## Import Student Data
 student_dt <- as.data.table(
-  read_csv(paste0(data_root, "3output_data/main_empsurvey_student.csv")))
+  read_csv(paste0(data_root, "3output_data/Main/student_data/main_all69_student_sys.csv")))
 
   
 ##### ##### ##### Import Distribution Data ##### ##### ##### 
   
 ## Import Qualtrics Distribution Data
 qualtrics_distribution_dt <- as.data.table(
-  read_csv(paste0(data_root, "3output_data/main_empsurvey_distribution_final.csv")))
+  read_csv(paste0(data_root, "3output_data/Main/survey_distribution/main_empsurvey_distribution_final.csv")))
 
 ## Import Apollo Data
 
@@ -75,7 +75,7 @@ qualtrics_distribution_dt <- as.data.table(
   
 ## Import Student Data
 crunchbase_dt <- as.data.table(
-  read_csv(paste0(data_root, "3output_data/main_empsurvey_clean_firm_names.csv")))
+  read_csv(paste0(data_root, "3output_data/Main/main_empsurvey_clean_firm_names.csv")))
   
 
 # ##### ##### ##### Import Dynamic Weights Data ##### ##### ##### 

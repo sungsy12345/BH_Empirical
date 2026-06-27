@@ -8,7 +8,7 @@ The user's raw data is stored in a cloud-synced directory to prevent data loss. 
 You may READ datasets, scripts, and inputs from this Dropbox path. You are STRICTLY FORBIDDEN from generating code that writes, modifies, deletes, or overwrites any files in this directory or its subdirectories. 
 
 2. **WRITE-ALLOWED DIRECTORY:**
-`/mnt/c/Users/sungs/OneDrive/Desktop/BH_Empirical/`
+`/mnt/c/Users/sungs/OneDrive/Documents/BH_Empirical/`
 All newly generated R scripts, R Markdown files, statistical model code, and generated figures MUST be saved locally within this repository folder.
 
 3. **NO DATA FILES IN THE REPOSITORY:**
