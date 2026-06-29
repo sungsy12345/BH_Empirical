@@ -25,6 +25,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Blinding Disrupts Pre-Existing Demographic Premiums and Penalties
 
+\begingroup\small
 \begin{itemize}\setlength\itemsep{2pt}\setlength\parskip{0pt}\setlength\topsep{0pt}\setlength\partopsep{0pt}
   \item \textbf{Blinding disrupts pre-existing system of demographic premiums and penalties.}
   \begin{itemize}\setlength\itemsep{2pt}\setlength\parskip{0pt}\setlength\topsep{0pt}\setlength\partopsep{0pt}
@@ -33,6 +34,7 @@ knitr::opts_chunk$set(echo = TRUE)
   \end{itemize}
   \item \textbf{Caveat:} Hiring is often an \emph{ordinal ranking} problem --- one candidate's gain corresponds to another's lost opportunity --- so the absence of statistical significance on a given row does not mean the corresponding group is unaffected by blinding.
 \end{itemize}
+\endgroup
 \vspace{-0.9em}
 
 ```{r blind_hiring_treatment_effects_demo, echo = FALSE, results = 'asis'}
@@ -108,10 +110,10 @@ modelsummary(
   gof_map  = gof_custom_blind,
   add_rows = fe_rows,
   escape   = FALSE,
-  title    = "Effect of Blinding on Overall Evaluation Score by Race-Gender (Resume-Screening vs Technical-Evaluation)",
+  title    = "Effect of Blinding on Overall Evaluation Score by Race-Gender",
   output   = "kableExtra"
 ) %>%
-  kable_styling(latex_options = "HOLD_position", font_size = 8) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 7) %>%
   add_header_above(c(" " = 1,
                      "Panel A: Resume-Screening" = 1,
                      "Panel B: Technical-Evaluation" = 1)) %>%
@@ -818,7 +820,142 @@ rm(results_all, dt_plot, demo_labels, dg, k,
 
 ## Determinants of Attention (Descriptive)
 
-\textit{[Placeholder --- descriptive determinants of attention (time on page and material engagement) to be added: candidate quality, signal mismatch, demographics, and display-order fatigue.]}
+\begingroup\footnotesize\linespread{0.95}\selectfont
+\begin{itemize}\setlength\itemsep{0pt}\setlength\parskip{0pt}\setlength\topsep{-2pt}\setlength\partopsep{0pt}\setlength\itemindent{0pt}\setlength\leftmargin{1em}
+  \item \textbf{Findings:} Evaluators do \textbf{not} spend more time on stronger candidates --- GPA, awards, top-firm experience, test-case performance, and resume--code mismatch are all statistically insignificant and economically negligible ($<3\%$ of mean time per SD). The one meaningful determinant is \textbf{display-order fatigue}: each later position receives less time (HR $-0.5$s per position, $\sim$$17\%$ cumulative decline; Engineers $-1.4$s, $\sim$$34\%$; both $p<0.01$). The table uses display positions $4$--$18$, dropping the first three as \emph{warm-up}: the first resume alone averages $78$s for HR and $171$s for Engineers (vs.\ a $\sim$$40$s/$\sim$$55$s plateau) and engineer time stays elevated through position three.
+\end{itemize}
+\endgroup
+\vspace{-0.3em}
+
+```{r s21_determinants_time, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+det <- copy(firm_long_dt)
+det[, ok       := !is.na(timeonpage) & timeonpage <= 600]
+det[, gpa_z    := as.numeric(scale(gpa))]
+det[, awards_z := as.numeric(scale(num_awards))]
+det[, top_exp  := as.integer(as.character(max_firm_signal_tier) == "Top")]
+det[, test_z   := as.numeric(scale(test_case))]
+det[, prest    := fcase(as.character(max_firm_signal_tier) == "Top", 2,
+                        as.character(max_firm_signal_tier) %in% c("Ordinary", "Growth"), 1,
+                        default = 0)]
+det[, paper_z  := as.numeric(scale(rowMeans(cbind(scale(gpa), scale(num_awards), scale(prest)))))]
+det[, mismatch := abs(paper_z - test_z)]
+det[, dpos     := as.numeric(str_extract(as.character(r_do), "[0-9]+"))]
+
+## One regression per role/phase, on display positions 4-18 (the first three
+## are dropped as warm-up: engineers' first resume averages ~171s and stays
+## elevated through position three). Within-evaluator (responseid FE); display
+## position enters linearly as the fatigue slope. HR never saw test cases /
+## code, so test_z and mismatch are Eng-only (blank in the HR column).
+det <- det[ok & dpos >= 4]
+fit_det <- function(rl) {
+  rhs <- if (rl == "Eng") "gpa_z + awards_z + top_exp + test_z + mismatch + dpos" else "gpa_z + awards_z + top_exp + dpos"
+  feols(as.formula(paste0("timeonpage ~ ", rhs, " | responseid")), det[role == rl], vcov = ~ responseid)
+}
+det_models <- list("(1)" = fit_det("HR"), "(2)" = fit_det("Eng"))
+
+det_coef_map <- c("gpa_z" = "GPA (Z)", "awards_z" = "\\# Awards (Z)", "top_exp" = "Top Experience",
+                  "test_z" = "Test Cases Passed (Z)", "mismatch" = "Quality Mismatch", "dpos" = "Display Position")
+det_chk <- "\\checkmark"
+det_mt  <- function(rl) sprintf("%.1f", mean(det[role == rl, timeonpage]))
+det_fe  <- data.frame(
+  term = c("Mean Time (Seconds)", "Respondent ID FE"),
+  "(1)" = c(det_mt("HR"), det_chk), "(2)" = c(det_mt("Eng"), det_chk),
+  check.names = FALSE, stringsAsFactors = FALSE)
+attr(det_fe, "position") <- c(7, 8)
+det_gof <- tribble(~raw, ~clean, ~fmt, "nobs", "Observations", 0, "r.squared", "R$^2$", 3)
+
+modelsummary(
+  det_models,
+  stars     = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  estimate  = "{estimate}{stars} ({std.error})",
+  statistic = NULL,
+  coef_map  = det_coef_map,
+  gof_map   = det_gof,
+  add_rows  = det_fe,
+  escape    = FALSE,
+  title     = "Determinants of Time on Page (Seconds)",
+  output    = "kableExtra"
+) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 8) %>%
+  add_header_above(c(" " = 1, "Panel A: Resume-Screening" = 1, "Panel B: Technical-Evaluation" = 1)) %>%
+  row_spec(6, extra_latex_after = "\\midrule") %>%
+  row_spec(8, extra_latex_after = "\\midrule") %>%
+  footnote(general = "Within-evaluator (Respondent ID FE); SE clustered by respondent. Estimates in seconds, est$^{*}$ (SE) inline; * p$<$.10, ** p$<$.05, *** p$<$.01. Sample is display positions 4--18; the first three positions are dropped as warm-up. Blank cells mark signals HR never saw (test cases, code). URM-race and URM-gender (nonblind) are also insignificant (not shown).",
+           general_title = "", threeparttable = TRUE, footnote_as_chunk = FALSE, escape = FALSE)
+
+rm(det, fit_det, det_models, det_coef_map, det_chk, det_mt, det_fe, det_gof)
+```
+
+\vspace{0.5em}
+
+\begingroup\footnotesize\linespread{0.95}\selectfont
+\begin{itemize}\setlength\itemsep{0pt}\setlength\parskip{0pt}\setlength\topsep{-2pt}\setlength\partopsep{0pt}\setlength\itemindent{0pt}\setlength\leftmargin{1em}
+  \item \textbf{Findings:} Material engagement responds to candidate quality --- and it shows up in \textbf{opening the code, not the resume.} Engineers open the actual code more for stronger candidates: higher GPA (\textcolor{blue}{$+1.5$ pp} per SD), higher test cases (\textcolor{blue}{$+1.7$ pp}), and especially candidates who \textbf{code better than their resume credentials} (Strong Coding, Weak Paper: \textcolor{blue}{$+3.2$ pp}, $\sim$$+5\%$) --- the ``hidden gem'' verification. Resume-opening responds to none of these, and time (above) responds to nothing. The reverse conflict (strong paper, weak coding), the candidates' assigned race/gender (Panel B, nonblind), and demographic$\times$quality interactions are all null. Entered jointly, collinearity across the 18 candidates renders the individual signals insignificant, so each coefficient below is a focused regression.
+\end{itemize}
+\endgroup
+\vspace{-0.3em}
+
+```{r s21_opening_determinants, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+od <- copy(firm_long_dt[role == "Eng"])
+od[, gpa_z    := as.numeric(scale(gpa))]
+od[, awards_z := as.numeric(scale(num_awards))]
+od[, prest    := fcase(as.character(max_firm_signal_tier) == "Top", 2,
+                       as.character(max_firm_signal_tier) %in% c("Ordinary", "Growth"), 1, default = 0)]
+od[, top_exp  := as.integer(as.character(max_firm_signal_tier) == "Top")]
+od[, paper_z  := as.numeric(scale(rowMeans(cbind(scale(gpa), scale(num_awards), scale(prest)))))]
+od[, test_z   := as.numeric(scale(test_case))]
+od[, dpos     := as.numeric(str_extract(as.character(r_do), "[0-9]+"))]
+od[, oc       := as.integer((!is.na(open_code1) & open_code1 == 1) | (!is.na(open_code2) & open_code2 == 1))]
+## Mismatch conflict cells (reference = concordant): above/below-average paper
+## composite (GPA, awards, firm prestige) vs. test cases.
+od[, dir_paper := as.integer(paper_z > 0 & test_z < 0)]  # strong paper, weak coding
+od[, dir_code  := as.integer(test_z > 0 & paper_z < 0)]  # strong coding, weak paper
+od[, urm_race   := as.integer(grepl("Hispanic", as.character(race_gender)))]
+od[, urm_gender := as.integer(grepl("Female",   as.character(race_gender)))]
+
+## Each coefficient is a SEPARATE focused regression (responseid FE + display
+## position control): quality signals univariate; the two mismatch flags jointly;
+## URM jointly (Panel B, nonblind). Marginal associations, in percentage points.
+gc <- function(dat, dv, rhs, v) {
+  m <- feols(as.formula(paste0(dv, " ~ ", rhs, " | responseid")), dat, vcov = ~ responseid)
+  ct <- coeftable(m); e <- ct[v, 1]; s <- ct[v, 2]; p <- ct[v, 4]
+  st <- if (p < .01) "***" else if (p < .05) "**" else if (p < .1) "*" else ""
+  sprintf("%.1f%s (%.1f)", 100 * e, st, 100 * s)
+}
+qA <- function(dv) c(
+  gc(od, dv, "gpa_z + dpos", "gpa_z"),    gc(od, dv, "test_z + dpos", "test_z"),
+  gc(od, dv, "awards_z + dpos", "awards_z"), gc(od, dv, "top_exp + dpos", "top_exp"),
+  gc(od, dv, "dir_paper + dir_code + dpos", "dir_paper"),
+  gc(od, dv, "dir_paper + dir_code + dpos", "dir_code"))
+nb <- od[treat == "nonblind"]
+qB <- function(dv) c(gc(nb, dv, "urm_race + urm_gender + dpos", "urm_race"),
+                     gc(nb, dv, "urm_race + urm_gender + dpos", "urm_gender"))
+aR <- qA("open_resume"); aC <- qA("oc"); bR <- qB("open_resume"); bC <- qB("oc")
+chk <- "\\checkmark"
+meanOR <- sprintf("%.1f", 100 * mean(od$open_resume)); meanOC <- sprintf("%.1f", 100 * mean(od$oc))
+nA <- format(nrow(od), big.mark = ","); nB <- format(nrow(nb), big.mark = ",")
+
+det_body <- data.frame(
+  Determinant = c("GPA (Z)", "Test Cases Passed (Z)", "\\# Awards (Z)", "Top Experience",
+                  "Strong Paper, Weak Coding", "Strong Coding, Weak Paper",
+                  "Mean Open Rate (\\%)", "Display Position Control", "Respondent FE", "Observations",
+                  "URM --- Race", "URM --- Gender", "Observations"),
+  "Open Resume" = c(aR, meanOR, chk, chk, nA, bR, nB),
+  "Open Code"   = c(aC, meanOC, chk, chk, nA, bC, nB),
+  check.names = FALSE, stringsAsFactors = FALSE)
+
+kbl(det_body, format = "latex", booktabs = TRUE, escape = FALSE, align = "lcc",
+    caption = "Determinants of Opening Rates (Engineer Phase Only)",
+    col.names = c(" ", "Open Resume", "Open Code")) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 8) %>%
+  pack_rows("Panel A: Quality, Mismatch \\& Fatigue (all rounds)", 1, 10, escape = FALSE) %>%
+  pack_rows("Panel B: Demographics (Nonblind only)", 11, 13, escape = FALSE) %>%
+  row_spec(6, extra_latex_after = "\\midrule") %>%
+  row_spec(10, extra_latex_after = "\\midrule") %>%
+  footnote(general = "Engineer phase only; outcome is opening a file (0/1). Each coefficient is a separate regression of the outcome on that signal (the two mismatch flags entered jointly; URM jointly), with Respondent ID FE and a display-position control; SE clustered by respondent. Coefficients in percentage points, est$^{*}$ (SE); * p$<$.10, ** p$<$.05, *** p$<$.01. Entered all together, collinearity across the 18 candidates renders these individually insignificant. ``Strong Paper, Weak Coding''/``Strong Coding, Weak Paper'' are above-/below-average splits on the paper-credential composite (GPA, awards, firm prestige) versus test cases (3 and 4 of 18 candidates; reference = concordant). Demographic$\\times$quality and other interactions tested and null.",
+           general_title = "", threeparttable = TRUE, footnote_as_chunk = FALSE, escape = FALSE)
+rm(od, nb, gc, qA, qB, aR, aC, bR, bC, chk, meanOR, meanOC, nA, nB, det_body)
+```
 
 
 ## Treatment Effects on Engagement (Causal)
