@@ -838,30 +838,33 @@ det[, prest    := fcase(as.character(max_firm_signal_tier) == "Top", 2,
                         as.character(max_firm_signal_tier) %in% c("Ordinary", "Growth"), 1,
                         default = 0)]
 det[, paper_z  := as.numeric(scale(rowMeans(cbind(scale(gpa), scale(num_awards), scale(prest)))))]
-det[, mismatch := abs(paper_z - test_z)]
+det[, dir_paper := as.integer(paper_z > 0 & test_z < 0)]  # Quality Mismatch I: strong resume, weak coding
+det[, dir_code  := as.integer(test_z > 0 & paper_z < 0)]  # Quality Mismatch II: strong coding, weak resume
 det[, dpos     := as.numeric(str_extract(as.character(r_do), "[0-9]+"))]
 
 ## One regression per role/phase, on display positions 4-18 (the first three
 ## are dropped as warm-up: engineers' first resume averages ~171s and stays
 ## elevated through position three). Within-evaluator (responseid FE); display
 ## position enters linearly as the fatigue slope. HR never saw test cases /
-## code, so test_z and mismatch are Eng-only (blank in the HR column).
+## code, so test_z and the mismatch flags are Eng-only (blank in the HR column).
 det <- det[ok & dpos >= 4]
 fit_det <- function(rl) {
-  rhs <- if (rl == "Eng") "gpa_z + awards_z + top_exp + test_z + mismatch + dpos" else "gpa_z + awards_z + top_exp + dpos"
+  rhs <- if (rl == "Eng") "gpa_z + awards_z + top_exp + test_z + dir_paper + dir_code + dpos" else "gpa_z + awards_z + top_exp + dpos"
   feols(as.formula(paste0("timeonpage ~ ", rhs, " | responseid")), det[role == rl], vcov = ~ responseid)
 }
 det_models <- list("(1)" = fit_det("HR"), "(2)" = fit_det("Eng"))
 
 det_coef_map <- c("gpa_z" = "GPA (Z)", "awards_z" = "\\# Awards (Z)", "top_exp" = "Top Experience",
-                  "test_z" = "Test Cases Passed (Z)", "mismatch" = "Quality Mismatch", "dpos" = "Display Position")
+                  "test_z" = "Test Cases Passed (Z)",
+                  "dir_paper" = "Quality Mismatch I (Strong Resume, Weak Coding)",
+                  "dir_code"  = "Quality Mismatch II (Strong Coding, Weak Resume)", "dpos" = "Display Position")
 det_chk <- "\\checkmark"
 det_mt  <- function(rl) sprintf("%.1f", mean(det[role == rl, timeonpage]))
 det_fe  <- data.frame(
   term = c("Mean Time (Seconds)", "Respondent ID FE"),
   "(1)" = c(det_mt("HR"), det_chk), "(2)" = c(det_mt("Eng"), det_chk),
   check.names = FALSE, stringsAsFactors = FALSE)
-attr(det_fe, "position") <- c(7, 8)
+attr(det_fe, "position") <- c(8, 9)
 det_gof <- tribble(~raw, ~clean, ~fmt, "nobs", "Observations", 0, "r.squared", "R$^2$", 3)
 
 modelsummary(
@@ -869,6 +872,7 @@ modelsummary(
   stars     = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
   estimate  = "{estimate}{stars} ({std.error})",
   statistic = NULL,
+  fmt       = 2,
   coef_map  = det_coef_map,
   gof_map   = det_gof,
   add_rows  = det_fe,
@@ -878,9 +882,9 @@ modelsummary(
 ) %>%
   kable_styling(latex_options = "HOLD_position", font_size = 8) %>%
   add_header_above(c(" " = 1, "Panel A: Resume-Screening" = 1, "Panel B: Technical-Evaluation" = 1)) %>%
-  row_spec(6, extra_latex_after = "\\midrule") %>%
-  row_spec(8, extra_latex_after = "\\midrule") %>%
-  footnote(general = "Within-evaluator (Respondent ID FE); SE clustered by respondent. Estimates in seconds, est$^{*}$ (SE) inline; * p$<$.10, ** p$<$.05, *** p$<$.01. Sample is display positions 4--18; the first three positions are dropped as warm-up. Blank cells mark signals HR never saw (test cases, code). URM-race and URM-gender (nonblind) are also insignificant (not shown).",
+  row_spec(7, extra_latex_after = "\\midrule") %>%
+  row_spec(9, extra_latex_after = "\\midrule") %>%
+  footnote(general = "Within-evaluator (Respondent ID FE); SE clustered by respondent. Estimates in seconds, est$^{*}$ (SE) inline; * p$<$.10, ** p$<$.05, *** p$<$.01. Sample is display positions 4--18; the first three positions are dropped as warm-up. Blank cells mark signals HR never saw (test cases, code). Quality Mismatch I/II are above-/below-average splits on the paper composite (GPA, awards, firm prestige) versus test cases (Eng-only). URM-race and URM-gender (nonblind) are also insignificant (not shown).",
            general_title = "", threeparttable = TRUE, footnote_as_chunk = FALSE, escape = FALSE)
 
 rm(det, fit_det, det_models, det_coef_map, det_chk, det_mt, det_fe, det_gof)
@@ -890,7 +894,7 @@ rm(det, fit_det, det_models, det_coef_map, det_chk, det_mt, det_fe, det_gof)
 
 \begingroup\footnotesize\linespread{0.95}\selectfont
 \begin{itemize}\setlength\itemsep{0pt}\setlength\parskip{0pt}\setlength\topsep{-2pt}\setlength\partopsep{0pt}\setlength\itemindent{0pt}\setlength\leftmargin{1em}
-  \item \textbf{Findings:} Material engagement responds to candidate quality --- and it shows up in \textbf{opening the code, not the resume.} Engineers open the actual code more for stronger candidates: higher GPA (\textcolor{blue}{$+1.5$ pp} per SD), higher test cases (\textcolor{blue}{$+1.7$ pp}), and especially candidates who \textbf{code better than their resume credentials} (Strong Coding, Weak Paper: \textcolor{blue}{$+3.2$ pp}, $\sim$$+5\%$) --- the ``hidden gem'' verification. Resume-opening responds to none of these, and time (above) responds to nothing. The reverse conflict (strong paper, weak coding), the candidates' assigned race/gender (Panel B, nonblind), and demographic$\times$quality interactions are all null. Entered jointly, collinearity across the 18 candidates renders the individual signals insignificant, so each coefficient below is a focused regression.
+  \item \textbf{Findings:} Material engagement responds to candidate quality --- and it shows up in \textbf{opening the code, not the resume.} Engineers open the actual code more for stronger candidates: higher GPA (\textcolor{blue}{$+1.5$ pp} per SD), higher test cases (\textcolor{blue}{$+1.7$ pp}), and especially candidates who \textbf{code better than their resume credentials} (Quality Mismatch II --- Strong Coding, Weak Resume: \textcolor{blue}{$+3.2$ pp}, $\sim$$+5\%$) --- the ``hidden gem'' verification. Resume-opening responds to none of these, and time (above) responds to nothing. The reverse conflict (Quality Mismatch I --- Strong Resume, Weak Coding), the candidates' assigned race/gender (Panel B, nonblind), and demographic$\times$quality interactions are all null. Entered jointly, collinearity across the 18 candidates renders the individual signals insignificant, so each coefficient below is a focused regression.
 \end{itemize}
 \endgroup
 \vspace{-0.3em}
@@ -937,7 +941,7 @@ nA <- format(nrow(od), big.mark = ","); nB <- format(nrow(nb), big.mark = ",")
 
 det_body <- data.frame(
   Determinant = c("GPA (Z)", "Test Cases Passed (Z)", "\\# Awards (Z)", "Top Experience",
-                  "Strong Paper, Weak Coding", "Strong Coding, Weak Paper",
+                  "Quality Mismatch I (Strong Resume, Weak Coding)", "Quality Mismatch II (Strong Coding, Weak Resume)",
                   "Mean Open Rate (\\%)", "Display Position Control", "Respondent FE", "Observations",
                   "URM --- Race", "URM --- Gender", "Observations"),
   "Open Resume" = c(aR, meanOR, chk, chk, nA, bR, nB),
@@ -952,7 +956,7 @@ kbl(det_body, format = "latex", booktabs = TRUE, escape = FALSE, align = "lcc",
   pack_rows("Panel B: Demographics (Nonblind only)", 11, 13, escape = FALSE) %>%
   row_spec(6, extra_latex_after = "\\midrule") %>%
   row_spec(10, extra_latex_after = "\\midrule") %>%
-  footnote(general = "Engineer phase only; outcome is opening a file (0/1). Each coefficient is a separate regression of the outcome on that signal (the two mismatch flags entered jointly; URM jointly), with Respondent ID FE and a display-position control; SE clustered by respondent. Coefficients in percentage points, est$^{*}$ (SE); * p$<$.10, ** p$<$.05, *** p$<$.01. Entered all together, collinearity across the 18 candidates renders these individually insignificant. ``Strong Paper, Weak Coding''/``Strong Coding, Weak Paper'' are above-/below-average splits on the paper-credential composite (GPA, awards, firm prestige) versus test cases (3 and 4 of 18 candidates; reference = concordant). Demographic$\\times$quality and other interactions tested and null.",
+  footnote(general = "Engineer phase only; outcome is opening a file (0/1). Each coefficient is a separate regression of the outcome on that signal (the two mismatch flags entered jointly; URM jointly), with Respondent ID FE and a display-position control; SE clustered by respondent. Coefficients in percentage points, est$^{*}$ (SE); * p$<$.10, ** p$<$.05, *** p$<$.01. Entered all together, collinearity across the 18 candidates renders these individually insignificant. Quality Mismatch I/II are above-/below-average splits on the paper-credential composite (GPA, awards, firm prestige) versus test cases (Strong Resume/Weak Coding and Strong Coding/Weak Resume; 3 and 4 of 18 candidates; reference = concordant). Demographic$\\times$quality and other interactions tested and null.",
            general_title = "", threeparttable = TRUE, footnote_as_chunk = FALSE, escape = FALSE)
 rm(od, nb, gc, qA, qB, aR, aC, bR, bC, chk, meanOR, meanOC, nA, nB, det_body)
 ```
