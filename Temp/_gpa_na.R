@@ -1,0 +1,12 @@
+suppressMessages({library(pacman); p_load(haven,here,readr,data.table,stringr,fixest)})
+options(warn=-1,readr.show_types=FALSE); date<-"18mar2026"; data_root<-"C:/Users/sungs/Dropbox/2_Research/A_By_Topics/A_Blind_hiring/"; setwd(here::here())
+a<-fread(file.path(data_root,"3output_data/Main/student_data/main_all69_student_sys.csv"))
+cat("=== GPA availability on 69 ===\n")
+cat("gpa_major: valid (0-4):",sum(a$gpa_major>=0 & a$gpa_major<=4,na.rm=TRUE),"of 69\n")
+cat("gpa overall: valid (0-4):",sum(a$gpa>=0 & a$gpa<=4,na.rm=TRUE),"of 69 | values>4 or <0:",sum(a$gpa>4|a$gpa<0,na.rm=TRUE),"\n")
+a[,g:=ifelse(gpa>=0&gpa<=4,gpa,NA_real_)]
+cat("overall-gpa validity (cleaned, n):",round(cor(scale(a$g),scale(a$overall_score),use="complete.obs"),2)," n=",sum(!is.na(a$g)),"\n")
+invisible(capture.output({for(f in c("2_Import","3_Firm_Cleaning","4_Distribution_Cleaning","5_Cleaning")) source(here::here("1_Codes",paste0(f,".R")))}))
+cat("\n=== NA among the 18 shown (firm_long_dt) for the signals ===\n")
+for(s in c("gpa_major","count_cs_work_experience","num_proj","num_awards","ind_cs_research","tier_top","test_case_z"))
+  cat(sprintf("  %-28s NA rows: %d\n",s,sum(is.na(firm_long_dt[[s]]))))

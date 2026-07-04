@@ -2922,11 +2922,11 @@ for (k in 1:18) {
 
   # --- HR ---
   hr_col  <- paste0("hr_pass", k)
-  hr_data <- firm_long_dt[role == "HR" & get(hr_col) == 1]
+  hr_data <- firm_long_dt[role == "HR" & get(hr_col) > 0]
 
   # Dynamic standardization: relative to nonblind mean/sd at this k
-  ctrl_mean_hr <- hr_data[treat == "nonblind", mean(overall_score, na.rm = TRUE)]
-  ctrl_sd_hr   <- hr_data[treat == "nonblind", sd(overall_score,   na.rm = TRUE)]
+  ctrl_mean_hr <- hr_data[treat == "nonblind", .wmean(overall_score, get(hr_col))]
+  ctrl_sd_hr   <- hr_data[treat == "nonblind", .wsd(overall_score, get(hr_col))]
 
   if (!is.na(ctrl_sd_hr) && ctrl_sd_hr > 0) {
     hr_data[, overall_score_std := (overall_score - ctrl_mean_hr) / ctrl_sd_hr]
@@ -2935,7 +2935,7 @@ for (k in 1:18) {
       m_hr <- suppressMessages(suppressWarnings(
         feols(overall_score_std ~ i(treat, ref = "nonblind") + resp_age |
                 q_version + resp_gender + resp_race + s2_educ + s2_income,
-              data = hr_data, vcov = ~ responseid)
+              data = hr_data, weights = as.formula(paste0('~', hr_col)), vcov = ~ responseid)
       ))
       ct <- coeftable(m_hr)
       if ("treat::blind" %in% rownames(ct)) {
@@ -2955,10 +2955,10 @@ for (k in 1:18) {
 
   # --- Engineer ---
   eng_col  <- paste0("eng_top", k)
-  eng_data <- firm_long_dt[role == "Eng" & get(eng_col) == 1]
+  eng_data <- firm_long_dt[role == "Eng" & get(eng_col) > 0]
 
-  ctrl_mean_eng <- eng_data[treat == "nonblind", mean(overall_score, na.rm = TRUE)]
-  ctrl_sd_eng   <- eng_data[treat == "nonblind", sd(overall_score,   na.rm = TRUE)]
+  ctrl_mean_eng <- eng_data[treat == "nonblind", .wmean(overall_score, get(eng_col))]
+  ctrl_sd_eng   <- eng_data[treat == "nonblind", .wsd(overall_score, get(eng_col))]
 
   if (!is.na(ctrl_sd_eng) && ctrl_sd_eng > 0) {
     eng_data[, overall_score_std := (overall_score - ctrl_mean_eng) / ctrl_sd_eng]
@@ -2968,7 +2968,7 @@ for (k in 1:18) {
         feols(overall_score_std ~ i(treat, ref = "nonblind") + resp_age |
                 q_version + resp_gender + resp_race + s2_educ + s2_income +
                 resp_python + resp_java,
-              data = eng_data, vcov = ~ responseid)
+              data = eng_data, weights = as.formula(paste0('~', eng_col)), vcov = ~ responseid)
       ))
       ct <- coeftable(m_eng)
       if ("treat::blind" %in% rownames(ct)) {
@@ -3064,16 +3064,16 @@ for (cmp in components) {
 
     ## --- HR ---
     hr_col  <- paste0("hr_pass", k)
-    hr_data <- firm_long_dt[role == "HR" & get(hr_col) == 1 & !is.na(get(cmp))]
-    ctrl_mean_hr <- hr_data[treat == "nonblind", mean(get(cmp), na.rm = TRUE)]
-    ctrl_sd_hr   <- hr_data[treat == "nonblind", sd(get(cmp),   na.rm = TRUE)]
+    hr_data <- firm_long_dt[role == "HR" & get(hr_col) > 0 & !is.na(get(cmp))]
+    ctrl_mean_hr <- hr_data[treat == "nonblind", .wmean(get(cmp), get(hr_col))]
+    ctrl_sd_hr   <- hr_data[treat == "nonblind", .wsd(get(cmp), get(hr_col))]
     if (!is.na(ctrl_sd_hr) && ctrl_sd_hr > 0) {
       hr_data[, std_outcome := (get(cmp) - ctrl_mean_hr) / ctrl_sd_hr]
       tryCatch({
         m_hr <- suppressMessages(suppressWarnings(
           feols(std_outcome ~ i(treat, ref = "nonblind") + resp_age |
                   q_version + resp_gender + resp_race + s2_educ + s2_income,
-                data = hr_data, vcov = ~ responseid)
+                data = hr_data, weights = as.formula(paste0('~', hr_col)), vcov = ~ responseid)
         ))
         ct <- coeftable(m_hr)
         if ("treat::blind" %in% rownames(ct)) {
@@ -3089,9 +3089,9 @@ for (cmp in components) {
 
     ## --- Engineer ---
     eng_col  <- paste0("eng_top", k)
-    eng_data <- firm_long_dt[role == "Eng" & get(eng_col) == 1 & !is.na(get(cmp))]
-    ctrl_mean_eng <- eng_data[treat == "nonblind", mean(get(cmp), na.rm = TRUE)]
-    ctrl_sd_eng   <- eng_data[treat == "nonblind", sd(get(cmp),   na.rm = TRUE)]
+    eng_data <- firm_long_dt[role == "Eng" & get(eng_col) > 0 & !is.na(get(cmp))]
+    ctrl_mean_eng <- eng_data[treat == "nonblind", .wmean(get(cmp), get(eng_col))]
+    ctrl_sd_eng   <- eng_data[treat == "nonblind", .wsd(get(cmp), get(eng_col))]
     if (!is.na(ctrl_sd_eng) && ctrl_sd_eng > 0) {
       eng_data[, std_outcome := (get(cmp) - ctrl_mean_eng) / ctrl_sd_eng]
       tryCatch({
@@ -3099,7 +3099,7 @@ for (cmp in components) {
           feols(std_outcome ~ i(treat, ref = "nonblind") + resp_age |
                   q_version + resp_gender + resp_race + s2_educ + s2_income +
                   resp_python + resp_java,
-                data = eng_data, vcov = ~ responseid)
+                data = eng_data, weights = as.formula(paste0('~', eng_col)), vcov = ~ responseid)
         ))
         ct <- coeftable(m_eng)
         if ("treat::blind" %in% rownames(ct)) {
@@ -3177,9 +3177,9 @@ for (k in 1:18) {
 
   ## --- HR ---
   hr_col  <- paste0("hr_pass", k)
-  hr_data <- firm_long_dt[role == "HR" & get(hr_col) == 1]
-  ctrl_mean_hr <- hr_data[treat == "nonblind", mean(overall_score, na.rm = TRUE)]
-  ctrl_sd_hr   <- hr_data[treat == "nonblind", sd(overall_score,   na.rm = TRUE)]
+  hr_data <- firm_long_dt[role == "HR" & get(hr_col) > 0]
+  ctrl_mean_hr <- hr_data[treat == "nonblind", .wmean(overall_score, get(hr_col))]
+  ctrl_sd_hr   <- hr_data[treat == "nonblind", .wsd(overall_score, get(hr_col))]
 
   if (!is.na(ctrl_sd_hr) && ctrl_sd_hr > 0) {
     hr_data[, overall_score_std := (overall_score - ctrl_mean_hr) / ctrl_sd_hr]
@@ -3188,7 +3188,7 @@ for (k in 1:18) {
       m_hr <- suppressMessages(suppressWarnings(
         feols(overall_score_std ~ i(treat, ref = "nonblind") * dei_index_z + resp_age |
                 q_version + resp_gender + resp_race + s2_educ + s2_income,
-              data = hr_data, vcov = ~ responseid)
+              data = hr_data, weights = as.formula(paste0('~', hr_col)), vcov = ~ responseid)
       ))
       cf <- coef(m_hr); V <- vcov(m_hr)
       idx_main <- match("treat::blind", names(cf))
@@ -3211,9 +3211,9 @@ for (k in 1:18) {
 
   ## --- Engineer ---
   eng_col  <- paste0("eng_top", k)
-  eng_data <- firm_long_dt[role == "Eng" & get(eng_col) == 1]
-  ctrl_mean_eng <- eng_data[treat == "nonblind", mean(overall_score, na.rm = TRUE)]
-  ctrl_sd_eng   <- eng_data[treat == "nonblind", sd(overall_score,   na.rm = TRUE)]
+  eng_data <- firm_long_dt[role == "Eng" & get(eng_col) > 0]
+  ctrl_mean_eng <- eng_data[treat == "nonblind", .wmean(overall_score, get(eng_col))]
+  ctrl_sd_eng   <- eng_data[treat == "nonblind", .wsd(overall_score, get(eng_col))]
 
   if (!is.na(ctrl_sd_eng) && ctrl_sd_eng > 0) {
     eng_data[, overall_score_std := (overall_score - ctrl_mean_eng) / ctrl_sd_eng]
@@ -3223,7 +3223,7 @@ for (k in 1:18) {
         feols(overall_score_std ~ i(treat, ref = "nonblind") * dei_index_z + resp_age |
                 q_version + resp_gender + resp_race + s2_educ + s2_income +
                 resp_python + resp_java,
-              data = eng_data, vcov = ~ responseid)
+              data = eng_data, weights = as.formula(paste0('~', eng_col)), vcov = ~ responseid)
       ))
       cf <- coef(m_eng); V <- vcov(m_eng)
       idx_main <- match("treat::blind", names(cf))
@@ -3325,9 +3325,9 @@ for (k in 1:18) {
 
   ## --- HR ---
   hr_col  <- paste0("hr_pass", k)
-  hr_data <- firm_long_dt[role == "HR" & get(hr_col) == 1 & !is.na(firm_targets_fh)]
-  ctrl_mean_hr <- hr_data[treat == "nonblind", mean(overall_score, na.rm = TRUE)]
-  ctrl_sd_hr   <- hr_data[treat == "nonblind", sd(overall_score,   na.rm = TRUE)]
+  hr_data <- firm_long_dt[role == "HR" & get(hr_col) > 0 & !is.na(firm_targets_fh)]
+  ctrl_mean_hr <- hr_data[treat == "nonblind", .wmean(overall_score, get(hr_col))]
+  ctrl_sd_hr   <- hr_data[treat == "nonblind", .wsd(overall_score, get(hr_col))]
 
   if (!is.na(ctrl_sd_hr) && ctrl_sd_hr > 0) {
     hr_data[, overall_score_std := (overall_score - ctrl_mean_hr) / ctrl_sd_hr]
@@ -3336,7 +3336,7 @@ for (k in 1:18) {
       m_hr <- suppressMessages(suppressWarnings(
         feols(overall_score_std ~ i(treat, ref = "nonblind") * firm_targets_fh + resp_age |
                 q_version + resp_gender + resp_race + s2_educ + s2_income,
-              data = hr_data, vcov = ~ responseid)
+              data = hr_data, weights = as.formula(paste0('~', hr_col)), vcov = ~ responseid)
       ))
       cf <- coef(m_hr); V <- vcov(m_hr)
       idx_main <- match("treat::blind", names(cf))
@@ -3358,9 +3358,9 @@ for (k in 1:18) {
 
   ## --- Engineer ---
   eng_col  <- paste0("eng_top", k)
-  eng_data <- firm_long_dt[role == "Eng" & get(eng_col) == 1 & !is.na(firm_targets_fh)]
-  ctrl_mean_eng <- eng_data[treat == "nonblind", mean(overall_score, na.rm = TRUE)]
-  ctrl_sd_eng   <- eng_data[treat == "nonblind", sd(overall_score,   na.rm = TRUE)]
+  eng_data <- firm_long_dt[role == "Eng" & get(eng_col) > 0 & !is.na(firm_targets_fh)]
+  ctrl_mean_eng <- eng_data[treat == "nonblind", .wmean(overall_score, get(eng_col))]
+  ctrl_sd_eng   <- eng_data[treat == "nonblind", .wsd(overall_score, get(eng_col))]
 
   if (!is.na(ctrl_sd_eng) && ctrl_sd_eng > 0) {
     eng_data[, overall_score_std := (overall_score - ctrl_mean_eng) / ctrl_sd_eng]
@@ -3370,7 +3370,7 @@ for (k in 1:18) {
         feols(overall_score_std ~ i(treat, ref = "nonblind") * firm_targets_fh + resp_age |
                 q_version + resp_gender + resp_race + s2_educ + s2_income +
                 resp_python + resp_java,
-              data = eng_data, vcov = ~ responseid)
+              data = eng_data, weights = as.formula(paste0('~', eng_col)), vcov = ~ responseid)
       ))
       cf <- coef(m_eng); V <- vcov(m_eng)
       idx_main <- match("treat::blind", names(cf))
@@ -3462,9 +3462,9 @@ for (k in 1:18) {
 
   ## --- HR ---
   hr_col  <- paste0("hr_pass", k)
-  hr_data <- firm_long_dt[role == "HR" & get(hr_col) == 1 & !is.na(misalign_z)]
-  ctrl_mean_hr <- hr_data[treat == "nonblind", mean(overall_score, na.rm = TRUE)]
-  ctrl_sd_hr   <- hr_data[treat == "nonblind", sd(overall_score,   na.rm = TRUE)]
+  hr_data <- firm_long_dt[role == "HR" & get(hr_col) > 0 & !is.na(misalign_z)]
+  ctrl_mean_hr <- hr_data[treat == "nonblind", .wmean(overall_score, get(hr_col))]
+  ctrl_sd_hr   <- hr_data[treat == "nonblind", .wsd(overall_score, get(hr_col))]
 
   if (!is.na(ctrl_sd_hr) && ctrl_sd_hr > 0) {
     hr_data[, overall_score_std := (overall_score - ctrl_mean_hr) / ctrl_sd_hr]
@@ -3473,7 +3473,7 @@ for (k in 1:18) {
       m_hr <- suppressMessages(suppressWarnings(
         feols(overall_score_std ~ i(treat, ref = "nonblind") * misalign_z + resp_age |
                 q_version + resp_gender + resp_race + s2_educ + s2_income,
-              data = hr_data, vcov = ~ responseid)
+              data = hr_data, weights = as.formula(paste0('~', hr_col)), vcov = ~ responseid)
       ))
       cf <- coef(m_hr); V <- vcov(m_hr)
       idx_main <- match("treat::blind", names(cf))
@@ -3495,9 +3495,9 @@ for (k in 1:18) {
 
   ## --- Engineer ---
   eng_col  <- paste0("eng_top", k)
-  eng_data <- firm_long_dt[role == "Eng" & get(eng_col) == 1 & !is.na(misalign_z)]
-  ctrl_mean_eng <- eng_data[treat == "nonblind", mean(overall_score, na.rm = TRUE)]
-  ctrl_sd_eng   <- eng_data[treat == "nonblind", sd(overall_score,   na.rm = TRUE)]
+  eng_data <- firm_long_dt[role == "Eng" & get(eng_col) > 0 & !is.na(misalign_z)]
+  ctrl_mean_eng <- eng_data[treat == "nonblind", .wmean(overall_score, get(eng_col))]
+  ctrl_sd_eng   <- eng_data[treat == "nonblind", .wsd(overall_score, get(eng_col))]
 
   if (!is.na(ctrl_sd_eng) && ctrl_sd_eng > 0) {
     eng_data[, overall_score_std := (overall_score - ctrl_mean_eng) / ctrl_sd_eng]
@@ -3507,7 +3507,7 @@ for (k in 1:18) {
         feols(overall_score_std ~ i(treat, ref = "nonblind") * misalign_z + resp_age |
                 q_version + resp_gender + resp_race + s2_educ + s2_income +
                 resp_python + resp_java,
-              data = eng_data, vcov = ~ responseid)
+              data = eng_data, weights = as.formula(paste0('~', eng_col)), vcov = ~ responseid)
       ))
       cf <- coef(m_eng); V <- vcov(m_eng)
       idx_main <- match("treat::blind", names(cf))
@@ -3603,10 +3603,10 @@ for (k in 1:18) {
 
   ## --- HR ---
   hr_col  <- paste0("hr_pass", k)
-  hr_data <- firm_long_dt[role == "HR" & get(hr_col) == 1 &
+  hr_data <- firm_long_dt[role == "HR" & get(hr_col) > 0 &
                           !is.na(dei_index_z) & !is.na(misalign_z)]
-  ctrl_mean_hr <- hr_data[treat == "nonblind", mean(overall_score, na.rm = TRUE)]
-  ctrl_sd_hr   <- hr_data[treat == "nonblind", sd(overall_score,   na.rm = TRUE)]
+  ctrl_mean_hr <- hr_data[treat == "nonblind", .wmean(overall_score, get(hr_col))]
+  ctrl_sd_hr   <- hr_data[treat == "nonblind", .wsd(overall_score, get(hr_col))]
 
   if (!is.na(ctrl_sd_hr) && ctrl_sd_hr > 0) {
     hr_data[, overall_score_std := (overall_score - ctrl_mean_hr) / ctrl_sd_hr]
@@ -3615,7 +3615,7 @@ for (k in 1:18) {
       m_hr <- suppressMessages(suppressWarnings(
         feols(overall_score_std ~ i(treat, ref = "nonblind") * dei_index_z * misalign_z + resp_age |
                 q_version + resp_gender + resp_race + s2_educ + s2_income,
-              data = hr_data, vcov = ~ responseid)
+              data = hr_data, weights = as.formula(paste0('~', hr_col)), vcov = ~ responseid)
       ))
       cf <- coef(m_hr); V <- vcov(m_hr)
       idx_main <- match("treat::blind",                        names(cf))
@@ -3645,10 +3645,10 @@ for (k in 1:18) {
 
   ## --- Engineer ---
   eng_col  <- paste0("eng_top", k)
-  eng_data <- firm_long_dt[role == "Eng" & get(eng_col) == 1 &
+  eng_data <- firm_long_dt[role == "Eng" & get(eng_col) > 0 &
                            !is.na(dei_index_z) & !is.na(misalign_z)]
-  ctrl_mean_eng <- eng_data[treat == "nonblind", mean(overall_score, na.rm = TRUE)]
-  ctrl_sd_eng   <- eng_data[treat == "nonblind", sd(overall_score,   na.rm = TRUE)]
+  ctrl_mean_eng <- eng_data[treat == "nonblind", .wmean(overall_score, get(eng_col))]
+  ctrl_sd_eng   <- eng_data[treat == "nonblind", .wsd(overall_score, get(eng_col))]
 
   if (!is.na(ctrl_sd_eng) && ctrl_sd_eng > 0) {
     eng_data[, overall_score_std := (overall_score - ctrl_mean_eng) / ctrl_sd_eng]
@@ -3658,7 +3658,7 @@ for (k in 1:18) {
         feols(overall_score_std ~ i(treat, ref = "nonblind") * dei_index_z * misalign_z + resp_age |
                 q_version + resp_gender + resp_race + s2_educ + s2_income +
                 resp_python + resp_java,
-              data = eng_data, vcov = ~ responseid)
+              data = eng_data, weights = as.formula(paste0('~', eng_col)), vcov = ~ responseid)
       ))
       cf <- coef(m_eng); V <- vcov(m_eng)
       idx_main <- match("treat::blind",                        names(cf))

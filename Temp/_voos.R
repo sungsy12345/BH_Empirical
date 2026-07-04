@@ -1,0 +1,6 @@
+suppressMessages(library(pdftools))
+f<-tail(grep("Drop",list.files("2_Reports","Main_Results.*pdf",full.names=T),invert=T,value=T),1)
+t<-pdf_text(f); cat("newest main:",basename(f),"| pages",length(t),"\n")
+oos<-which(grepl("Out-of-Sample Reweighting to the 69",t))
+cat("OOS section starts p",oos[1],"\n")
+pdftools::pdf_convert(f,pages=(oos[1]):(oos[1]+2),filenames=paste0("Temp/_oos_p",1:3,".png"),dpi=95,verbose=FALSE)

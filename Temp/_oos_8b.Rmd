@@ -1,0 +1,35 @@
+---
+title: "Out-of-Sample Reweighting to the 69-Student Pool: Composition and Productivity"
+subtitle: "Real student demographics; fixed-behavior (composition) channel; 8B house style"
+date: "`r format(Sys.time(), '%d %b %Y')`"
+output:
+  pdf_document: { number_sections: true, latex_engine: pdflatex }
+geometry: margin=0.8in
+header-includes: \usepackage{booktabs}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+We take the measured non-blind demographic biases and apply them to the true 69-student pool (real demographics, real productivity), simulating blind vs non-blind selection at each hiring cutoff K. Behavior is held fixed (composition channel); this documents how blinding reshapes *who* is hired and whether that moves *productivity*.
+
+# Compositional changes: who gets hired
+
+```{r comp, fig.width=9.5, fig.height=8.5, out.width="100%", fig.align="center"}
+print(figComp)
+```
+
+Blinding removes the non-blind premia/penalties, so it mechanically reshuffles the demographic composition of hires (e.g., groups that were penalized when identified gain; groups that were given a premium lose). This mirrors the in-sample composition result, now on the real applicant pool.
+
+# Treatment effect on productivity
+
+```{r prod, fig.width=9, fig.height=4.2, out.width="100%", fig.align="center"}
+print(figProd)
+```
+
+Despite the compositional reshuffle, the effect on the true productivity of the hired cohort is null across the entire hiring margin, in both stages. The composition channel moves *who* is hired without moving *how productive* they are --- because the biases are modest and demographic identity carries little productivity information beyond the visible signals.
+
+# Caveats
+
+Calibration, not estimation: behavior held fixed (statistical-discrimination channel deferred); s(X) extrapolated from 18 profiles; bands are simulation-based (evaluator-clustered); the 69 pool is Berkeley-CS (79\% Asian, with rare Hispanic-female / White-female cells, so those group panels are noisy).

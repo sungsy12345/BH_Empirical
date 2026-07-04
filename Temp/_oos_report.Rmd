@@ -1,0 +1,75 @@
+---
+title: "Out-of-Sample Reweighting: Would a Realistic Demographic--Productivity Distribution Change the Productivity Effect of Blinding?"
+subtitle: "Fixed-behavior (composition) backbone --- calibrated simulation, not an estimate"
+date: "`r format(Sys.time(), '%d %b %Y')`"
+output:
+  pdf_document:
+    number_sections: true
+    latex_engine: pdflatex
+geometry: margin=1in
+header-includes:
+  - \usepackage{booktabs}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+library(knitr); library(kableExtra)
+```
+
+# Motivation and what this exercise can (and cannot) do
+
+The experiment randomizes demographic labels onto fixed résumé content, so assigned demographics are **orthogonal to true productivity by construction**. Demographic bias can then only reshuffle candidates *within* a productivity level, never systematically select less-productive people --- so the measured **null productivity effect of blinding is largely mechanical**. This note asks: if, as in the real market, demographic identity correlated with true productivity, would the measured biases translate into a productivity effect?
+
+This is a **calibrated simulation, not an estimate.** It holds evaluator scoring behavior fixed (the "fixed-behavior" / composition channel) and sweeps the one thing the experiment cannot identify --- the correlation between identity and the productivity that is *unobserved* by the score. The complementary statistical-discrimination channel (where blinding could destroy a genuinely predictive signal) is a bounded-invariance question deferred to a later layer (see \S5).
+
+# Primitives (identified in-sample)
+
+The content-score map s(X) is fit on the 18 shown profiles' blind-arm scores and predicted out to all 69; u is the true productivity **not** captured by that score. Firm prestige is now included in s(X) (available for all 69).
+
+```{r t1}
+kable(T1, booktabs=TRUE, caption="Content-score fit and the invisible-productivity share, by stage.") %>% kable_styling(latex_options="HOLD_position", font_size=9)
+```
+
+The score already explains the large majority of productivity variance, so only a small share (u) is left for identity to proxy. Adding firm prestige barely changes the fit (compare the two LOO columns) --- consistent with prestige predicting the *score* more than lab productivity.
+
+```{r t2}
+kable(T2, booktabs=TRUE, caption="Six-group non-blind score bias (demeaned) and pool share. Engineers show the S1.1 pattern (White Male penalized, minorities premium); HR biases are near zero. The largest-bias groups are the rarest in the pool.") %>% kable_styling(latex_options="HOLD_position", font_size=9)
+```
+
+# (b) Does the bias bend with ability? A shrinkage-consistency check
+
+A pure level shift (consistent with constant taste) would be flat across the ability signal; a premium that *bends* toward zero as the signal strengthens is consistent with Bayesian shrinkage (statistical discrimination) --- though, because taste can itself be ability-dependent, this is a **consistency check, not an identification** of the mechanism.
+
+```{r figA, fig.width=8, fig.height=4, fig.align="center"}
+print(figA)
+```
+
+# (f) Productivity effect of blinding: sensitivity and the hiring margin
+
+Effect of blinding = E[Y | blind hires] - E[Y | non-blind hires], in SD of true productivity. `corr = 0` recovers the measured null (validation).
+
+```{r figB, fig.width=9, fig.height=4, fig.align="center"}
+print(figB)
+```
+
+```{r figK, fig.width=7, fig.height=3.8, fig.align="center"}
+print(figK)
+```
+
+Even at a **strong** identity--productivity correlation (|corr| approx 0.5), the effect stays within roughly +/- 0.02 SD for engineers and smaller for HR. The k-curve is flat and near zero across the hiring margin.
+
+# Sensitivity to the applicant pool (e)
+
+```{r sens}
+kable(sens, booktabs=TRUE, caption="Blinding effect (SD of Y) at a strong anti-alignment (corr = -0.4, K=10): our Berkeley pool vs an illustrative US-representative pool.") %>% kable_styling(latex_options="HOLD_position", font_size=9)
+```
+
+Reweighting to a US-representative demographic mix does not rescue a meaningful effect, because the mechanism is bounded by the biases and by SD(u), not by the marginal shares alone.
+
+# Interpretation, the deferred layer, and caveats
+
+**Why the composition channel is inert here** --- three compounding reasons: (1) the biases are modest (~0.16 SD spread) and mostly cancel over a realistic pool; (2) visible signals already explain the large majority of productivity, leaving little u for identity to proxy; (3) the groups carrying the largest bias are the rarest in the pool. Refining the model (firm prestige, ability-tier-varying bias) sharpens but does not overturn this.
+
+**The real question is the deferred (c) layer.** The composition channel cannot make blinding *hurt* efficiency; only a statistical-discrimination channel can (blinding removing a genuinely predictive signal). Our design cannot separate taste from statistical discrimination --- and, since taste can be ability-dependent, not even the ability-slope cleanly identifies it. The honest object there is a productivity band swept over a **behavioral-invariance** parameter (scoring rule fixed  ->  composition null; scoring rule re-optimizes to correct beliefs  ->  efficiency cost). That band's width *is* the statement of what the experiment cannot identify.
+
+**Caveats.** Calibration, not estimation; s(X) extrapolates from 18 profiles (LOO R2 reported); group x tier interactions are low-powered at N=18 x 6; the US-representative shares are illustrative; the Berkeley pool is 79\% Asian with ~1 Hispanic-female profile.
