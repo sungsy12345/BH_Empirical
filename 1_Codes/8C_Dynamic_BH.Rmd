@@ -1,0 +1,183 @@
+---
+title: "Analysis Report"
+output:
+  pdf_document:
+    number_sections: true
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{threeparttable}
+  - \usepackage{float}
+  - \usepackage{bbm}
+  - \usepackage{array}
+  - \usepackage{arydshln}
+  - \usepackage{enumitem}
+  - \usepackage{multirow}
+geometry: margin=0.5in, landscape
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+```{r prelim, include=FALSE}
+## average endogenous pass share, needed for inline reference in the intro below
+## (inline R evaluates in document order, so compute it before the intro text)
+suppressWarnings(suppressMessages(library(data.table)))
+endo_share <- round(100*mean(unique(firm_twostage_long_dt[,.(responseid_hr,cnt=sc_advance_count_hr)])$cnt, na.rm=TRUE)/18)
+```
+
+# Two-Stage Combined Pipeline: Exogenous \& Endogenous HR Selection, Fractional Tie-Weighting
+
+\begingroup\small
+\begin{itemize}\setlength\itemsep{2pt}\setlength\parskip{0pt}\setlength\topsep{0pt}
+  \item \textbf{Pipeline.} Each HR evaluator is paired with an Engineer. HR passes a top-$h$ résumé set to the Engineer, who then hires its top-$k$ from the passed pool. We vary the HR cut four ways: \emph{exogenous} $h=3$ ($17\%$ of 18), $h=6$ ($33\%$), $h=9$ ($50\%$), and \emph{endogenous} $=$ the résumés the HR \emph{actually advanced} in the experiment ($\overline{\text{pass}}\approx`r endo_share`\%$). The $h\times k$ combinations run are: $h=3\!:k{=}1$; $h=6\!:k\in\{1,3\}$; $h=9\!:k\in\{1,3,5\}$; endogenous$\!:k\in\{1,2,3\}$. Arms combine blinding across stages: \textbf{Control} (nonblind$\to$nonblind), \textbf{Realistic BH} (blind HR $\to$ nonblind Eng), \textbf{Complete BH} (blind$\to$blind). $k=1$ is the noisiest cut.
+  \item \textbf{Fractional tie-weighting.} At each \emph{score-based} stage the top-$k$ weight is $(k-A)/t$ clamped to $[0,1]$ ($t=$ score-tie size, $A=$ number strictly above); ties split boundary seats. Compounded: $\text{hire}=f^{HR}\times f^{Eng}_k$. Under endogenous selection the HR pass is the observed binary advance decision ($f^{HR}\in\{0,1\}$), so only the Engineer stage is fractional; when the HR advances fewer than $k$, the Engineer hires all of them.
+  \item \textbf{IPF matching weights} $=1/(N_{HR}\times N_{Eng})$ within each (arm $\times$ Eng version) block (Complete BH collapsed to one block; weights recomputed within each matched subset in §4).
+  \item \textbf{Contrasts \& demographic} (label = what the \emph{toggled} stage saw, ref $=$ Blind, sign-flipped so $+ =$ blinding increases): \emph{Realistic$-$Control} $=$ blind HR (uses what HR saw); \emph{Complete$-$Realistic} $=$ blind Eng (what Eng saw); \emph{Complete$-$Control} $=$ combined. SEs two-way clustered by HR and Engineer.
+  \item \textbf{Caveats.} Significance stars: * $p<.10$, ** $p<.05$, *** $p<.01$ (two-way clustered). Rare groups (esp.\ Hispanic Female) are noisy in the small pools.
+\end{itemize}
+\endgroup
+
+```{r twostage_compute}
+suppressWarnings(suppressMessages({library(fixest);library(data.table);library(ggplot2);library(kableExtra);library(stringr)}))
+demos <- c("White_Male","White_Female","Asian_Male","Asian_Female","Hispanic_Male","Hispanic_Female")
+
+## ---- one cell: given a pair-subset, HR-pass h (integer OR "endo"), Eng-select k -> prod (3 contrasts) + comp (6x3) ----
+run_cell <- function(Dsub, h, k) {
+  pr <- unique(Dsub[,.(arm,responseid_hr,responseid_eng,resume_ver_eng)])
+  pr[, `:=`(nHR=uniqueN(responseid_hr), nEng=uniqueN(responseid_eng)), by=.(arm,resume_ver_eng)]
+  pr[, w_ipf := 1/(nHR*nEng)]
+  d <- merge(Dsub, pr[,.(arm,responseid_hr,responseid_eng,resume_ver_eng,w_ipf)], by=c("arm","responseid_hr","responseid_eng","resume_ver_eng"))
+  ## ---- HR pass stage ----
+  if (is.character(h) && h=="endo") {
+    ## endogenous: HR passes the resumes it actually advanced (observed binary decision, no fractional HR ties)
+    d[, fh := fifelse(sc_advance_hr==1, 1, 0, na=0)]
+  } else {
+    ## exogenous: fractional top-h on HR's (overall, coding) score
+    hr <- unique(d[,.(responseid_hr,resume_index,so=sc_overall_z_hr,sc=sc_coding_z_hr)])
+    hr[, grp:=.GRP, by=.(responseid_hr, round(so,8), round(sc,8))]
+    g <- hr[,.(t=.N,so=so[1],sc=sc[1]),by=.(responseid_hr,grp)]; setorder(g,responseid_hr,-so,-sc); g[,A:=cumsum(c(0,head(t,-1))),by=responseid_hr]
+    g[, fh:=pmin(1,pmax(0,(h-A)/t))]; hr<-merge(hr,g[,.(responseid_hr,grp,fh)],by=c("responseid_hr","grp"))
+    d <- merge(d, hr[,.(responseid_hr,resume_index,fh)], by=c("responseid_hr","resume_index"))
+  }
+  pas <- d[fh>0]
+  ## ---- Eng select stage (fractional top-k on Eng's (overall, coding) score within passed pool) ----
+  pas[, grp:=.GRP, by=.(pair_id, round(sc_overall_z_eng,8), round(sc_coding_z_eng,8))]
+  ge <- pas[,.(t=.N,so=sc_overall_z_eng[1],sc=sc_coding_z_eng[1]),by=.(pair_id,grp)]; setorder(ge,pair_id,-so,-sc); ge[,A:=cumsum(c(0,head(t,-1))),by=pair_id]
+  ge[, fe:=pmin(1,pmax(0,(k-A)/t))]; pas<-merge(pas,ge[,.(pair_id,grp,fe)],by=c("pair_id","grp"))
+  pas[, hire := fh*fe]
+  prod_c <- function(a_ref,a_alt){ s<-pas[hire>0 & arm%in%c(a_ref,a_alt)]; s[,arm:=factor(as.character(arm),levels=c(a_ref,a_alt))]; s[,ww:=w_ipf*hire]
+    m<-tryCatch(feols(as.formula(paste0("overall_score_z ~ i(arm, ref='",a_ref,"') + resp_age_hr+resp_age_eng | resp_gender_hr+resp_race_hr+resp_gender_eng+resp_race_eng")), s, weights=~ww, vcov=~responseid_hr+responseid_eng),error=function(e) NULL)
+    if(is.null(m)) return(c(NA,NA)); ct<-coeftable(m); rn<-grep(paste0("arm::",a_alt),rownames(ct),value=TRUE); c(ct[rn,1],ct[rn,4]) }
+  comp_c <- function(a_ref,a_alt,demo){ s<-pas[arm%in%c(a_ref,a_alt)]
+    m<-tryCatch(feols(as.formula(paste0("hire ~ i(",demo,", ref='Blind') + resp_age_hr+resp_age_eng | resume_index+resp_gender_hr+resp_race_hr+resp_gender_eng+resp_race_eng")), s, weights=~w_ipf, vcov=~responseid_hr+responseid_eng),error=function(e) NULL)
+    o<-matrix(NA,length(demos),3,dimnames=list(demos,c("est","se","p"))); if(!is.null(m)){ct<-coeftable(m); for(g in demos){rn<-paste0(demo,"::",g); if(rn%in%rownames(ct)) o[g,]<-c(-ct[rn,1],ct[rn,2],ct[rn,4])}}; o }
+  list(prod=rbind(RC=prod_c("Control","Realistic_BH"),CR=prod_c("Realistic_BH","Complete_BH"),CC=prod_c("Control","Complete_BH")),
+       comp=list(RC=comp_c("Control","Realistic_BH","race_gender_hr"),CR=comp_c("Realistic_BH","Complete_BH","race_gender_eng"),CC=comp_c("Control","Complete_BH","race_gender_eng")))
+}
+star<-function(p) ifelse(is.na(p),"",ifelse(p<0.01,"***",ifelse(p<0.05,"**",ifelse(p<0.1,"*",""))))
+
+D0 <- copy(firm_twostage_long_dt)
+## endo_share computed in the `prelim` chunk above (needed earlier for the intro)
+hlab <- function(h) if (is.character(h)&&h=="endo") sprintf("Endog. (~%s%%)",endo_share) else sprintf("%s (%s%%)",h,round(100*as.numeric(h)/18))
+
+## grid: h=3 x{1}; h=6 x{1,3}; h=9 x{1,3,5}; endogenous x{1,2,3}
+cells <- list(list(h=3,k=1),
+              list(h=6,k=1), list(h=6,k=3),
+              list(h=9,k=1), list(h=9,k=3), list(h=9,k=5),
+              list(h="endo",k=1), list(h="endo",k=2), list(h="endo",k=3))
+grid <- lapply(cells, function(cl) run_cell(D0, cl$h, cl$k))
+```
+
+## Treatment Effect on Productivity of Hired (baseline matching)
+
+\textit{Effect on true lab productivity (Z) of the hired, SD units; $+ =$ blinding raises. Two-way clustered SE; * $p<.10$, ** $p<.05$, *** $p<.01$.}
+
+```{r prod_grid, results='asis'}
+Rt <- rbindlist(lapply(seq_along(cells), function(i){ cl<-cells[[i]]; p<-grid[[i]]$prod
+  data.table(HRpass=hlab(cl$h), EngSel=cl$k,
+    RC=sprintf("%.3f%s",p["RC",1],star(p["RC",2])),
+    CR=sprintf("%.3f%s",p["CR",1],star(p["CR",2])),
+    CC=sprintf("%.3f%s",p["CC",1],star(p["CC",2]))) }))
+print(kable(Rt,format="latex",booktabs=TRUE,escape=TRUE,align="llccc",row.names=FALSE,
+  col.names=c("HR passes","Eng selects","Realistic - Control","Complete - Realistic","Complete - Control")) |>
+  kable_styling(latex_options="HOLD_position",font_size=9))
+```
+
+\clearpage
+## Treatment Effect on Composition (baseline matching)
+
+\textit{Effect of blinding on P(hire is group), percentage points; points $=$ estimate, bars $=$ 95\% CI, stars $=$ two-way-clustered significance (* $p<.10$, ** $p<.05$, *** $p<.01$). Rows: HR pass; columns: Engineers selected (blank panel $=$ combination not run).}
+
+```{r comp_grid_plot, fig.width=11, fig.height=7.5}
+Cp <- rbindlist(lapply(seq_along(cells), function(i){ cl<-cells[[i]]
+  rbindlist(lapply(c("RC","CR","CC"), function(ct){ m<-grid[[i]]$comp[[ct]]
+    data.table(h=as.character(cl$h),k=cl$k,contrast=c(RC="Realistic - Control",CR="Complete - Realistic",CC="Complete - Control")[ct],
+               demo=rownames(m), est=m[,"est"], se=m[,"se"], p=m[,"p"]) })) }))
+Cp[, `:=`(pp=100*est, lo=100*(est-1.96*se), hi=100*(est+1.96*se))]
+Cp[, stars := star(p)]
+Cp[, demo_f:=factor(gsub("_"," ",demo),levels=rev(gsub("_"," ",demos)))]
+Cp[, contrast:=factor(contrast,levels=c("Realistic - Control","Complete - Realistic","Complete - Control"))]
+Cp[, pass_f:=factor(fifelse(h=="endo","Endogenous",paste0("HR passes ",h)),
+                    levels=c("HR passes 3","HR passes 6","HR passes 9","Endogenous"))]
+Cp[, sel_f:=factor(paste0("Eng selects ",k),levels=paste0("Eng selects ",c(1,2,3,5)))]
+ggplot(Cp, aes(x=pp,y=demo_f,color=contrast)) + geom_vline(xintercept=0,linetype="dashed",color="gray55") +
+  geom_pointrange(aes(xmin=lo,xmax=hi),position=position_dodge(width=0.6),size=0.22,fatten=1.5) +
+  geom_text(aes(label=stars, x=hi), position=position_dodge(width=0.6), hjust=-0.15, vjust=0.4, size=2.5, show.legend=FALSE) +
+  facet_grid(pass_f~sel_f) +
+  scale_color_manual(values=c("Realistic - Control"="#C44E52","Complete - Realistic"="#4C72B0","Complete - Control"="#8172B3"),name=NULL) +
+  labs(x="Effect of blinding on P(hire is group) — percentage points",y=NULL) +
+  theme_bw(base_size=9)+theme(legend.position="bottom",panel.grid.minor=element_blank(),strip.text=element_text(face="bold",size=8))
+```
+
+\clearpage
+# Robustness: How the TE Changes Under Different HR$\leftrightarrow$Engineer Matching (Eng selects $k=3$)
+
+\begingroup\small
+Instead of pairing every HR with every Engineer, restrict pairs so HR and Engineer are at firms matching on a characteristic, recompute the IPF weights within the matched set, and re-estimate. \textbf{Region} $=$ same U.S.\ state (evaluator geolocated from the address ZIP, as in the descriptive; 95--96\% coverage). Engineer selection fixed at $k=3$; HR cut shown for exogenous $h=6,9$ and endogenous ($h=3$ is omitted as it runs only $k=1$).
+\endgroup
+
+```{r matching_compute}
+## state from address ZIP (as in 7_Descriptive)
+suppressWarnings(suppressMessages(library(zipcodeR)))
+st <- unique(firm_dt[, .(responseid, zip5 = str_extract(as.character(s6_address_5), "\\d{5}"))])[!is.na(zip5)]
+zc <- tryCatch(as.data.table(zipcodeR::reverse_zipcode(unique(st$zip5)))[,.(zip5=zipcode,state)],error=function(e) NULL)
+if(!is.null(zc)){ st<-merge(st,zc,by="zip5")[!is.na(state)&state!=""]
+  D0 <- merge(D0, st[,.(responseid_hr=responseid,state_hr=state)],by="responseid_hr",all.x=TRUE)
+  D0 <- merge(D0, st[,.(responseid_eng=responseid,state_eng=state)],by="responseid_eng",all.x=TRUE) }
+D0[, size_tier_hr := fcase(firm_size_small_hr==1,"S",firm_size_mid_hr==1,"M",firm_size_large_hr==1,"L",default=NA_character_)]
+D0[, size_tier_eng:= fcase(firm_size_small_eng==1,"S",firm_size_mid_eng==1,"M",firm_size_large_eng==1,"L",default=NA_character_)]
+jp <- unique(matching_crosswalk_jobs[,.(arm,responseid_hr,responseid_eng)])
+schemes <- list("Baseline (all)"=D0,
+  "Same firm-size tier"=D0[!is.na(size_tier_hr)&!is.na(size_tier_eng)&size_tier_hr==size_tier_eng],
+  "Same subfield"=merge(D0,jp[,.(arm,responseid_hr,responseid_eng,jm=1)],by=c("arm","responseid_hr","responseid_eng"))[jm==1],
+  "Same URM policy"=D0[!is.na(firm_targets_any_urm_hr)&!is.na(firm_targets_any_urm_eng)&firm_targets_any_urm_hr==firm_targets_any_urm_eng],
+  "Same state"=if("state_hr"%in%names(D0)) D0[!is.na(state_hr)&!is.na(state_eng)&state_hr==state_eng] else D0[0])
+schemes <- schemes[sapply(schemes,function(x) nrow(x)>0)]
+hset <- list(6,9,"endo")
+hkey <- function(h) if(is.character(h)&&h=="endo") "Endog." else as.character(h)
+MM <- list(); for(nm in names(schemes)) for(h in hset) MM[[paste(nm,hkey(h),sep="||")]] <- run_cell(schemes[[nm]],h,3)
+```
+
+## Productivity of Hired by Matching Scheme ($k=3$)
+
+```{r match_prod, results='asis'}
+Mt <- rbindlist(lapply(names(MM), function(nm){ sp<-strsplit(nm,"\\|\\|")[[1]]; p<-MM[[nm]]$prod
+  data.table(Scheme=sp[1],`HR passes`=sp[2],
+    `Realistic - Control`=sprintf("%.3f%s",p["RC",1],star(p["RC",2])),
+    `Complete - Realistic`=sprintf("%.3f%s",p["CR",1],star(p["CR",2])),
+    `Complete - Control`=sprintf("%.3f%s",p["CC",1],star(p["CC",2])) )}))
+print(kable(Mt,format="latex",booktabs=TRUE,escape=TRUE,align="lcccc",row.names=FALSE) |>
+  kable_styling(latex_options="HOLD_position",font_size=9))
+```
+
+## Composition (Total Effect, Complete $-$ Control) by Matching Scheme ($k=3$, pp)
+
+```{r match_comp, results='asis'}
+MC <- rbindlist(lapply(names(MM), function(nm){ sp<-strsplit(nm,"\\|\\|")[[1]]; m<-MM[[nm]]$comp$CC
+  cs <- sprintf("%.1f%s", 100*m[,"est"], star(m[,"p"]))
+  dt<-as.data.table(t(cs)); setnames(dt, gsub("_"," ",demos)); cbind(data.table(Scheme=sp[1],`HR passes`=sp[2]), dt) }))
+print(kable(MC,format="latex",booktabs=TRUE,escape=TRUE,align="lccccccc",row.names=FALSE) |>
+  kable_styling(latex_options="HOLD_position",font_size=8))
+cat("\n\\par\\smallskip{\\footnotesize\\textit{$+ =$ blinding raises that group's hire probability. WM/WF/AM/AF/HM/HF $=$ White/Asian/Hispanic Male/Female.}}\n")
+```
